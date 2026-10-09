@@ -72,6 +72,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.8.1 — the case 1 tutorial lines that said to touch the Court Record Button now say to press
+  the R Button (and "Touch to see before and after" for the Hanging Scroll says Press L);
+  choice labels with quotation marks ("You were blinded?") showed parentheses instead;
+  `gs3_script.py --table en` now shows Phoenix's thoughts as ( ), and the DS font's hyphen,
+  quote and accented letters.
 * 0.8 — Witness Testimony / Cross Examination banners, the Testimony label, the
   cross-examination buttons and the OK / Back prompts in English.
 * 0.7 — Court Record in English: names and descriptions of all 211 evidence and profile

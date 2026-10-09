@@ -70,7 +70,6 @@ LABELS = {
 # text -> script character codes (same encoding as the dialogue text)
 def encode(text):
     out = []
-    quote_open = True
     for ch in text:
         if '0' <= ch <= '9': out.append(0x80 + ord(ch) - 48)
         elif 'A' <= ch <= 'Z': out.append(0x8a + ord(ch) - 65)
@@ -81,7 +80,7 @@ def encode(text):
         elif ch == "'": out.append(0x173)
         elif ch == '?': out.append(0xbf)
         elif ch == '!': out.append(0xbe)
-        elif ch == '"': out.append(0x165 if quote_open else 0x166); quote_open = not quote_open
+        elif ch == '"': out.append(0x682)          # straight double quote of the DS English font
         elif ch == '☆': out.append(0x17d)
         elif ch == 'é': out.append(0x68b)
         else: raise ValueError('no code for %r' % ch)

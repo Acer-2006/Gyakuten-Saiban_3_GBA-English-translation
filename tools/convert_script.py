@@ -167,6 +167,47 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
     if emap is not None: emap[len(e)] = len(out)
     return out
 
+# The DS script tells the player to touch things; on the GBA the same actions are buttons (the
+# Court Record opens with R, a piece of evidence's second page with L).  Each entry rewrites one
+# DS phrase; the notation is that of hacking/tools/gs3_script.py ({cmd args} in hex, text).
+GBA_WORDING = [
+    ('touching the{01}{03 1}Court Record Button', 'pressing the{01}{03 1}R Button'),
+    ('touch the{01}{03 1}Court Record Button', 'press the{01}{03 1}R Button'),
+    ('with the{01}{03 1}Court Record Button', 'with the{01}{03 1}R Button'),
+    ('Touch to see before and after{01}view under the Check screen.',
+     'Press L to see the before and{01}after view.'),
+]
+
+def notation_items(s):
+    """'text{03 1}more' -> converter items."""
+    from labels_en import encode
+    items = []; i = 0
+    while i < len(s):
+        if s[i] == '{':
+            j = s.index('}', i)
+            v = [int(x, 16) for x in s[i + 1:j].split()]
+            items.append(('c', v[0], tuple(v[1:]))); i = j + 1
+        else:
+            j = s.find('{', i); j = len(s) if j < 0 else j
+            items += [('t', c, ()) for c in encode(s[i:j])]; i = j
+    return items
+
+_WORDING = None
+def gba_wording(items, stats=None):
+    """Apply GBA_WORDING to a converted section (list of items); returns the new list."""
+    global _WORDING
+    if _WORDING is None:
+        _WORDING = [(notation_items(a), notation_items(b)) for a, b in GBA_WORDING]
+    for old, new in _WORDING:
+        k = 0
+        while k <= len(items) - len(old):
+            if items[k:k + len(old)] == old:
+                items = items[:k] + new + items[k + len(old):]; k += len(new)
+                if stats is not None: stats['gba_wording'] += 1
+            else:
+                k += 1
+    return items
+
 def items_to_words(items):
     ws = []
     for it in items:
@@ -206,10 +247,15 @@ def run_mem(ctx):
     for b in range(42):
         G, J, E = parsed[b]
         secs = {}; emaps = {}
+        label_secs = {sec for sec, off in E['labels'].values()}
         for s in G['present']:
             emap = {}
             conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
                                    tok(words(E['sections'][s]), ADS), argmap, labels=labels.get((b, s)), stats=stats, emap=emap)
+            reworded = gba_wording(conv, stats)
+            if reworded != conv and s in label_secs:
+                raise ValueError(f'bank {b} section {s}: GBA wording in a section with label entries')
+            conv = reworded
             secs[s] = pack(items_to_words(conv)); emaps[s] = (conv, emap)
         # label entries (command 0x36 targets): E's byte offset -> E item index -> output item -> byte offset
         new_labels = {}
@@ -232,7 +278,7 @@ def run_mem(ctx):
     for s in Graw['present']:   # keep the GBA section count (52); the DS has 54
         conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][s]), ADS),
                                tok(words(Eraw['sections'][s]), ADS), argmap, stats=stats)
-        secs[s] = pack(items_to_words(conv))
+        secs[s] = pack(items_to_words(gba_wording(conv, stats)))
     out['common'] = bk.build_bank(Graw['n'], secs, Graw['labels'], Graw['stale'])
     return out, dict(stats)
 

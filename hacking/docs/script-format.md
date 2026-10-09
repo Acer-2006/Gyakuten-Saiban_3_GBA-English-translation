@@ -144,7 +144,8 @@ shared with the English DS font, is:
 | `0x17d` | ☆ |
 | `0x17f` | space |
 | `0x681`, `0x682` | `-` and `"` (DS English font) |
-| `0x685`–`0x697` | accented letters (DS English font; `0x68b` = é) |
+| `0x683`–`0x68a` | `[ ] $ # > < = ■` (DS English font) |
+| `0x68b`–`0x697` | `é á ; ç à Ç û î è â ñ ï ê` (DS English font) |
 
 Everything else in `0x80`–`0x67f` is Japanese (kana, kanji, symbols). Use `gs3_font.py sheet`
 to render the whole font of your ROM with the code of every glyph, and build a table file from

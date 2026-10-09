@@ -83,7 +83,11 @@ def builtin_table(name='en'):
     for i in range(26): t[0xa4 + i] = chr(97 + i)
     t.update({0xbe: '!', 0xbf: '?', 0x161: '.', 0x16d: ':', 0x16f: ',', 0x173: "'", 0x17d: '☆', 0x17f: ' '})
     if name == 'en':
-        t.update({0x165: '“', 0x166: '”', 0x68b: 'é'})
+        # the DS English font: 0x165/0x166 are parentheses (Phoenix's thoughts), the straight
+        # double quote and the hyphen are extra glyphs 0x682 / 0x681
+        t.update({0x165: '(', 0x166: ')', 0x170: '+', 0x171: '/', 0x172: '*', 0x177: '%', 0x179: '~',
+                  0x17c: '&'})
+        for i, ch in enumerate('-"[]$#><=■éá;çàÇûîèâñïê'): t[0x681 + i] = ch
     else:
         for i, ch in enumerate(KANA): t[0xc0 + i] = ch
         t.update({0x163: '「', 0x164: '」', 0x165: '(', 0x166: ')', 0x167: '『', 0x168: '』', 0x169: '“', 0x16a: '”',
