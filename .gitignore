@@ -1,0 +1,12 @@
+# never commit game data or build products
+roms/
+out/
+extract/
+shots/
+build/
+*.gba
+*.nds
+*.bps
+*.ss
+*.dst
+__pycache__/
