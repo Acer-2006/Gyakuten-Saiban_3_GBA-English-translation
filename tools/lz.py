@@ -22,6 +22,8 @@ def decompress(d, off=0):
                 out.append(d[p]); p += 1
     return bytes(out), p - off  # data, compressed length consumed
 
+MAX_CHAIN = 128     # candidates tried per position (like zlib's max_chain); keeps long runs fast
+
 def compress(data, vram_safe=True):
     """Greedy LZ10 encoder (min disp 2 when vram_safe, as the GBA BIOS needs for VRAM)."""
     out = bytearray(struct.pack('<I', 0x10 | (len(data) << 8)))
@@ -35,7 +37,7 @@ def compress(data, vram_safe=True):
         if i + 3 > n: return 0, 0
         key = data[i:i + 3]
         cands = table.get(key, ())
-        for j in reversed(cands):
+        for j in reversed(cands[-MAX_CHAIN:]):
             disp = i - j
             if disp > 0x1000: break
             if disp < min_disp: continue

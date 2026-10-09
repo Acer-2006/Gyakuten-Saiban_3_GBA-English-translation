@@ -13,7 +13,7 @@ notes say so.
 | --- | --- |
 | [docs/script-format.md](docs/script-format.md) | script banks (including partial banks and label entries), tokens, the command table, character codes, choices and jumps |
 | [docs/text-engine.md](docs/text-engine.md) | the text engine: dispatcher, state struct, how a character is drawn, the box, captions, and every hook the English build uses |
-| [docs/graphics.md](docs/graphics.md) | chunked images (backgrounds, title), title menu sprites, name tags, the episode-select sheet, speech bubbles, the font |
+| [docs/graphics.md](docs/graphics.md) | chunked images (backgrounds, title), title menu sprites, name tags, the Court Record (GBA pictures and where the DS keeps its English ones), the episode-select sheet, speech bubbles, the font |
 | [docs/sound.md](docs/sound.md) | the MP2K driver tables, song and sample formats, which songs are the shouts |
 | [docs/memory-map.md](docs/memory-map.md) | ROM regions, free space, important RAM and VRAM addresses |
 | [docs/tools.md](docs/tools.md) | how to use the command-line tools and the emulator harness |

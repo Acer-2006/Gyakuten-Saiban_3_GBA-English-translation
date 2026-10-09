@@ -53,6 +53,50 @@ The sheet at `0x08181820` is raw 4bpp: 10 groups of `0x800` bytes, 5 tags per gr
 `group * 0x800 + k * 0xc0` (6 tiles, 192 bytes) and the bottom row at `+ 0x400`. The tag is
 drawn into BG1 rows 12–13 above the dialogue box.
 
+## Court Record
+
+**Item table: `0x08045f74`**, 211 entries of `{u32 image, u32 icon | detail << 16}`, indexed by
+item id (evidence and profiles share one id space; the inventory in RAM lists ids, see
+memory-map.md). `icon` selects the picture in the left box; `detail` is non-zero for items that
+have a second page opened with the L Button (photos, maps, letters).
+
+Each `image` is LZ: 5120 bytes, a 160×64 4bpp picture stored as ten 32×32 sprite cells, 5 across
+and 2 down, each cell 4×4 tiles row-major. It holds the item name on top and the description
+below it (Japanese: the name in 12-pixel kanji, three lines of text at a 16-pixel pitch). The
+picture is drawn at (80, 24) with OBJ palette 2: index 9 is the background, 15 the name
+(yellow), 8 the text (white), and columns 152–159 are index 0 (transparent; the right arrow sits
+there). Unused ids (69–73, 121–125, 192, 193, 195, 196, 204, 205) point at item 0's picture.
+
+The label next to the R icon under the picture, 人物ファイル on the evidence page and 証拠品ファイル
+on the profile page, is two raw 32×16 sprite cells each (512 bytes) at `0x0818ad20` and
+`0x0818af20`, OBJ palette 4 (white 12, outline 10, grey 11), DMA'd to OBJ tile `0x1a8`
+(`0x06013500`) by the code with literal pools at `0x08013988` and `0x080139cc`. The same raw
+sheet holds 決定 (`0x0818ab20`) and もどる (`0x0818ac20`), 32×16 each, and the cross-examination
+buttons from `0x0818a720`.
+
+The English build makes new pictures: the name is the DS version's name picture (copied pixel
+for pixel), the description is the DS text set again in Spleen 5x8 (`tools/smallfont.py`) so it
+fits 152 pixels. Where the DS says "Touch the Check Button", the GBA text says "Press L".
+
+### Where the DS version keeps them
+
+Item ids are the same in both versions. The arm9 has a table of 211 records of 24 bytes at
+`0x020a2368`: `{u16 icon, u16 name, u16 name, u16 info panel, u16 description, u16 detail, ...}`
+(icon and detail are the GBA's numbers). Per-language offsets into `data.bin` are at
+`0x020a44c0`, eight words for each of Japanese, English and English again; for English the
+fifth word is the first name picture and the eighth the first description picture. Both are
+plain texture files laid out one after another:
+
+```
+u8 format (3 = 16 colours), u8 log2(width/8), u8 log2(height/8), u8 0,
+u32 image offset (0x14), u32 image size, u32 palette offset, u32 palette size
+```
+
+Names are 128×16 (`0x434` bytes per file; text index 2), descriptions 256×64 (`0x2034`). The
+description pictures were drawn with the dialogue font, so `tools/dsimgtext.py` reads their text
+back exactly (see its docstring for the two quirks of the tool that drew them). The info panels
+("Type: ...", "Age: ...") use a small font that is not in the ROM and are not used.
+
 ## Episode-select screen
 
 The sprite sheet is ten LZ blocks of 3840 bytes each:

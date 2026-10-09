@@ -10,8 +10,8 @@ the two games:
 * `gs3_jp.gba` — Gyakuten Saiban 3 (Japan), 8 MB, CRC32 51B6CF22
 * `tt_us.nds`  — Phoenix Wright: Ace Attorney – Trials and Tribulations (USA), game code YG3E
 
-The English script, font, name tags, menu labels and other English material are read out of the
-DS image while the ROM is built. This tool only contains the code changes (the new text engine,
+The English script, font, name tags, Court Record, menu labels and other English material are
+read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
 the script converter and the hooks); nothing from either game is stored in it.
 
 ## Use
@@ -28,12 +28,16 @@ flash cart.
 * Variable-width English font (the DS font) in a three-line text box.
 * The complete DS English script, including the choice-menu options.
 * English name tags from the DS version.
+* Court Record in English: every evidence and profile name (the DS name pictures) and
+  description (the DS text, set in a small font so it fits the GBA panel; "Touch the Check
+  Button" becomes "Press L"), and the R Profiles / R Evidence switch.
 * Caption screens ("5 Years Earlier", date/location cards) in English.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
 Still Japanese for now: the in-court speech bubbles, the testimony / cross-examination banners,
-the investigation and court-record buttons, and the episode titles on the episode-select screen.
+the investigation and cross-examination buttons, the pages behind the L Button (photos, maps,
+letters), and the episode titles on the episode-select screen.
 
 ## Your own voice clips (optional)
 
@@ -50,6 +54,11 @@ own for some or all of them:
 
 The `voices/` folder is ignored by git, so recordings stay on your machine.
 
+## Credits
+
+The Court Record descriptions use Spleen 5x8 by Frederic Cambus (BSD 2-Clause licence, see
+`tools/fonts/LICENSE.spleen`).
+
 ## Hacking the game yourself
 
 `hacking/` holds format notes (script, text engine, graphics, sound, memory map) and
@@ -60,6 +69,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.7 — Court Record in English: names and descriptions of all 211 evidence and profile
+  entries, taken from your DS ROM while building (the DS stores the descriptions as pictures;
+  the build reads their text back with the DS font and sets it again for the GBA panel), and the
+  R Profiles / R Evidence label.
 * 0.6.1 — script and box fixes: the DS command `0x3a` is now read with its three arguments,
   which fixes about 20 boxes in cases 3–5 where a word was cut ("ini" for "Bikini"), a stray
   character box appeared, or two boxes ran together; the GBA's own `0x53` commands are kept; no
