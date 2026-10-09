@@ -23,6 +23,9 @@ Requires Python 3.8 or newer, nothing else.
 Takes about 20–30 seconds. The output `gs3_en.gba` (16 MB) runs in any GBA emulator or on a
 flash cart.
 
+In-game saves carry over to newer builds. Emulator savestates do not: a savestate made with an
+older build can show a garbled text box until the next page of text.
+
 ## What the English build changes
 
 * Variable-width English font (the DS font) in a three-line text box.
