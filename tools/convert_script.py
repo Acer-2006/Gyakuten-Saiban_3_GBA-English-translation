@@ -15,9 +15,12 @@ from mes import load_bank, save_bank, words, pack
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 A = {int(k, 16): v for k, v in json.load(open(os.path.join(ROOT, 'data/cmd_args.json'))).items()}
-ADS = dict(A); ADS.update({0x74: 2, 0x75: 4, 0x76: 2, 0x77: 2, 0x78: 1})
+ADS = dict(A); ADS.update({0x74: 2, 0x75: 4, 0x76: 2, 0x77: 2, 0x78: 1,
+                           0x3a: 3})   # DS 0x3a is (slot, x, y); the GBA packs it as (slot<<8, x<<8|y)
 TEXT_CMDS = {0x01, 0x02, 0x03, 0x0b, 0x0c, 0x2d, 0x2e, 0x45}   # emitted verbatim from E
-DS_ONLY = {0x53, 0x74, 0x75, 0x76, 0x77, 0x78}                 # never emitted
+DS_ONLY = {0x74, 0x75, 0x76, 0x77, 0x78}                       # never emitted
+# 0x53 exists on both (33 uses on the GBA, 117 on the DS): it is kept where it lines up with a GBA
+# 0x53 and dropped where the DS added it.
 CHOICE_END = {0x08, 0x09, 0x0a}
 
 def tok(ws, tab):
@@ -61,6 +64,7 @@ def learn_argmap(pairs):
         m = align(g, j, False)
         for jk, gk in m.items():
             gi, ji = g[gk], j[jk]
+            if len(gi[2]) != len(ji[2]): continue      # layout differs (0x3a), see ds_to_gba_args
             for pos, (ga, ja) in enumerate(zip(gi[2], ji[2])):
                 mp[(gi[1], pos)][ja][ga] += 1
     out = {}
@@ -71,7 +75,15 @@ def learn_argmap(pairs):
         out[key] = m
     return out
 
+def ds_to_gba_args(cmd, args):
+    """Commands whose argument layout differs between the DS and GBA scripts."""
+    if cmd == 0x3a and len(args) == 3:          # (slot, x, y) -> (slot << 8, x << 8 | y)
+        return (args[0] << 8 & 0xffff, (args[1] & 0xff) << 8 | (args[2] & 0xff))
+    return None
+
 def map_args(cmd, args, argmap):
+    fixed = ds_to_gba_args(cmd, args)
+    if fixed is not None: return fixed
     res = []
     for p, a in enumerate(args):
         m = argmap.get((cmd, p))
@@ -131,6 +143,10 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
             if stats is not None: stats['dropped_dsonly'] += 1
             continue
         jk = je.get(i)
+        if jk is None and c == 0x53:
+            i += 1
+            if stats is not None: stats['dropped_dsonly'] += 1
+            continue
         if jk is None:
             # EN-only command: translate args
             out.append(('c', c, map_args(c, it[2], argmap)))

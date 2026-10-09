@@ -299,8 +299,22 @@ void vwf_frame(void) {
     }
     labels_hide();
     vs.lbl_row0 = -1;
+    if (!box_open()) {
+        vs.arrow_on = 0;
+        /* The engine writes its arrow cells (row 19, columns 14-15: tile 0x24/0x25 = arrow,
+           0x09 = plain bottom edge) even after the box has been cleared; with the box gone
+           they would stay on screen as a 16x8 scrap of frame.  Remove them when they are the
+           only thing left on that row. */
+        volatile u16* r = &BG1MAP[(CV_MAPROW + 5) * 32];
+        u32 e = r[14] & 0x3ff;
+        if ((e == 0x09 || e == 0x24) && (r[8] & 0x3ff) == 0 && (r[12] & 0x3ff) == 0 &&
+            (r[13] & 0x3ff) == 0 && (r[16] & 0x3ff) == 0) {
+            r[14] = 0; r[15] = 0;
+            SYS_BGDIRTY |= 2;
+        }
+        return;
+    }
     if (!vs.mapped) return;
-    if (!box_open()) { vs.arrow_on = 0; return; }
     u32 e = BG1MAP[(CV_MAPROW + 5) * 32 + 14] & 0x3ff;
     if (e == 0x24) vs.arrow_on = 1;
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;

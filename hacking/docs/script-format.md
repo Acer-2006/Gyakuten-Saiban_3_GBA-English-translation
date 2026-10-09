@@ -137,13 +137,13 @@ shared with the English DS font, is:
 | `0xa4`–`0xbd` | a–z |
 | `0xbe`, `0xbf` | `!`, `?` |
 | `0x161` | `.` |
-| `0x165`, `0x166` | opening / closing double quote |
+| `0x165`, `0x166` | `(` and `)` (Phoenix's thoughts are in parentheses) |
 | `0x16d` | `:` |
 | `0x16f` | `,` |
 | `0x173` | apostrophe |
 | `0x17d` | ☆ |
 | `0x17f` | space |
-| `0x681`, `0x682` | dash-like characters (DS English font) |
+| `0x681`, `0x682` | `-` and `"` (DS English font) |
 | `0x685`–`0x697` | accented letters (DS English font; `0x68b` = é) |
 
 Everything else in `0x80`–`0x67f` is Japanese (kana, kanji, symbols). Use `gs3_font.py sheet`
@@ -155,5 +155,14 @@ it for `gs3_script.py --table`.
 Phoenix Wright: Ace Attorney – Trials and Tribulations keeps its script in `mes_all.bin`:
 `[u32 count][u32 offset, u32 size] × 86`, each entry an LZ10 block. Banks `2b` / `2b+1` are the
 Japanese / English text of chapter bank `b` (0–41); 84 / 85 are the common bank. The DS
-commands `0x74`–`0x78` take 2, 4, 2, 2, 1 arguments and do not exist on the GBA; `0x53` is also
-DS-only.
+commands `0x74`–`0x78` take 2, 4, 2, 2, 1 arguments and do not exist on the GBA.
+
+Two commands differ between the versions:
+
+* `0x3a` takes **three** arguments on the DS, `(slot, x, y)`, and two on the GBA, which packs them
+  as `(slot << 8, x << 8 | y)`: DS `3a 1 a1 12` is GBA `3a 100 a112`. Reading the DS script with
+  two arguments desynchronises it (the third argument is taken for a character or a command); the
+  DS game's own argument table at `0x020a1b44` (arm9) says 3.
+* `0x53` (no arguments) exists on both: 27 uses in the GBA chapter banks, 117 in the DS ones. The
+  handler (`0x080235b9`) clears `SYS+0x256` and calls `0x0801a8b4(2)`. The converter keeps the
+  GBA's uses and drops the ones the DS added.

@@ -60,6 +60,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.6.1 — script and box fixes: the DS command `0x3a` is now read with its three arguments,
+  which fixes about 20 boxes in cases 3–5 where a word was cut ("ini" for "Bikini"), a stray
+  character box appeared, or two boxes ran together; the GBA's own `0x53` commands are kept; no
+  more 16×8 scrap of box frame left at the bottom of the screen after the text box closes.
 * 0.6 — `hacking/` notes and tools. Build fixes: the three label jumps (command `0x36`) now land
   where they should, partial banks keep their structure, the common bank's true size is used,
   and a bank directory at `0x08800000` lets tools edit the English text.
