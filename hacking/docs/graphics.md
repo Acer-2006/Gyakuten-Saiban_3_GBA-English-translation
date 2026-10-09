@@ -33,6 +33,38 @@ copyright rows at the bottom use them. The English build rebuilds that object wi
 `gs3_image.py list ROM` prints the table with the flavour and size of each object;
 `gs3_image.py extract` / `build` convert to and from PNG.
 
+## Pictures with writing in them
+
+The DS keeps its full-screen pictures in `data.bin` as small archives:
+
+```
+u32 7, then 7 x {u32 offset, u32 size}     ; offsets relative to the archive
+pair 0:     palette (0x20 bytes, 16 colours, or 0x200, 256 colours)
+pairs 1-6:  LZ chunks of 8x8 tiles in 1D order: 256x192, or 512x192 for the wide pictures
+```
+
+The arm9 lists them at `0x0209dce4`: 180 records `{u32 offset, u32 size, u32 flags, u32 index}`
+in the DS's own order (flags bit 31 = 16 colours, as on the GBA). `index` is `0x8000` for a
+picture that is the same in both languages; otherwise it selects one of the 57 pictures that
+differ, listed as `{u32 offset, u32 size}` pairs twice in the same order: Japanese at
+`0x0209d924`, English at `0x0209db04` (the Japanese table ends with a zero pair).
+
+Most of them are the GBA picture with a border: the GBA's 240×160 is the Japanese DS picture cut
+at (8, 16), the wide 480×160 ones at (16, 16), tile for tile and with the same palette. The
+exceptions: a few are another quantisation or palette order of the same art (the store front,
+the calling card, the river map), three are the GBA picture enlarged by 16/15 (the newspaper, the
+urn twice), the pages of text were set again for the DS screen, and the burnt letter's paper is
+8 pixels wider on the GBA. Of the 57, five are the DS episode title cards and two its save-error
+screens, which the GBA does not have; ten look the same in both languages, and one changes only
+outside the part the GBA shows.
+
+`patches/pictures.py` pairs 39 GBA images with their DS pictures and changes the GBA picture
+where the Japanese and English DS ones differ; it sets the English text of the pages into the GBA
+pages (keeping the GBA's page numbers and arrows) and uses the whole English calling card and
+newspaper. The rebuilt objects keep the original chunk sizes (chunks that did not change keep
+their compressed bytes, `chunkimg.build(..., old=...)`), and every image-table entry that used an
+old object is pointed at the new one.
+
 ## Sprite text on the title screen
 
 The title menu items are raw 4bpp sprites, each 64×16 pixels stored as two 32×16 one-dimensional

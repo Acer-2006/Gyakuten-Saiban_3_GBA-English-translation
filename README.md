@@ -10,8 +10,8 @@ the two games:
 * `gs3_jp.gba` — Gyakuten Saiban 3 (Japan), 8 MB, CRC32 51B6CF22
 * `tt_us.nds`  — Phoenix Wright: Ace Attorney – Trials and Tribulations (USA), game code YG3E
 
-The English script, font, name tags, Court Record, menu labels, talk topics, episode titles and
-other English material are read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
+The English script, font, name tags, Court Record, menu labels, talk topics, episode titles,
+pictures and other English material are read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
 the script converter and the hooks); nothing from either game is stored in it.
 
 ## Use
@@ -40,13 +40,15 @@ flash cart.
 * Episode select: the episode titles (from the DS script) and EPISODE 1–5 labels.
 * Save screen: SAVE header, Yes / No and the note under them.
 * Unlock Successful when the last Psyche-Lock breaks, and the NOT GUILTY / GUILTY verdict.
+* Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
+  summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
+  exhibition poster and the signs in the backgrounds.
 * Caption screens ("5 Years Earlier", date/location cards) in English; lines shown without the
   text box (the episode-select prompt, "To be continued") sit where the original puts them.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
-Still Japanese for now: the pages behind the L Button (photos, maps, letters) and other
-pictures with writing in them, and one data screen in a later episode (脱獄囚に関するデータ).
+Still Japanese for now: one data screen in a later episode (the escaped convict's data).
 
 ## Your own voice clips (optional)
 
@@ -78,6 +80,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11 — pictures with writing in them in English: the L Button pages, letters, maps, the
+  newspapers, the calling card, the poster and the signs in the backgrounds (39 pictures, taken
+  from your DS ROM while building).
 * 0.10.1 — browsing the Court Record no longer leaves garbage in the text box: the Court Record
   borrows the text box's tiles to slide between items; the box now shows empty during the slide
   and the text comes back afterwards.
