@@ -116,12 +116,66 @@ As observed in OAM while the screen is up (not cross-checked against the loader 
 * unselected box: palette 12, tiles 540–663;
 * the "episode n" label: objects 125–127, tiles 128–136, palette 13, at y = 12.
 
-## Speech bubbles (court shouts)
+## Effects archive: banners and speech bubbles
 
-The bubble shown with a shout is seven sprites, objects 105–111, palette 11, tiles 488–712,
-placed at (x, y, w×h): (57, 132, 32×16), (25, 132, 32×16), (−7, 132, 32×16), (57, 68, 32×64),
-(−7, 68, 64×64), (−7, 4, 64×64), (57, 4, 32×64). The tile data was not found as a plain LZ block
-in the ROM; it most likely lives inside one of the 4bpp chunked objects of the image table.
+Animated effects (the testimony and cross-examination banners, the shout bubbles, and many
+others) are driven by an **animation table** around `0x08046b3c`–`0x08047cb0`: 20-byte entries
+
+```
+u32 position (y << 16 | x), u32 flags, u32 archive, u32 VRAM destination, u32 frame data
+```
+
+Nearly all of them use the **effects archive at `0x0869c8f0`**. The frame data says which
+sub-archive (offset inside the archive) holds its pictures:
+
+```
+frame data:   u16 0, u16 frames, u32 sub-archive offset
+              frames x {u16 offset, u16 time, u32 0}
+              at each offset: u16 sprites, u16 0, then per sprite
+                  u16 position (y << 8 | x, signed bytes from the anchor)
+                  u16 attribute: top nibble size << 2 | shape (as in OAM), 0x0800 = second
+                      palette of the sub-archive, low bits = cell number
+sub-archive:  u16 palettes, u16 0x8000, 32 bytes per palette,
+              u32 cell offset[n] (from the start of this table), cells
+cell:         a 4bpp sprite (1D tile order) packed with a 16-bit RLE: token u16 t, then one
+              u16 repeated t & 0x7fff times (t & 0x8000 set) or t literal u16s
+```
+
+The pictures are decompressed into OBJ VRAM at the destination each time a frame is shown.
+
+**Testimony / cross-examination banners** (証言開始 blue, 尋問開始 red): sub-archive offset 0,
+two palettes, 19 cells: the halves 開始 (0), 証言 (1), 尋問 (13) as 64×32, and 32×32 quarters
+plain and with a white sheen (2–12 for 証言開始, 14–18 for 尋問). Six table entries use it:
+`0x080471a4` (sheen over 証言開始, frames `0x086de2b8`), `0x080471b8` (sheen over 尋問開始,
+`0x086de3b0`), and the halves sliding in, `0x080471cc` (証言), `0x080471e0` (開始), `0x080471f4`
+(尋問), `0x08047208` (開始). The two banners share the right half 開始. The English build writes
+a new sub-archive with 26 cells (the cross-examination banner gets its own right half in cells
+19–25), points the six entries at it and renumbers the cells in the two cross-examination frame
+blocks. The pieces use OBJ tiles `0x240`–`0x2bf`, so a banner can be at most 128×32.
+
+**Speech bubbles** (異議あり！, 待った！, くらえ！): sub-archives `0x28e4`, `0x3c44`, `0x4e24`,
+one palette each, 7 cells (32×64, two 64×64, 32×64, three 16×32), drawn by the entries from
+`0x08046b3c` to destination `0x06013d00` (OBJ tiles `0x1e8`–`0x2bf`, palette 11) with frames
+`0x086de558`, `0x086de590` and `0x086de5c8`. The text is written vertically inside a tall
+spiky bubble. A copy of the banner kanji, as 16×16 blocks (four tiles each), also sits raw at
+`0x08186b20`; the game does not use it for the banners.
+
+**Testimony label** (証言中, top left during a testimony): raw 64×32 sprite at `0x08189f20`
+(1D tile order), OBJ palette 5, white (2) with a green outline (1).
+
+## Buttons
+
+Raw 4bpp sprites, 32×16 one-dimensional cells (256 bytes):
+
+| Address | Size | Japanese | Shown |
+| --- | --- | --- | --- |
+| `0x0818a720` | 64×16 | L ゆさぶる | cross-examination, top left; white box (1), lettering 3 / 2, OBJ palette 5 |
+| `0x0818a920` | 64×16 | つきつける R | cross-examination, top right |
+| `0x0818ab20` | 32×16 | 決定 | Court Record when presenting, next to the A icon; white (12), outline (10), OBJ palette 4 |
+| `0x0818ac20` | 32×16 | もどる | next to the B icon |
+
+The cross-examination pair is DMA'd (1 KB) to OBJ tile `0x180` with palette `0x081988d0` by the
+code at `0x0800ddd0`, `0x0800eb6c`, `0x0801e5a8` and `0x080224f4`.
 
 ## Font
 

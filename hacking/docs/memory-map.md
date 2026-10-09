@@ -9,6 +9,7 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x08000000`–`0x080000c0` | header (title `GYAKUTEN_SA3`, code `A3JJ`) |
 | `0x080000c0`–`0x0803c000` approx. | code (Thumb, a little ARM): game code to about `0x08030000`, the text engine around `0x0801e000`–`0x08023000`, the sound driver and BIOS wrappers `0x08036000`–`0x0803b000` (`m4aSongNumStart` `0x08038bd0`, LZ77-to-WRAM wrapper `0x0803a048`) |
 | `0x08045f74` | Court Record item table (211 × {LZ picture, icon \| detail << 16}, see graphics.md) |
+| `0x08046b3c`–`0x08047cb0` | animation table, 20-byte entries {position, flags, archive, VRAM destination, frame data} (see graphics.md, effects archive) |
 | `0x08049834`, `0x0804991c` | per-command property tables (u16 × 121) |
 | `0x08049b38` | chapter table: 25 pointers to script banks |
 | `0x080547f4`, `0x08054824` | MP2K player table, song table (406 entries) |
@@ -23,6 +24,8 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x0823e7a8`–`0x0848xxxx` | chunked image objects (backgrounds) and other compressed graphics |
 | `0x08254d24`–`0x0825c000` approx. | episode-select sprite sheet (10 LZ blocks) |
 | `0x0826deb0` | title screen image object |
+| `0x0869c8f0` | effects archive: sub-archives of RLE-packed sprite cells for banners, shout bubbles and other effects |
+| `0x086de2b8`– | animation frame data |
 | `0x086e3578`–`0x086e5bc4` | common script bank (raw) |
 | `0x086e5bc4`–`0x087ff0d5` | 44 compressed script banks |
 

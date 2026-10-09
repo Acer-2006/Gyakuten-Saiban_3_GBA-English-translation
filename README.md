@@ -31,13 +31,16 @@ flash cart.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
   description (the DS text, set in a small font so it fits the GBA panel; "Touch the Check
   Button" becomes "Press L"), and the R Profiles / R Evidence switch.
+* Witness Testimony / Cross Examination banners (bold italic lettering after the DS ones), the
+  Testimony label, the cross-examination buttons (L Press / Present R) and the OK / Back
+  prompts when presenting.
 * Caption screens ("5 Years Earlier", date/location cards) in English.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
-Still Japanese for now: the in-court speech bubbles, the testimony / cross-examination banners,
-the investigation and cross-examination buttons, the pages behind the L Button (photos, maps,
-letters), and the episode titles on the episode-select screen.
+Still Japanese for now: the speech bubbles (異議あり！ etc.), the investigation menu buttons, the
+pages behind the L Button (photos, maps, letters), and the episode titles on the episode-select
+screen.
 
 ## Your own voice clips (optional)
 
@@ -69,6 +72,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.8 — Witness Testimony / Cross Examination banners, the Testimony label, the
+  cross-examination buttons and the OK / Back prompts in English.
 * 0.7 — Court Record in English: names and descriptions of all 211 evidence and profile
   entries, taken from your DS ROM while building (the DS stores the descriptions as pictures;
   the build reads their text back with the DS font and sets it again for the GBA panel), and the
