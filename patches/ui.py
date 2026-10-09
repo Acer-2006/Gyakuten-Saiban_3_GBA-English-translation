@@ -44,6 +44,10 @@ SAVE_BG, SAVE_FILL, SAVE_OUTLINE, SAVE_PLAIN = 9, 3, 8, 0x40
 # palette 9 for the highlighted one, 10 for the other; 12 fill, dark lettering)
 YESNO, YESNO_TEXT = 0x0819a070, ('Yes', 'No')
 YESNO_FILL, YESNO_INK = 12, 4
+# the continue screen (after Continue on the title) in the same style, two 128x32 boxes of two
+# 64x32 sprites each, at (56, 98) and (56, 130): 中断したところから (from where the game was
+# suspended) and この章のはじめから (from the start of this part)
+CONTINUE, CONTINUE_TEXT = 0x08199070, ('Resume Play', 'Restart Part')
 # the note under them (※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。): 0x0818e720,
 # 80 tiles shown as a 160x32 line at (40, 128): two 64x32 sprites, then a 32x32 column of four
 # 32x8 strips whose tiles are stored in the order of rows 0, 2, 1, 3; OBJ palette 13, white (1)
@@ -53,22 +57,32 @@ HELP_LINES = ('You can save at any time during', 'the game by pressing START.')
 HELP_HIGHLIGHT = 'START'
 HELP_FILL, HELP_HL, HELP_OUTLINE = 1, 6, 5
 
+def box_button(rom, font, addr, width, text):
+    """A box button of `width` // 64 sprites of 64x32 (1D): rows 6-25 and columns 2 to width - 4
+    are the inside of the box; the text goes there, centred and bold."""
+    n = width // 64
+    grid = [sum((unpack_cells(rom.read(addr + 1024 * i, 1024), 64, 32, 64, 32)[y] for i in range(n)), [])
+            for y in range(32)]
+    if grid[6][2] != YESNO_FILL or grid[24][width - 4] != YESNO_FILL:
+        raise SystemExit(f'ui: unexpected box button at {addr:#x}')
+    for y in range(7, 25):
+        for x in range(3, width - 4):
+            grid[y][x] = YESNO_FILL
+    w = font.measure(text) + 1
+    if w > width - 7: raise SystemExit(f'ui: {text!r} does not fit its button')
+    g = textgfx.render(font, text, w + 1, 16, fill=1, align='left')
+    x0 = 2 + (width - 4 - w) // 2
+    for y in range(16):
+        for x in range(w):
+            if g[y][x] or (x and g[y][x - 1]): grid[8 + y][x0 + x] = YESNO_INK   # bold
+    rom.write(addr, b''.join(textgfx.sprite_cells([r[64 * i:64 * i + 64] for r in grid], 64, 32)
+                             for i in range(n)), 'button ' + text)
+
 def yes_no(rom, font):
     for k, text in enumerate(YESNO_TEXT):
-        addr = YESNO + 1024 * k
-        grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)
-        if grid[6][2] != YESNO_FILL or grid[24][60] != YESNO_FILL:
-            raise SystemExit('ui: unexpected Yes / No button')
-        for y in range(7, 25):                   # inside the box: rows 6-25, columns 2-60
-            for x in range(3, 60):
-                grid[y][x] = YESNO_FILL
-        w = font.measure(text) + 1
-        g = textgfx.render(font, text, w + 1, 16, fill=1, align='left')
-        x0 = 2 + (60 - w) // 2
-        for y in range(16):
-            for x in range(w):
-                if g[y][x] or (x and g[y][x - 1]): grid[8 + y][x0 + x] = YESNO_INK   # bold
-        rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'save ' + text)
+        box_button(rom, font, YESNO + 1024 * k, 64, text)
+    for k, text in enumerate(CONTINUE_TEXT):
+        box_button(rom, font, CONTINUE + 2048 * k, 128, text)
 
 def help_note(rom):
     cv = [[0] * 160 for _ in range(32)]
@@ -169,4 +183,5 @@ def apply(rom, ctx):
     save_header(rom)
     yes_no(rom, font)
     help_note(rom)
-    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn; save screen header, Yes / No and note")
+    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn; save screen header, Yes / No and note; "
+          f"continue screen {' / '.join(CONTINUE_TEXT)}")

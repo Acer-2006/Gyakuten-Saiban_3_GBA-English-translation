@@ -214,6 +214,17 @@ def gba_wording(items, stats=None):
                 k += 1
     return items
 
+# The common bank: the GBA's has 52 sections, the DS's 54. The DS added two system messages as
+# sections 7 and 8; GBA section s is DS section s up to 6 and DS section s + 2 from 7 on. The game's
+# code jumps to common sections by number (the chapter names of the continue screen, 7-31; the
+# investigation's nothing-to-examine line, 32; the court's responses to wrong evidence, 35-48), so
+# the English common bank keeps the GBA numbering.
+COMMON_SECTIONS = (52, 54)
+COMMON_DS_ONLY = (7, 8)
+
+def ds_common_section(s):
+    return s if s < COMMON_DS_ONLY[0] else s + len(COMMON_DS_ONLY)
+
 def items_to_words(items):
     ws = []
     for it in items:
@@ -238,8 +249,11 @@ def run_mem(ctx):
         for s in G['present']:
             pairs.append((tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS)))
     Graw = bk.parse_bank(ctx.gba_common); Jraw = bk.parse_bank(ctx.ds_banks[84]); Eraw = bk.parse_bank(ctx.ds_banks[85])
+    if (Graw['n'], Jraw['n'], Eraw['n']) != COMMON_SECTIONS + COMMON_SECTIONS[1:] or \
+            any(ds_common_section(s) not in Jraw['present'] for s in Graw['present']):
+        raise SystemExit('convert: unexpected common bank layout')
     for s in Graw['present']:
-        pairs.append((tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][s]), ADS)))
+        pairs.append((tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][ds_common_section(s)]), ADS)))
     argmap = learn_argmap(pairs)
     stats = Counter()
     gba_menus = {}
@@ -281,9 +295,10 @@ def run_mem(ctx):
         stale = {i: bk.entries(out[m])[i] for i in G['stale']} if m != b and len(bk.entries(out[m])) == G['n'] else G['stale']
         out[b] = bk.build_bank(G['n'], secs, new_labels, stale)
     secs = {}
-    for s in Graw['present']:   # keep the GBA section count (52); the DS has 54
-        conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][s]), ADS),
-                               tok(words(Eraw['sections'][s]), ADS), argmap, stats=stats)
+    for s in Graw['present']:   # GBA numbering (see COMMON_DS_ONLY)
+        d = ds_common_section(s)
+        conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][d]), ADS),
+                               tok(words(Eraw['sections'][d]), ADS), argmap, stats=stats)
         secs[s] = pack(items_to_words(gba_wording(conv, stats)))
     out['common'] = bk.build_bank(Graw['n'], secs, Graw['labels'], Graw['stale'])
     return out, dict(stats)

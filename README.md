@@ -23,8 +23,9 @@ Requires Python 3.8 or newer, nothing else.
 Takes about 20–30 seconds. The output `gs3_en.gba` (16 MB) runs in any GBA emulator or on a
 flash cart.
 
-In-game saves carry over to newer builds. Emulator savestates do not: a savestate made with an
-older build can show a garbled text box until the next page of text.
+In-game saves are tied to the build for now: a save made with an older build can resume at the
+wrong place if that part of the script changed in between. Emulator savestates made with an older
+build can show a garbled text box until the next page of text.
 
 ## What the English build changes
 
@@ -41,7 +42,8 @@ older build can show a garbled text box until the next page of text.
 * Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
   destinations (the DS version's pictures, copied into the GBA boxes).
 * Episode select: the episode titles (from the DS script) and EPISODE 1–5 labels.
-* Save screen: SAVE header, Yes / No and the note under them.
+* Save screen: SAVE header, Yes / No and the note under them; the continue screen names the
+  part you saved in and offers Resume Play / Restart Part.
 * Unlock Successful when the last Psyche-Lock breaks, and the NOT GUILTY / GUILTY verdict.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
@@ -82,6 +84,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.6 — fix: the shared script lines the game calls up by number were two places off from
+  the DS ones from the continue screen on (the DS added two messages there). Examining a spot
+  with nothing in it showed a debug line and the game stopped; presenting the wrong evidence
+  in court played the wrong response; the continue screen showed a DS error message instead
+  of the part you saved in. The continue screen's two buttons are in English (Resume Play,
+  Restart Part).
 * 0.11.5 — the metal detector tutorial in case 5 gives the GBA controls (the display turns red,
   press the A Button) instead of the DS touch screen's.
 * 0.11.4 — lines that trail off (Ron's mumbling) fade out as in the original.

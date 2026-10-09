@@ -189,6 +189,13 @@ state back, then calls `0x08020024`, which redraws text sprites from the records
 * はい / いいえ: `0x0819a070`, two 64×32 sprites (1D) in the Talk-topic box style, DMA'd to OBJ
   tile `0x1e0`; OAM entries 40 and 41 at (48, 96) and (128, 96), palette 9 for the highlighted
   one and 10 for the other.
+* The continue screen (Continue on the title) uses the same screen: the box shows the name of
+  the part the save was made in (common section 7 + chapter, see script-format.md) and two
+  128×32 buttons in the same style sit at (56, 98) and (56, 130), each two 64×32 sprites:
+  中断したところから (where the game was suspended) at `0x08199070` and この章のはじめから (the
+  start of this part) at `0x08199870`, OBJ tiles `0x1a0`–`0x21f`, OAM entries 38–41. The box
+  inside is index 12 from row 6 to 25 and column 2 to 125. The English build writes Resume Play
+  and Restart Part.
 * The note ※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。: `0x0818e720`, 80 tiles
   at OBJ tile `0x220`, a 160×32 line at (40, 128): two 64×32 sprites, then a 32×32 column of four
   32×8 sprites whose tiles are stored in the order of rows 0, 2, 1, 3. OBJ palette 13

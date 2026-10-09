@@ -14,6 +14,23 @@ The script is split into **44 chapter banks** plus one **common bank**.
 * The common bank is **not** compressed: `0x086e3578`, `0x264c` bytes (it ends where bank 0 starts), 52 sections. It holds the
   sections that every chapter can jump to (section numbers below 0x80, see below).
 
+The game's code jumps to most common sections by number (`movs r0, #n` before `bl 0x0801fcd8`):
+
+| Sections | Used for |
+| --- | --- |
+| 0–6 | system messages: the two save questions (0, 1), the episode-select prompt (2), save failed (3), erase all data (4), a new episode (5), suspending (6) |
+| 7–29 | the continue screen: the name of the part the save was made in, section 7 + the chapter number `SYS+0xc1` (`0x0800d860`) |
+| 30, 31 | debug court / debug investigation |
+| 32, 33 | Examine with nothing there (`0x08010c00`; chapters 14 and 15 jump to sections of their own) |
+| 34 | a game-over line (the penalty bar running out goes to a section of the chapter bank instead, from the table at `0x08045bf2`) |
+| 35–48 | the court's response to wrong evidence, one sequence per attorney and courtroom (`0x08012c02`–`0x08012ce4`, `0x0800ec44`) |
+| 49, 50 | the text of the escaped convict's data screen (episode 4) |
+| 51 | a dummy |
+
+The DS common bank has 54 sections: it adds two system messages as sections 7 and 8, so GBA
+section *n* is DS section *n* up to 6 and DS section *n* + 2 from 7 on. The English build keeps
+the GBA numbering (`tools/convert_script.py`, `ds_common_section`).
+
 The game refers to the banks from two places:
 
 | Where | What |
