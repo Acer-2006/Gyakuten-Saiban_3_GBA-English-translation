@@ -295,11 +295,14 @@ static void label_draw_char(u32 code, int col, int row) {
         u32 sec = TXT_SECTION;
         vs.lbl_sys = (sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31));
         vs.lbl_align = TXT_ALIGN & 0xf;
-        vs.lbl_low = TXT_1A == 0;
         vs.lbl_free = (TXT_FLAGS & 4) ? 1 : 0;
         vs.lbl_fx = TXT_OFSX; vs.lbl_fy = TXT_OFSY;
         for (int i = 0; i < LBL_LINES; i++) vs.lbl_full[i] = 0;
         vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
+        /* alignment-2 lines sit at y 71 while TXT+0x1a is 0, which it is until the engine
+           reaches the first new line: a one-line caption stays there, a longer one moves up
+           to y 62 once its second line starts; the English text goes there from the start */
+        vs.lbl_low = vs.lbl_rows - vs.lbl_row0 <= 1;
     }
     int L = row - vs.lbl_row0;
     if (L < 0 || L >= LBL_LINES) return;

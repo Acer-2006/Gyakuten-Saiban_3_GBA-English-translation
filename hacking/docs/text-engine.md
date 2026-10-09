@@ -92,7 +92,9 @@ episode is picked, with its prompt still on the page). Where it puts them:
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
   messages: save prompts, the chapter names): y − 64, and no centring;
 * otherwise, with alignment set (`TXT+0x22` low nibble, command `0x5d`): the line is centred,
-  and alignment 2 (captions) puts it at y 62 + 18 · row, or at y 71 when `TXT+0x1a` is 0;
+  and alignment 2 (captions) puts it at y 62 + 18 · row, or at y 71 when `TXT+0x1a` is 0
+  (it is until the engine reaches the page's first new line: a one-line caption stays at 71, a
+  longer one moves up to 62 when its second line starts);
 * in the free-slot mode (`TXT+0x1c` bit 2) the record already holds the position
   (14 + 14 · column + `TXT+0x4c`, 36 + 18 · row + `TXT+0x4d`; the writer adds 9 to x) and the
   records are taken from 32 on. The staff roll at the end of the game is shown this way, with
