@@ -119,11 +119,15 @@ As observed in OAM while the screen is up (not cross-checked against the loader 
 ## Effects archive: banners and speech bubbles
 
 Animated effects (the testimony and cross-examination banners, the shout bubbles, and many
-others) are driven by an **animation table** around `0x08046b3c`–`0x08047cb0`: 20-byte entries
+others) are driven by an **animation table at `0x08046b30`**, indexed by effect number (entry 0 is
+empty), 20-byte entries
 
 ```
-u32 position (y << 16 | x), u32 flags, u32 archive, u32 VRAM destination, u32 frame data
+u32 archive, u32 VRAM destination, u32 frame data, s16 x, s16 y, u32 flags
 ```
+
+The code at `0x080173e8` reads x and y and starts the effect; while `SYS+0x4a` bit 4 is set it
+moves every effect except 1–8 and 0x1c–0x1d 240 pixels to the left.
 
 Nearly all of them use the **effects archive at `0x0869c8f0`**. The frame data says which
 sub-archive (offset inside the archive) holds its pictures:
@@ -145,20 +149,27 @@ The pictures are decompressed into OBJ VRAM at the destination each time a frame
 
 **Testimony / cross-examination banners** (証言開始 blue, 尋問開始 red): sub-archive offset 0,
 two palettes, 19 cells: the halves 開始 (0), 証言 (1), 尋問 (13) as 64×32, and 32×32 quarters
-plain and with a white sheen (2–12 for 証言開始, 14–18 for 尋問). Six table entries use it:
-`0x080471a4` (sheen over 証言開始, frames `0x086de2b8`), `0x080471b8` (sheen over 尋問開始,
-`0x086de3b0`), and the halves sliding in, `0x080471cc` (証言), `0x080471e0` (開始), `0x080471f4`
-(尋問), `0x08047208` (開始). The two banners share the right half 開始. The English build writes
-a new sub-archive with 26 cells (the cross-examination banner gets its own right half in cells
-19–25), points the six entries at it and renumbers the cells in the two cross-examination frame
-blocks. The pieces use OBJ tiles `0x240`–`0x2bf`, so a banner can be at most 128×32.
+plain and with a white sheen (2–12 for 証言開始, 14–18 for 尋問). Effects 0x53–0x58 use it
+(entries `0x080471ac` + 20·n): the sheen over 証言開始 (frames `0x086de2b8`) and over 尋問開始
+(`0x086de3b0`), and the halves sliding in: 証言, 開始, 尋問, 開始 (`0x086de4d8`, `0x086de4f8`,
+`0x086de518`, `0x086de538`). The 0x0800 bit in the cross-examination frames selects the red
+palette. The two banners share the right half 開始. The English build writes a new sub-archive
+with 26 cells (the cross-examination banner gets its own right half in cells 19–25), points the
+six entries at it and renumbers the cells in the two cross-examination frame blocks. The pieces
+use OBJ tiles `0x240`–`0x2bf`, so a banner can be at most 128×32.
 
 **Speech bubbles** (異議あり！, 待った！, くらえ！): sub-archives `0x28e4`, `0x3c44`, `0x4e24`,
-one palette each, 7 cells (32×64, two 64×64, 32×64, three 16×32), drawn by the entries from
-`0x08046b3c` to destination `0x06013d00` (OBJ tiles `0x1e8`–`0x2bf`, palette 11) with frames
-`0x086de558`, `0x086de590` and `0x086de5c8`. The text is written vertically inside a tall
-spiky bubble. A copy of the banner kanji, as 16×16 blocks (four tiles each), also sits raw at
-`0x08186b20`; the game does not use it for the banners.
+one palette each (1 white, 2 red, 3–4 darker reds, 5 bubble outline, 6 grey, 7 light red),
+one frame of 7 cells (32×64, two 64×64, 32×64, three 32×16; 216 tiles at OBJ tile `0x1e8`,
+palette 11), frames `0x086de558`, `0x086de590` and `0x086de5c8`. Effects 1–9 show them: 異議あり
+at x 45, 190 and 120 (effects 2, 3, 6, 8, 9), 待った at 45 and 120 (1, 5, 7), くらえ at 45 (4),
+y 80. The words are written vertically in a 96×144 bubble. The English build draws OBJECTION!
+and HOLD IT! in a 144×96 bubble (two 64×64, two 64×32 and three 16×32 sprites, the same 216
+tiles), moves their anchors at x 45 / 190 to 72 / 168 so they stay on screen, and keeps the
+tall shape for TAKE THAT!, which shares the screen with the evidence being presented.
+
+A copy of the banner kanji as 16×16 blocks also sits raw at `0x08186b20`; the game does not
+use it for the banners.
 
 **Testimony label** (証言中, top left during a testimony): raw 64×32 sprite at `0x08189f20`
 (1D tile order), OBJ palette 5, white (2) with a green outline (1).

@@ -9,7 +9,7 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x08000000`–`0x080000c0` | header (title `GYAKUTEN_SA3`, code `A3JJ`) |
 | `0x080000c0`–`0x0803c000` approx. | code (Thumb, a little ARM): game code to about `0x08030000`, the text engine around `0x0801e000`–`0x08023000`, the sound driver and BIOS wrappers `0x08036000`–`0x0803b000` (`m4aSongNumStart` `0x08038bd0`, LZ77-to-WRAM wrapper `0x0803a048`) |
 | `0x08045f74` | Court Record item table (211 × {LZ picture, icon \| detail << 16}, see graphics.md) |
-| `0x08046b3c`–`0x08047cb0` | animation table, 20-byte entries {position, flags, archive, VRAM destination, frame data} (see graphics.md, effects archive) |
+| `0x08046b30` | animation table, indexed by effect number: 20-byte entries {archive, VRAM destination, frame data, s16 x, s16 y, flags} (see graphics.md, effects archive) |
 | `0x08049834`, `0x0804991c` | per-command property tables (u16 × 121) |
 | `0x08049b38` | chapter table: 25 pointers to script banks |
 | `0x080547f4`, `0x08054824` | MP2K player table, song table (406 entries) |

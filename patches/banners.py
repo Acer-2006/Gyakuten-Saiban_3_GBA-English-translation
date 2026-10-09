@@ -2,9 +2,10 @@
 
 The banners (証言開始 "testimony begins", blue; 尋問開始 "cross-examination begins", red) are
 sprite animations.  Their pictures live in an effects archive at 0x0869c8f0: the animation table
-(20-byte entries {u32 x/y, u32 flags, u32 archive, u32 VRAM destination, u32 frame data})
-points at the archive, and the frame data's header names the sub-archive inside it (offset 0 for
-the banners).  A sub-archive is
+at 0x08046b30 (20-byte entries {u32 archive, u32 VRAM destination, u32 frame data, s16 x, s16 y,
+u32 flags}, indexed by effect number; the code at 0x080173e8 reads it) points at the archive,
+and the frame data's header names the sub-archive inside it (offset 0 for the banners).  A
+sub-archive is
 
     u16 palettes, u16 0x8000, 32 bytes per palette,
     u32 cell offset[n] (from the start of this table), cells
@@ -28,8 +29,14 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import textgfx, smallfont
 
 FX_ARCHIVE = 0x0869c8f0
-# animation table entries that use the banner sub-archive (offset 0)
-BANNER_ENTRIES = [0x080471a4, 0x080471b8, 0x080471cc, 0x080471e0, 0x080471f4, 0x08047208]
+ANIM_TABLE = 0x08046b30
+ANIM_COUNT = 142                          # effects 0 (empty) .. 141
+BANNER_FRAMES = [0x086de2b8, 0x086de3b0, 0x086de4d8, 0x086de4f8, 0x086de518, 0x086de538]
+
+def effect_entries(rom, frames):
+    """Animation table entries whose frame data is one of `frames` (effects 0x53-0x58 for the
+    banners, 1-9 for the shout bubbles)."""
+    return [ANIM_TABLE + 20 * k for k in range(1, ANIM_COUNT) if rom.u32(ANIM_TABLE + 20 * k + 8) in frames]
 TESTIMONY_FRAMES = 0x086de2b8          # sheen over 証言開始 (cells 0-12)
 CROSS_FRAMES = [0x086de3b0, 0x086de538]  # sheen over 尋問開始, and its right half sliding in
 CROSS_REMAP = {0: 19, 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 25}
@@ -169,9 +176,12 @@ def label_picture(text):
 def apply(rom, ctx):
     font = textgfx.Font.from_ctx(ctx)
     a = FX_ARCHIVE
-    for e in BANNER_ENTRIES:
-        fp = rom.u32(e + 16)
-        if rom.u32(e + 8) != a or rom.u32(fp + 4) != 0:
+    entries = effect_entries(rom, BANNER_FRAMES)
+    if len(entries) != 6:
+        raise SystemExit(f'banners: expected 6 animation entries, found {len(entries)}')
+    for e in entries:
+        fp = rom.u32(e + 8)
+        if rom.u32(e) != a or rom.u32(fp + 4) != 0:
             raise SystemExit(f'banners: unexpected animation entry at {e:#x}')
     npal = rom.u16(a)
     pals = rom.read(a + 4, 32 * npal)
@@ -193,8 +203,8 @@ def apply(rom, ctx):
         while len(body) % 2: body.append(0)
     blob = struct.pack('<HH', npal, rom.u16(a + 2)) + pals + bytes(table) + bytes(body)
     addr = rom.store(blob, 'ext', 4, 'banner sub-archive')
-    for e in BANNER_ENTRIES:
-        rom.w32(e + 8, addr)
+    for e in entries:
+        rom.w32(e, addr)
     # point the cross-examination frames at its own right half
     for fp in CROSS_FRAMES:
         n = rom.u16(fp + 2)
