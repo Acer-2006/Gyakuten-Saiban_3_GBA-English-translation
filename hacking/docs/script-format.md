@@ -19,7 +19,7 @@ The game refers to the banks from two places:
 | Where | What |
 | --- | --- |
 | `0x08049b38` | chapter table: 25 pointers, the first bank of each chapter (banks 0, 1, 3, 5, 7, 10, 11, 13, 15, 17, 20, 21, 23, 25, 27, 28, 30, 31, 32, 34, 36, 38, 39, 42, 43) |
-| literal pools of the loader (`0x0801ee9c`–`0x0801eff0`) | the other 19 banks, selected by a `switch` in the loader: 2 → `0x0801ee9c`, 4 → `0x0801eecc`, 6 → `0x0801eea4`, 8 → `0x0801eeb4`, 9 → `0x0801eebc`, 12 → `0x0801eed4`, 14 → `0x0801eee4`, 16 → `0x0801ef54`, 18 → `0x0801eef4`, 19 → `0x0801eefc`, 22 → `0x0801ef14`, 24 → `0x0801ef34`, 26 → `0x0801ef74`, 29 → `0x0801ef6c`, 33 → `0x0801ef84`, 35 → `0x0801ef9c`, 37 → `0x0801efa8`, 40 → `0x0801efc0`, 41 → `0x0801eff0` |
+| literal pools of the loader (`0x0801ee9c`–`0x0801eff0`) | the other 19 banks, selected by a `switch` in the loader: 2 → `0x0801ee9c`, 4 → `0x0801eecc`, 6 → `0x0801eea4`, 8 → `0x0801eeb4`, 9 → `0x0801eebc`, 12 → `0x0801eed4`, 14 → `0x0801eee4`, 16 → `0x0801ef54`, 18 → `0x0801eef4`, 19 → `0x0801eefc`, 22 → `0x0801ef14`, 24 → `0x0801ef34`, 26 → `0x0801ef74`, 29 → `0x0801ef6c`, 33 → `0x0801ef84`, 35 → `0x0801ef9c`, 37 → `0x0801efa8`, 40 → `0x0801efc0`, 41 → `0x0801eff0`; and a second pointer to seven main banks, used when an episode is started from the episode select or a save is continued: 3 → `0x0801eec4`, 7 → `0x0801eeac`, 13 → `0x0801eedc`, 17 → `0x0801eeec`, 28 → `0x0801ef64`, 32 → `0x0801ef7c`, 34 → `0x0801ef8c` |
 | `0x0801ed64`, `0x0801ed60` | the common bank: its base, and base + 4 (the offset table) |
 
 The loader (seven call sites, `0x0801ef04 0x0801ef24 0x0801ef44 0x0801ef94 0x0801efb0 0x0801efd0

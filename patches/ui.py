@@ -21,6 +21,16 @@ PROMPTS = [
     (0x0818ac20, 'Back'),                   # もどる
 ]
 
+# investigation menu tabs (slide down from the top of the screen): 64x32 sprites, the lettering in
+# rows 16-28; fill 1, lettering 3 (white), outline 14 (shows on the selected tab, OBJ palette 6;
+# the others use palette 5)
+TABS = [
+    (0x08188b20, 'Examine'),                # 調べる
+    (0x08188f20, 'Move'),                   # 移動する
+    (0x08189320, 'Talk'),                   # 話す
+    (0x08189720, 'Present'),                # つきつける
+]
+
 def unpack_cells(data, w, h=16, cw=32, ch=16):
     """Inverse of textgfx.sprite_cells: cells left to right, top to bottom -> rows of indices."""
     grid = [[0] * w for _ in range(h)]
@@ -59,4 +69,14 @@ def apply(rom, ctx):
         while font.measure(text) - sq * (len(text) - 1) > 29: sq += 1
         grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
-    print(f"  buttons: {len(BUTTONS) + len(PROMPTS)} redrawn")
+    for addr, text in TABS:
+        grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)
+        for y in range(16, 29):
+            for x in range(2, 58):
+                if grid[y][x] in (2, 3, 14): grid[y][x] = 1
+        txt = fit(font, text, 56, fill=3, outline=14, y0=1)
+        for y in range(13):
+            for x in range(56):
+                if txt[y][x]: grid[16 + y][2 + x] = txt[y][x]
+        rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'tab ' + text)
+    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn")

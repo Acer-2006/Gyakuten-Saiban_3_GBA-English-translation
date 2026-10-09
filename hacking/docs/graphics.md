@@ -188,6 +188,13 @@ Raw 4bpp sprites, 32×16 one-dimensional cells (256 bytes):
 The cross-examination pair is DMA'd (1 KB) to OBJ tile `0x180` with palette `0x081988d0` by the
 code at `0x0800ddd0`, `0x0800eb6c`, `0x0801e5a8` and `0x080224f4`.
 
+The investigation menu tabs that slide down from the top of the screen are 64×32 sprites (1D
+tile order, 1 KB each) loaded to OBJ tiles `0x100`, `0x120`, `0x140`, `0x160` when an
+investigation begins: 調べる `0x08188b20`, 移動する `0x08188f20`, 話す `0x08189320`,
+つきつける `0x08189720`. The lettering is in rows 16–28: fill 1, lettering 3 (white), outline 14;
+the selected tab uses OBJ palette 6 (orange, dark outline), the others palette 5 (outline the
+same colour as the fill).
+
 ## Font
 
 See [text-engine.md](text-engine.md): `0x081f31cc`, 128 bytes per glyph (16×16 4bpp, four

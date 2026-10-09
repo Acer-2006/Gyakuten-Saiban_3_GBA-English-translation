@@ -10,6 +10,7 @@ EXTRA_BLOCK_LITS = {                  # block index -> literal address (from the
     2: 0x1ee9c, 4: 0x1eecc, 6: 0x1eea4, 8: 0x1eeb4, 9: 0x1eebc, 12: 0x1eed4, 14: 0x1eee4, 16: 0x1ef54,
     18: 0x1eef4, 19: 0x1eefc, 22: 0x1ef14, 24: 0x1ef34, 26: 0x1ef74, 29: 0x1ef6c, 33: 0x1ef84,
     35: 0x1ef9c, 37: 0x1efa8, 40: 0x1efc0, 41: 0x1eff0}
+LOADER_POOLS = (0x1ee80, 0x1f000)   # the loader's literal pools (offsets)
 COMMON_LITS = [(0x1ed64, 0), (0x1ed60, 4)]   # (literal address, offset from bank base)
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
@@ -61,7 +62,15 @@ def apply(rom, ctx):
         if b in bank_addr: rom.w32(CHAPTER_TABLE + i * 4, bank_addr[b])
     for b, lit in EXTRA_BLOCK_LITS.items():
         assert by_addr[rom.u32(0x08000000 + lit)] == b, (b, hex(rom.u32(0x08000000 + lit)))
-        rom.w32(0x08000000 + lit, bank_addr[b])
+    # every bank pointer in the loader's literal pools: besides the 19 above, the loader's switch
+    # also loads the first bank of seven chapters (3, 7, 13, 17, 28, 32, 34) from here, which is
+    # the way in when an episode is started from the episode select or a save is continued
+    redirected = 0
+    for lit in range(LOADER_POOLS[0], LOADER_POOLS[1], 4):
+        b = by_addr.get(rom.u32(0x08000000 + lit))
+        if b is not None and b in bank_addr:
+            rom.w32(0x08000000 + lit, bank_addr[b]); redirected += 1
+    assert redirected == len(EXTRA_BLOCK_LITS) + 7, redirected
     for lit, off in COMMON_LITS:
         assert rom.u32(0x08000000 + lit) == 0x086e3578 + off
         rom.w32(0x08000000 + lit, common + off)

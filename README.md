@@ -35,12 +35,14 @@ flash cart.
   Testimony label, the cross-examination buttons (L Press / Present R) and the OK / Back
   prompts when presenting.
 * OBJECTION!, HOLD IT! and TAKE THAT! speech bubbles.
+* Investigation menu tabs (Examine, Move, Talk, Present).
 * Caption screens ("5 Years Earlier", date/location cards) in English.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
-Still Japanese for now: the investigation menu buttons, the pages behind the L Button (photos,
-maps, letters), and the episode titles on the episode-select screen.
+Still Japanese for now: the place names in the Move menu, the pages behind the L Button
+(photos, maps, letters) and other pictures with writing in them, and the episode titles on the
+episode-select screen.
 
 ## Your own voice clips (optional)
 
@@ -72,6 +74,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.9.1 — fix: starting an episode from the episode select (or continuing a save at the start
+  of a chapter) loaded the Japanese script for chapters 3, 7, 13, 17, 28, 32 and 34's first
+  part; the loader had a second set of pointers to those banks. Investigation menu tabs in
+  English.
 * 0.9 — OBJECTION!, HOLD IT! and TAKE THAT! bubbles in English.
 * 0.8.1 — the case 1 tutorial lines that said to touch the Court Record Button now say to press
   the R Button (and "Touch to see before and after" for the Hanging Scroll says Press L);
