@@ -52,6 +52,8 @@ struct vwf_state {
     u8 lbl_rows;
     u8 lbl_sys;
     u8 lbl_low;
+    u8 lbl_free;        /* free-slot mode (TXT flags bit 2): placed at the command 0x48 offset */
+    u8 lbl_fx, lbl_fy;
     u8 lbl_full[LBL_LINES];   /* width of each line of the page (measured ahead) */
     u8 lost;            /* the canvas tiles were overwritten while mapped (see canvas_check) */
     u8 csum_ok;
@@ -294,6 +296,8 @@ static void label_draw_char(u32 code, int col, int row) {
         vs.lbl_sys = (sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31));
         vs.lbl_align = TXT_ALIGN & 0xf;
         vs.lbl_low = TXT_1A == 0;
+        vs.lbl_free = (TXT_FLAGS & 4) ? 1 : 0;
+        vs.lbl_fx = TXT_OFSX; vs.lbl_fy = TXT_OFSY;
         for (int i = 0; i < LBL_LINES; i++) vs.lbl_full[i] = 0;
         vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
     }
@@ -338,7 +342,13 @@ static void labels_oam(void) {
             int fw = vs.lbl_full[L] > w ? vs.lbl_full[L] : w;
             x = 9;
             y = (vs.lbl_rows > 2) ? 112 + L * 16 : 116 + L * 18;
-            if (vs.lbl_sys) {
+            if (vs.lbl_free) {
+                /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
+                   36 + 18 * row + y offset, and the writer adds 9 to x */
+                x = 23 + vs.lbl_fx;
+                y = 36 + L * 18 + vs.lbl_fy;
+                if (vs.lbl_sys) y -= 64;
+            } else if (vs.lbl_sys) {
                 /* the engine does not centre these (the Japanese pads them with spaces); the
                    English lines are centred, as on the DS */
                 y = 52 + L * CAP_PITCH;

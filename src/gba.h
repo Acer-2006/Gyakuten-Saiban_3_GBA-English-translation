@@ -27,5 +27,7 @@ typedef int s32;
 #define TXT_ALIGN (*(volatile u8*)0x03007222)     /* low nibble: 1 = centred (command 0x5d) */
 #define TXT_SECTION (*(volatile u16*)0x0300720c)  /* current section (< 0x80: common bank) */
 #define TXT_1A (*(volatile u16*)0x0300721a)       /* 0: alignment-2 text sits at y 71 */
+#define TXT_OFSX (*(volatile u8*)0x0300724c)     /* free-slot text offset (command 0x48 x y) */
+#define TXT_OFSY (*(volatile u8*)0x0300724d)
 #define VRAM ((volatile u8*)0x06000000)
 #define OBJVRAM ((volatile u16*)0x06010000)

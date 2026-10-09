@@ -100,6 +100,7 @@ DS version of the script.
 | `0x0b`, `0x0c`, `0x45` | 1, 1, 0 | text-flow commands whose exact meaning was not worked out; they are identical in the GBA and DS scripts and the English converter copies them verbatim |
 | `0x42 n` | 1 | caption mode: `n = 0` sets bit 2 of `SYS+0x25c` (`0x03003a0c`), `n = 1` clears it. Caption text is re-dispatched every frame from column 0 / row 0 and drawn centred at `y = 62 + 18*row` |
 | `0x5d a` | 1 | alignment, low nibble of `TXT+0x22`; non-zero (the script uses 2) = centred |
+| `0x48 x y` | 2 | offset of free-slot sprite text: `TXT+0x4c` = x, `TXT+0x4d` = y (see text-engine.md) |
 | `0x0e n` | 1 | background music, stored at `TXT+0x24` |
 | `0x0f a b` | 2 | stores `a` at `TXT+0x10` |
 | `0x10 f` | 1 | set flag |

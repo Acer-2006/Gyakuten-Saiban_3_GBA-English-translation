@@ -94,7 +94,10 @@ episode is picked, with its prompt still on the page). Where it puts them:
 * otherwise, with alignment set (`TXT+0x22` low nibble, command `0x5d`): the line is centred,
   and alignment 2 (captions) puts it at y 62 + 18 · row, or at y 71 when `TXT+0x1a` is 0;
 * in the free-slot mode (`TXT+0x1c` bit 2) the record already holds the position
-  (14 + 14 · column + `TXT+0x4c`, 36 + 18 · row + `TXT+0x4d`).
+  (14 + 14 · column + `TXT+0x4c`, 36 + 18 · row + `TXT+0x4d`; the writer adds 9 to x) and the
+  records are taken from 32 on. The staff roll at the end of the game is shown this way, with
+  the offsets set by command `0x48 x y` (`x = 0xffff` puts 0 in both and sets bit 9 of
+  `0x03003ada`).
 
 Command `0x42 0` (bit 2 of `SYS+0x25c`) is used for every line shown without the text box:
 captions, the episode-select prompt (common section 2), phone calls and voices over a black
