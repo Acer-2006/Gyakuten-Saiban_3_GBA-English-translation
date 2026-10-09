@@ -79,6 +79,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.2 — the episode-select prompt no longer stays on screen after an episode is picked (it
+  went with the box in the original); `gs3_script.py` shows the music note.
 * 0.11.1 — the escaped convict's data screen in episode 4 in English (its title bars, from the
   DS version).
 * 0.11 — pictures with writing in them in English: the L Button pages, letters, maps, the

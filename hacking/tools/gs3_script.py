@@ -86,7 +86,7 @@ def builtin_table(name='en'):
         # the DS English font: 0x165/0x166 are parentheses (Phoenix's thoughts), the straight
         # double quote and the hyphen are extra glyphs 0x682 / 0x681
         t.update({0x165: '(', 0x166: ')', 0x170: '+', 0x171: '/', 0x172: '*', 0x177: '%', 0x179: '~',
-                  0x17c: '&'})
+                  0x17c: '&', 0x17e: '♪'})
         for i, ch in enumerate('-"[]$#><=■éá;çàÇûîèâñïê'): t[0x681 + i] = ch
     else:
         for i, ch in enumerate(KANA): t[0xc0 + i] = ch

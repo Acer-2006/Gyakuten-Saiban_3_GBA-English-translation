@@ -318,6 +318,9 @@ static void labels_hide(void) {
 }
 
 static void labels_oam(void) {
+    /* the engine's sprite-text writer shows nothing while SYS+0x19 is 0 (the episode select
+       clears it as soon as an episode is picked, with its prompt still on the page) */
+    if (!SYS[0x19] && !fullscreen_box()) { labels_hide(); return; }
     OBJPAL[2 * 16 + 13] = 0x167f; OBJPAL[2 * 16 + 14] = 0x7eed; OBJPAL[2 * 16 + 15] = 0x2be7;
     /* white (index 8) is the UI palette's; screens that load their own palette 2 (the episode
        select) leave it black */

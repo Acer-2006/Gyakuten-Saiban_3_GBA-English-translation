@@ -84,7 +84,9 @@ Page ends reset the text state in four places: `0x08021ab0` (wait for button), `
 
 Each drawn character gets a 12-byte record at `0x03003e50` (in use: bit 15 of the first
 halfword; then tile, x = 14 · column, y = 18 · row, colour). The writer at `0x0801fd6c` turns
-the records into OAM entries 2, 3, ... every frame:
+the records into OAM entries 2, 3, ... every frame, unless `SYS+0x19` is 0: then it hides
+entries 2–33 and the records stay as they are (the episode select clears the byte as soon as an
+episode is picked, with its prompt still on the page). Where it puts them:
 
 * normally y + 116 and x + 9 (the box rows);
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
