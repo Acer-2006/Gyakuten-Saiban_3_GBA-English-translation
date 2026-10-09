@@ -79,6 +79,7 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.4 — lines that trail off (Ron's mumbling) fade out as in the original.
 * 0.11.3 — the staff roll at the end of the game is placed as in the original (it was drawn at
   the bottom of the screen); captions of more than one line ("5 Years Earlier") start at the
   height the original moves them to.

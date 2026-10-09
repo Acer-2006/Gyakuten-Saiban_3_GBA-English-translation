@@ -419,7 +419,19 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
     int x = TEXT_X0 + vs.pen_x;
     if (x > 240 - 4) return;
     u32 c = text_colors[TXT_COLOR & 0xf];
-    if (code != 0x17f) {
+    int draw = code != 0x17f;
+    if (TXT_ALIGN & 0x20) {
+        /* command 0x5d 5: the line trails off (Ron's mumbling).  The engine greys the text out by
+           column and leaves out everything from a last column on; these are the DS English
+           version's columns, in characters, and the nearest greys of the UI palette */
+        static const u8 fade_end[5] = {8, 16, 22, 28, 32};
+        static const u8 fade_col[5] = {0, 4, 3, 3, 2};
+        int k = 0;
+        while (k < 5 && col >= fade_end[k]) k++;
+        if (k == 5) draw = 0;
+        else if (k) c = fade_col[k];
+    }
+    if (draw) {
         blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
         if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | (L * LINE_H) << 17 | c << 23;
         vs.csum_ok = 0;

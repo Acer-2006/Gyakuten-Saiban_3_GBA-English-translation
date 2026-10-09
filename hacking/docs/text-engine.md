@@ -109,6 +109,15 @@ Screens that are opened over the game (the save screen, ...) save the records an
 state and put them back when they close; `0x08020024` then redraws the text sprites from the
 records (called at `0x0800bcc4`, `0x0800dcd4` and `0x08014464`).
 
+## Fading lines
+
+Command `0x5d 5` sets bit 5 of `TXT+0x22`: the cell draw then greys the text out by column, using
+the thresholds at `0x08049c1c` (4, 8, 11, 14, 16): columns 0–3 as usual, then OBJ palette 13
+indices 4, 3, 2, 1 (`0x6b5a`, `0x5294`, `0x4210`, `0x318c`), and nothing from column 16 on. The
+script uses it for the last line of a page when a character trails off. The DS keeps the same
+table at `0x020a1ca0` and one for English after it, (8, 16, 22, 28, 32), counted in characters;
+the English build uses that one, with the greys 4, 3, 3 and 2 of the UI palette.
+
 ## Captions and choices
 
 * **Captions** (command `0x42 0`): the same text is dispatched again every frame from column 0,
