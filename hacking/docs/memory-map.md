@@ -50,7 +50,7 @@ puts all of its code there), while data can go anywhere.
 | --- | --- |
 | `0x02011fc0` | decompressed chapter bank (appears to be `0x1b000` bytes) |
 | `0x0202cfc0` | episode-select sprite sheet after decompression (`0x9600` bytes) |
-| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028100` script) |
+| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script) |
 
 ## IWRAM
 

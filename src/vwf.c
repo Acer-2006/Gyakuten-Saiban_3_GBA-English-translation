@@ -53,8 +53,19 @@ struct vwf_state {
     u8 lbl_sys;
     u8 lbl_low;
     u8 lbl_full[LBL_LINES];   /* width of each line of the page (measured ahead) */
+    u8 lost;            /* the canvas tiles were overwritten while mapped (see canvas_check) */
+    u8 csum_ok;
+    u16 glog_n;
+    u32 csum;
 };
 static struct vwf_state vs;
+
+/* Every glyph blitted onto the canvas since it was last cleared, so that the page can be drawn
+   again: the Court Record's slide between items copies its panel into BG tiles 0xa0-0x17f,
+   which are the canvas's (BG char block 0 has no room for both). */
+#define GLOG_MAX   192
+static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 */
+#define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
 
 static const u16 text_colors[16] = {
     /* colour index per text colour argument (command 0x03) */
@@ -129,7 +140,7 @@ static void fill_tile(int dst_tile, const u32* src) {
     for (int i = 0; i < 8; i++) d[i] = src[i];
 }
 
-static void canvas_reset(void) {
+static void canvas_tiles(void) {
     for (int ty = 0; ty < CV_ROWS; ty++) {
         for (int tx = 0; tx < CV_COLS; tx++) {
             int src;
@@ -138,6 +149,12 @@ static void canvas_reset(void) {
             fill_tile(CV_TILE0 + ty * CV_COLS + tx, frame_tiles[src]);
         }
     }
+    vs.csum_ok = 0;
+}
+
+static void canvas_reset(void) {
+    canvas_tiles();
+    vs.glog_n = 0;
 }
 
 static void arrow_load(void) {
@@ -156,6 +173,11 @@ static int box_open(void) {
            (BG1MAP[(CV_MAPROW + CV_ROWS - 1) * 32 + 8] & 0x3ff) != 0x00;
 }
 
+static int canvas_tile(u32 e) {
+    u32 t = e & 0x3ff;
+    return t >= CV_TILE0 && t < CV_TILE0 + CV_ROWS * CV_COLS;
+}
+
 static void canvas_map(void) {
     for (int ty = 0; ty < CV_ROWS; ty++)
         for (int tx = 0; tx < CV_COLS; tx++)
@@ -164,6 +186,58 @@ static void canvas_map(void) {
     BGPAL[13] = 0x167f; BGPAL[14] = 0x7eed; BGPAL[15] = 0x2be7;
     arrow_load();
     vs.mapped = 1;
+}
+
+/* Put the engine's empty box back where the canvas was mapped. */
+static void canvas_unmap(void) {
+    for (int ty = 0; ty < CV_ROWS; ty++)
+        for (int tx = 0; tx < CV_COLS; tx++)
+            BG1MAP[(CV_MAPROW + ty) * 32 + tx] = BOX_TEMPLATE[(CV_MAPROW + ty) * 32 + tx];
+    SYS_BGDIRTY |= 2;
+    vs.mapped = 0;
+}
+
+/* A sample of the canvas tiles (every 16th byte). */
+static u32 canvas_sum(void) {
+    volatile u32* p = (volatile u32*)(VRAM + CV_TILE0 * 32);
+    u32 h = 0;
+    for (int i = 0; i < CV_ROWS * CV_COLS * 8; i += 4) h = (h << 1 | h >> 31) ^ p[i];
+    return h;
+}
+
+/* Does any background with char base 0 show canvas tiles (other than the canvas itself)? */
+static int canvas_in_use(void) {
+    u32 dispcnt = REG16(0x04000000);
+    for (int bg = 0; bg < 3; bg++) {
+        if (!(dispcnt & (0x100 << bg))) continue;
+        u32 cnt = REG16(0x04000008 + 2 * bg);
+        if (cnt & 0x0c) continue;                        /* other char base */
+        volatile u16* m = (volatile u16*)(VRAM + ((cnt >> 8) & 31) * 0x800);
+        for (int i = 0; i < 32 * 20; i++)
+            if (canvas_tile(m[i]) && !(bg == 1 && vs.mapped)) return 1;
+    }
+    return 0;
+}
+
+static void blit_to(int gi, int x, int y, u32 c, rowptr_fn rowptr);
+static volatile u32* canvas_rowptr(int tx, int ty, int r);
+
+static void canvas_redraw(void) {
+    canvas_tiles();
+    for (int i = 0; i < vs.glog_n; i++) {
+        u32 g = glog[i];
+        blit_to(g & 0x1ff, (g >> 9) & 0xff, (g >> 17) & 0x3f, g >> 23, canvas_rowptr);
+    }
+}
+
+/* Per frame while the canvas is mapped: if its tiles changed behind our back, show the
+   engine's empty box instead and draw the page again once nothing else uses the tiles. */
+static void canvas_check(void) {
+    u32 h = canvas_sum();
+    if (!vs.csum_ok) { vs.csum = h; vs.csum_ok = 1; return; }
+    if (h == vs.csum) return;
+    canvas_unmap();
+    vs.lost = 1;
 }
 
 /* Measure the rest of the current line (from the script pointer) in pixels. */
@@ -311,7 +385,11 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
     if ((vs.lbl_row0 >= 0 && vs.lbl_caption) || (SYS_CAPTION & 4) || fullscreen_box()) {
         label_draw_char(code, col, row); return;
     }
-    if (!vs.mapped) { canvas_reset(); canvas_map(); }
+    if (!vs.mapped) {
+        if (vs.lost) { canvas_redraw(); vs.lost = 0; }
+        else canvas_reset();
+        canvas_map();
+    }
     else if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
     if (vs.pen_x == 0) {
         /* start of a line: decide on squeeze */
@@ -325,7 +403,11 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
     int x = TEXT_X0 + vs.pen_x;
     if (x > 240 - 4) return;
     u32 c = text_colors[TXT_COLOR & 0xf];
-    if (code != 0x17f) blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
+    if (code != 0x17f) {
+        blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
+        if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | (L * LINE_H) << 17 | c << 23;
+        vs.csum_ok = 0;
+    }
     int adv = font_w[gi] - vs.squeeze;
     if (adv < 1) adv = 1;
     vs.pen_x += adv;
@@ -343,6 +425,7 @@ void vwf_clear(void) {
     vs.lbl_row0 = -1;
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     canvas_reset();
+    vs.lost = 0;
 }
 
 /* Per frame (before the BG map / OAM DMA). */
@@ -354,6 +437,13 @@ void vwf_frame(void) {
     }
     labels_hide();
     vs.lbl_row0 = -1;
+    if (vs.lost) {
+        /* the box is still there (its top edge) and nothing shows the canvas tiles any more */
+        if ((BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {
+            canvas_redraw(); canvas_map(); vs.lost = 0;
+        }
+        return;
+    }
     if (!box_open()) {
         vs.arrow_on = 0;
         /* The engine writes its arrow cells (row 19, columns 14-15: tile 0x24/0x25 = arrow,
@@ -384,6 +474,7 @@ void vwf_frame(void) {
         OAMBUF[ARROW_OBJ * 4 + 1] = 222 | (0 << 14);          /* x, size 0 -> 16x8 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
     }
+    canvas_check();
 }
 
 /* Called before 0x08020024, which redraws the text sprites from the saved sprite records when

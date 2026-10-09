@@ -132,10 +132,11 @@ the old font area.
 | `0x0800577a`, `0x08005784` | `0xe0 → 0xd0`: partial redraw starts one row higher |
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
 | `0x08022166` | box clear loop replaced by `bl vwf_boxclear; b 0x08022186` |
+| BG tiles `0xe0`–`0x193` | the canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, shows the engine's empty box (template rows) until no background uses those tiles any more, then draws the page again from a log of the glyphs blitted since the last clear |
 | `0x0800bcc4`, `0x0800dcd4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024` |
 | every copy of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) | entries 13–15 become the text colours (`167f`, `7eed`, `2be7`) |
 
-Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028100` (BSS of
+Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028800` (BSS of
 `script.c`). The script loader is replaced at its seven call sites so that banks placed above
 `0x08800000` are used uncompressed in place (`src/script.c`: `script_load`, `jump_section`,
 `jump_label`), which also removes the EWRAM size limit for edited banks.

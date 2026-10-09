@@ -51,7 +51,7 @@ def apply(rom, ctx):
                                   ld_defsyms={'font_rows': rows_addr, 'font_w': w_addr})
     code_addr = rom.store(binary, 'font', 4, 'vwf code')
     assert code_addr == text_addr
-    assert bss <= 0x4000, bss
+    assert bss <= 0x800, bss                 # script.c's state follows at 0x02028800
     print(f"  vwf code at {code_addr:#x} ({len(binary)} bytes), bss {bss} bytes")
     rom.syms = syms
 

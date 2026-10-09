@@ -15,6 +15,7 @@ COMMON_LITS = [(0x1ed64, 0), (0x1ed60, 4)]   # (literal address, offset from ban
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
+SCRIPT_BSS = 0x02028800               # after the renderer's state (patches/text.py)
 DIRECTORY = 0x08800000               # bank directory written for tools: 'GS3E', u32 1, u32 45, {u32 addr, u32 len} x 45
                                      # (banks 0..43 then the common bank; len 0 = LZ-compressed at addr)
 
@@ -38,7 +39,7 @@ def apply(rom, ctx):
 
     # 2. compile script.c
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)
-    binary, syms, bss = compile_c([os.path.join(ROOT, 'src/script.c')], text_addr, 0x02028100,
+    binary, syms, bss = compile_c([os.path.join(ROOT, 'src/script.c')], text_addr, SCRIPT_BSS,
                                   os.path.join(ROOT, 'build/script'),
                                   defines=[f'COMMON_BANK_ADDR={common:#x}'], ld_defsyms={
                                       'f_801e210': 0x0801e211, 'f_801e4ac': 0x0801e4ad, 'f_801fb98': 0x0801fb99,

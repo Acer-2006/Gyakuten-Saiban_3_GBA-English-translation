@@ -78,6 +78,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.10.1 — browsing the Court Record no longer leaves garbage in the text box: the Court Record
+  borrows the text box's tiles to slide between items; the box now shows empty during the slide
+  and the text comes back afterwards.
 * 0.10 — Talk topics and Move destinations, the episode-select titles and labels, the save
   screen, the Psyche-Lock "Unlock Successful" banner and the verdict in English. Lines shown
   without the text box are placed as in the original (the episode-select prompt was drawn over
