@@ -176,6 +176,12 @@ GBA_WORDING = [
     ('with the{01}{03 1}Court Record Button', 'with the{01}{03 1}R Button'),
     ('Touch to see before and after{01}view under the Check screen.',
      'Press L to see the before and{01}after view.'),
+    # the metal detector (case 5): the GBA's display turns red where there is metal, and the
+    # A Button looks there
+    ('{03 1} touch{03 0} the detector', '{03 1} move{03 0} the detector'),
+    ('the{03 1} CHECK{03 0} gauge{01}will flash.', 'the{03 1} display{03 0}{01}will turn red.'),
+    ('touch{01}the gauge to really give the', 'press{01}the{03 1} A Button{03 0} to give the'),
+    ('the{03 1} CHECK{03 0} gauge and wait{01}for it to flash,', 'the{03 1} display{03 0} and wait{01}for it to turn red,'),
 ]
 
 def notation_items(s):

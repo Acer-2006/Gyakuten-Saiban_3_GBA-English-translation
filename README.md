@@ -79,6 +79,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.5 — the metal detector tutorial in case 5 gives the GBA controls (the display turns red,
+  press the A Button) instead of the DS touch screen's.
 * 0.11.4 — lines that trail off (Ron's mumbling) fade out as in the original.
 * 0.11.3 — the staff roll at the end of the game is placed as in the original (it was drawn at
   the bottom of the screen); captions of more than one line ("5 Years Earlier") start at the
