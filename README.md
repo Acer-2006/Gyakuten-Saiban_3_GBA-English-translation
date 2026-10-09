@@ -43,12 +43,11 @@ flash cart.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
   exhibition poster and the signs in the backgrounds.
+* The escaped convict's data screen in episode 4 (Fugitive Data, Fugitive Movements).
 * Caption screens ("5 Years Earlier", date/location cards) in English; lines shown without the
   text box (the episode-select prompt, "To be continued") sit where the original puts them.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
-
-Still Japanese for now: one data screen in a later episode (the escaped convict's data).
 
 ## Your own voice clips (optional)
 
@@ -80,6 +79,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.1 — the escaped convict's data screen in episode 4 in English (its title bars, from the
+  DS version).
 * 0.11 — pictures with writing in them in English: the L Button pages, letters, maps, the
   newspapers, the calling card, the poster and the signs in the backgrounds (39 pictures, taken
   from your DS ROM while building).

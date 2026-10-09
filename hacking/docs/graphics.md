@@ -217,7 +217,9 @@ u32 archive, u32 VRAM destination, u32 frame data, s16 x, s16 y, u32 flags
 ```
 
 The code at `0x080173e8` reads x and y and starts the effect; while `SYS+0x4a` bit 4 is set it
-moves every effect except 1–8 and 0x1c–0x1d 240 pixels to the left.
+moves every effect except 1–8 and 0x1c–0x1d 240 pixels to the left. The second byte of `flags`
+is the number of sprites (OAM entries) the effect takes: the most any of its frames uses. Script
+command `0x2f n on` starts effect `n` (`on` = 1) or stops it (0).
 
 Nearly all of them use the **effects archive at `0x0869c8f0`**. The frame data says which
 sub-archive (offset inside the archive) holds its pictures:
@@ -272,9 +274,19 @@ the sheen (6), quarter 3 with it (7, 9), quarter 3 (10), quarter 4 (8) and with 
 `0x086df188`). The English build writes a new sub-archive and sets the three frame blocks'
 sub-archive offset to 0.
 
-Other effects with writing: 69 and 70 (脱獄囚に関するデータ, 脱獄から再逮捕までの推移, a data
-screen) and 71–73 (PICTURE, DATA1, DATA2), sub-archive `0x2d240`. The DS keeps a copy of that
-sub-archive in `data.bin` at `0x76c254`, still in Japanese.
+**Data screen** (episode 4, the escaped convict): effects 69 and 70 are its title bars
+(脱獄囚に関するデータ, 脱獄から再逮捕までの推移) and 71–73 the PICTURE, DATA1 and DATA2 tabs,
+sub-archive `0x2d240` (one palette, 17 cells; frames `0x086e2768`, `0x086e27a0`, `0x086e282c`,
+`0x086e27d4`, `0x086e2800`). A bar is 224×32 at the top of the screen: the end cap (cell 0, a
+16×32 sprite, with attribute bit `0x0200` set for the right end, which flips it) and pieces with
+the lettering from 16×32 to 64×32. The DS keeps the sub-archive in `data.bin` twice, Japanese at
+`0x76c254` and English at `0x76d2c0`: the same cap and tabs (cells 8–16), and for the bars a
+plain 16×32 piece (1) and the lettering pieces 2–7 (64×32, and 32×32 for 4 and 7). The English
+build copies cells 0–7 into a sub-archive of their own, adds a plain 32×32 piece and gives the
+two effects new frames: the caps, then the lettering centred between them.
+
+The animation table has 241 entries (0–240); the ones after 141 are characters and objects for
+cut-scenes and the ending, with no writing.
 
 ## Buttons
 

@@ -31,7 +31,7 @@ import textgfx, smallfont
 
 FX_ARCHIVE = 0x0869c8f0
 ANIM_TABLE = 0x08046b30
-ANIM_COUNT = 142                          # effects 0 (empty) .. 141
+ANIM_COUNT = 241                          # effects 0 (empty) .. 240
 BANNER_FRAMES = [0x086de2b8, 0x086de3b0, 0x086de4d8, 0x086de4f8, 0x086de518, 0x086de538]
 
 def effect_entries(rom, frames):
