@@ -1,8 +1,4 @@
-# Gyakuten Saiban 3 GBA English translation
-
-<img width="400" height="266" alt="image" src="https://github.com/user-attachments/assets/5b35b4c8-c8e0-4f19-8cbe-5c49a6f609d9" />
-
-A fan translation of Gyakuten Saiban 3 that uses the English DS script, features three lines, a vwf and of course, as always English!
+# Gyakuten Saiban 3 — English build tool
 
 Builds an English-language ROM of *Gyakuten Saiban 3* (Game Boy Advance) from your own copies of
 the two games:
@@ -35,7 +31,24 @@ Still Japanese for now: the in-court speech bubbles ("Objection!" etc.), the tes
 cross-examination banners, the investigation and court-record buttons, the episode titles on the
 episode-select screen, and the voice clips.
 
+## Your own voice clips
+
+The shouts ("Objection!" and so on) are 8-bit samples in the GBA ROM. To replace them with
+recordings of your own:
+
+1. `python3 build.py gs3_jp.gba tt_us.nds --export-voices samples/` writes every candidate
+   sample as a `.wav` named by its ROM offset, so you can hear which is which. The sample at
+   `0xed1c0` is Mia's "Take that!"; the others are identified by ear.
+2. Put your clips in `voices/` and write `voices/voices.json` mapping sample offsets to files
+   (see `voices/voices.example.json`). WAV is read directly; other formats need ffmpeg.
+3. Build as usual. Clips are resampled to at most 22 kHz, converted to 8-bit, placed in the
+   expanded ROM, and the sound driver's instruments are repointed at them.
+
+The `voices/` folder is ignored by git, so recordings stay on your machine.
+
 ## Version history
+
+* 0.4 — voice-clip import (`voices/`) and sample export.
 
 * 0.3 — English title screen and title menu.
 * 0.2 — Python-only build tool; English choice menus; caption screens.

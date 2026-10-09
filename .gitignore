@@ -10,3 +10,7 @@ build/
 *.ss
 *.dst
 __pycache__/
+
+# recordings stay local; only the example mapping is tracked
+voices/*
+!voices/voices.example.json

@@ -12,8 +12,9 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(ROOT, 'tools')); sys.path.insert(0, ROOT)
 from rom import Rom, save_cache
 from pipeline import BuildContext
+import voices
 
-def build(gba_path, nds_path, out_path):
+def build(gba_path, nds_path, out_path, voices_dir=None):
     t0 = time.time()
     ctx = BuildContext(gba_path, nds_path)
     ctx.convert()
@@ -23,6 +24,7 @@ def build(gba_path, nds_path, out_path):
     rom.region('ext', 0x800000, 0x1000000)
     from patches import apply_all
     apply_all(rom, ctx)
+    if voices_dir and os.path.isdir(voices_dir): voices.apply(rom, ctx, voices_dir)
     rom.save(out_path)
     save_cache()
     print(f"done: {out_path} ({time.time() - t0:.0f} s; font area used {rom.regions['font'].used:#x}, "
@@ -34,7 +36,13 @@ if __name__ == '__main__':
     ap.add_argument('gba', nargs='?', default=os.path.join(ROOT, 'roms', 'gs3_jp.gba'), help='Gyakuten Saiban 3 (Japan) .gba')
     ap.add_argument('nds', nargs='?', default=os.path.join(ROOT, 'roms', 'tt_us.nds'), help='Trials and Tribulations (USA) .nds')
     ap.add_argument('-o', '--out', default=None, help='output ROM (default: out/gs3_en.gba)')
+    ap.add_argument('--voices', default=os.path.join(ROOT, 'voices'),
+                    help='folder with voices.json and your recorded clips (default: voices/)')
+    ap.add_argument('--export-voices', metavar='DIR', default=None,
+                    help="write the GBA's shout samples as .wav files to DIR and exit")
     a = ap.parse_args()
+    if a.export_voices:
+        voices.export(BuildContext(a.gba, a.nds, verbose=False), a.export_voices); sys.exit(0)
     out = a.out or os.path.join(ROOT, 'out', 'gs3_en.gba')
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
-    build(a.gba, a.nds, out)
+    build(a.gba, a.nds, out, a.voices)

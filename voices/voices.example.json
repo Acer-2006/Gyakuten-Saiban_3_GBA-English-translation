@@ -1,0 +1,4 @@
+{
+  "_comment": "Copy to voices.json. Keys are GBA sample offsets from `python3 build.py gs3_jp.gba tt_us.nds --export-voices DIR`; values are your clip files in this folder (WAV, or other formats if ffmpeg is installed).",
+  "0xed1c0": "mia_take_that.wav"
+}
