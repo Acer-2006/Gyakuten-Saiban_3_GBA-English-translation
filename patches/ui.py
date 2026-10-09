@@ -5,7 +5,7 @@ row-major, 256 bytes); see hacking/docs/graphics.md.
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import textgfx
+import textgfx, smallfont
 
 # cross-examination buttons, OBJ palette 5: a white box (index 1) with dark lettering (3, grey 2
 # for the anti-aliasing) and the L / R button icon at one end.  (address, cells, box interior
@@ -30,6 +30,93 @@ TABS = [
     (0x08189320, 'Talk'),                   # 話す
     (0x08189720, 'Present'),                # つきつける
 ]
+
+# save screen header 記録: two 32x32 glyphs in the UI BG tile sheet (0x08180820, DMA'd to char
+# block 0), tiles 0x60-0x6f and 0x70-0x7f, placed by the screen's BG2 map (0x0803bf44, 32 wide)
+# at columns 10-13 and 18-21 of rows 3-6.  BG palette 0: grey (3) lettering with a white (8)
+# outline on dark red (9).  English: one 64x32 picture in the same 32 tiles, columns 12-19.
+SAVE_TILES, SAVE_MAP = 0x08181420, 0x0803bf44
+SAVE_ROWS, SAVE_COL0 = (3, 4, 5, 6), 10
+SAVE_TEXT = 'SAVE'
+SAVE_BG, SAVE_FILL, SAVE_OUTLINE, SAVE_PLAIN = 9, 3, 8, 0x40
+
+# save screen はい / いいえ: 0x0819a070, two 64x32 sprites (1D) in the Talk-topic box style (OBJ
+# palette 9 for the highlighted one, 10 for the other; 12 fill, dark lettering)
+YESNO, YESNO_TEXT = 0x0819a070, ('Yes', 'No')
+YESNO_FILL, YESNO_INK = 12, 4
+# the note under them (※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。): 0x0818e720,
+# 80 tiles shown as a 160x32 line at (40, 128): two 64x32 sprites, then a 32x32 column of four
+# 32x8 strips whose tiles are stored in the order of rows 0, 2, 1, 3; OBJ palette 13, white (1)
+# lettering, START in light blue (6), dark outline (5)
+HELP = 0x0818e720
+HELP_LINES = ('You can save at any time during', 'the game by pressing START.')
+HELP_HIGHLIGHT = 'START'
+HELP_FILL, HELP_HL, HELP_OUTLINE = 1, 6, 5
+
+def yes_no(rom, font):
+    for k, text in enumerate(YESNO_TEXT):
+        addr = YESNO + 1024 * k
+        grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)
+        if grid[6][2] != YESNO_FILL or grid[24][60] != YESNO_FILL:
+            raise SystemExit('ui: unexpected Yes / No button')
+        for y in range(7, 25):                   # inside the box: rows 6-25, columns 2-60
+            for x in range(3, 60):
+                grid[y][x] = YESNO_FILL
+        w = font.measure(text) + 1
+        g = textgfx.render(font, text, w + 1, 16, fill=1, align='left')
+        x0 = 2 + (60 - w) // 2
+        for y in range(16):
+            for x in range(w):
+                if g[y][x] or (x and g[y][x - 1]): grid[8 + y][x0 + x] = YESNO_INK   # bold
+        rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'save ' + text)
+
+def help_note(rom):
+    cv = [[0] * 160 for _ in range(32)]
+    for i, line in enumerate(HELP_LINES):
+        x = (160 - smallfont.measure(line)) // 2
+        y = 6 + 12 * i
+        for j, part in enumerate(line.split(HELP_HIGHLIGHT)):
+            if j:
+                smallfont.render(HELP_HIGHLIGHT, cv, x, y, HELP_HL); x += smallfont.measure(HELP_HIGHLIGHT)
+            smallfont.render(part, cv, x, y, HELP_FILL); x += smallfont.measure(part)
+    src = [r[:] for r in cv]
+    for y in range(32):
+        for x in range(160):
+            if not src[y][x] and any(0 <= y + dy < 32 and 0 <= x + dx < 160 and src[y + dy][x + dx] in (HELP_FILL, HELP_HL)
+                                     for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
+                cv[y][x] = HELP_OUTLINE
+    out = textgfx.sprite_cells([r[0:64] for r in cv], 64, 32) + textgfx.sprite_cells([r[64:128] for r in cv], 64, 32)
+    for row in (0, 2, 1, 3):                     # the 32x8 strips
+        out += b''.join(textgfx.tile4([r[128:160] for r in cv], tx * 8, row * 8) for tx in range(4))
+    if len(out) != 2560: raise SystemExit('ui: help note size')
+    rom.write(HELP, out, 'save note')
+
+def save_header(rom):
+    from .shouts import lettering
+    old = [[rom.u16(SAVE_MAP + 2 * (r * 32 + c)) for c in range(SAVE_COL0, SAVE_COL0 + 12)] for r in SAVE_ROWS]
+    want = [[0x60 + 4 * k + j for j in range(4)] + [SAVE_PLAIN] * 4 + [0x70 + 4 * k + j for j in range(4)]
+            for k in range(4)]
+    if old != want: raise SystemExit('ui: unexpected save screen map')
+    m = lettering(SAVE_TEXT)
+    h, w = len(m), len(m[0])
+    if w + 2 > 64 or h + 2 > 32: raise SystemExit('ui: save header too big')
+    cv = [[SAVE_BG] * 64 for _ in range(32)]
+    x0, y0 = (64 - w) // 2, (32 - h) // 2
+    for y in range(h):
+        for x in range(w):
+            if m[y][x]: cv[y0 + y][x0 + x] = SAVE_FILL
+    src = [r[:] for r in cv]
+    for y in range(32):
+        for x in range(64):
+            if src[y][x] != SAVE_FILL and any(0 <= y + dy < 32 and 0 <= x + dx < 64 and src[y + dy][x + dx] == SAVE_FILL
+                                              for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
+                cv[y][x] = SAVE_OUTLINE
+    tiles = b''.join(textgfx.tile4(cv, tx * 8, ty * 8) for ty in range(4) for tx in range(8))
+    rom.write(SAVE_TILES, tiles, 'save header')
+    for k, r in enumerate(SAVE_ROWS):           # the picture's 8x4 tiles in columns 12-19
+        row = [SAVE_PLAIN, SAVE_PLAIN] + [0x60 + 8 * k + j for j in range(8)] + [SAVE_PLAIN, SAVE_PLAIN]
+        for j, t in enumerate(row):
+            rom.w16(SAVE_MAP + 2 * (r * 32 + SAVE_COL0 + j), t)
 
 def unpack_cells(data, w, h=16, cw=32, ch=16):
     """Inverse of textgfx.sprite_cells: cells left to right, top to bottom -> rows of indices."""
@@ -79,4 +166,7 @@ def apply(rom, ctx):
             for x in range(56):
                 if txt[y][x]: grid[16 + y][2 + x] = txt[y][x]
         rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'tab ' + text)
-    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn")
+    save_header(rom)
+    yes_no(rom, font)
+    help_note(rom)
+    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn; save screen header, Yes / No and note")

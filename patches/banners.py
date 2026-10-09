@@ -1,4 +1,5 @@
-"""Testimony / cross-examination banners and the "Testimony" corner label, in English.
+"""Testimony / cross-examination banners, the Psyche-Lock banner and the "Testimony" corner label,
+in English.
 
 The banners (証言開始 "testimony begins", blue; 尋問開始 "cross-examination begins", red) are
 sprite animations.  Their pictures live in an effects archive at 0x0869c8f0: the animation table
@@ -48,6 +49,19 @@ FILL, OUTLINE, SHEEN, SHEEN_EDGE = 3, 2, 1, 4
 # OBJ palette 5, white (2) with a green outline (1)
 LABEL = 0x08189f20
 LABEL_TEXT = 'Testimony'
+
+# 解除成功 ("unlock successful"), shown when the last Psyche-Lock breaks: the same kind of banner
+# in its own sub-archive (offset 0xa4b4, four palettes for the flash at the end, 13 cells), used
+# by effects 104 (the whole sequence) and 105-107 (the halves)
+UNLOCK_FRAMES = [0x086df030, 0x086df168, 0x086df188]
+UNLOCK_SUB = 0xa4b4
+UNLOCK_TEXT = ('Unlock', 'Successful')   # the DS version's wording
+# its cells: 0 left half, 1 right half, 2 quarter 2, 3/4 quarter 1 with the sheen coming in, 5
+# quarter 1, 6 quarter 2 with the sheen, 7/9 quarter 3 with it, 10 quarter 3, 8 quarter 4, 11/12
+# quarter 4 with the sheen.  (x, width, sheen position or None) in the 128x32 picture:
+UNLOCK_CELLS = [(0, 64, None), (64, 64, None), (32, 32, None), (0, 32, 6), (0, 32, 22), (0, 32, None),
+                (32, 32, 50), (64, 32, 78), (96, 32, None), (64, 32, 90), (64, 32, None), (96, 32, 104),
+                (96, 32, 118)]
 
 def rle16(data):
     """Pack bytes (even length) with the archive's 16-bit RLE."""
@@ -173,6 +187,31 @@ def label_picture(text):
     _outline(cv, 2, 1)
     return cv
 
+def unlock(rom, font):
+    """The Psyche-Lock banner: a new sub-archive with the same palettes and cell roles."""
+    a = FX_ARCHIVE
+    entries = effect_entries(rom, UNLOCK_FRAMES)
+    if len(entries) != 4:
+        raise SystemExit(f'banners: expected 4 unlock animation entries, found {len(entries)}')
+    for fp in UNLOCK_FRAMES:
+        if rom.u32(fp + 4) != UNLOCK_SUB:
+            raise SystemExit(f'banners: unexpected unlock frame data at {fp:#x}')
+    s = a + UNLOCK_SUB
+    npal = rom.u16(s)
+    if rom.u32(s + 4 + 32 * npal) != 4 * len(UNLOCK_CELLS):
+        raise SystemExit('banners: the unlock sub-archive does not have 13 cells')
+    pic = banner_picture(font, UNLOCK_TEXT)
+    table = bytearray(); body = bytearray()
+    for x, w, pos in UNLOCK_CELLS:
+        table += struct.pack('<I', 4 * len(UNLOCK_CELLS) + len(body))
+        body += rle16(cell(pic if pos is None else sheen(pic, pos), x, w))
+    blob = struct.pack('<HH', npal, rom.u16(s + 2)) + rom.read(s + 4, 32 * npal) + bytes(table) + bytes(body)
+    addr = rom.store(blob, 'ext', 4, 'unlock banner sub-archive')
+    for fp in UNLOCK_FRAMES:
+        rom.w32(fp + 4, 0)                       # the frames' sub-archive is now at offset 0 ...
+    for e in entries:
+        rom.w32(e, addr)                         # ... of the new archive
+
 def apply(rom, ctx):
     font = textgfx.Font.from_ctx(ctx)
     a = FX_ARCHIVE
@@ -215,6 +254,7 @@ def apply(rom, ctx):
                 at = q + 4 + 4 * k + 2
                 attr = rom.u16(at); c = attr & 0x1ff
                 if c in CROSS_REMAP: rom.w16(at, (attr & ~0x1ff) | CROSS_REMAP[c])
+    unlock(rom, font)
     # corner label
     cv = label_picture(LABEL_TEXT)
     tiles = bytearray()
@@ -225,4 +265,4 @@ def apply(rom, ctx):
                 for x in range(tx * 8, tx * 8 + 8, 2):
                     tiles.append((row[x] & 15) | ((row[x + 1] & 15) << 4))
     rom.write(LABEL, bytes(tiles), 'testimony label')
-    print(f"  banners: testimony / cross-examination ({len(blob)} bytes) and the Testimony label")
+    print(f"  banners: testimony / cross-examination ({len(blob)} bytes), Unlock Successful and the Testimony label")

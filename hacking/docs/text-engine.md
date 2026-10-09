@@ -80,11 +80,39 @@ the shift). The interior is cleared by the loop at `0x08022166`–`0x08022186`.
 Page ends reset the text state in four places: `0x08021ab0` (wait for button), `0x08022622`
 (command `0x2e`), `0x0801fc00` (section initialisation) and `0x0801fa6c` (text reset).
 
+## Where sprite text goes
+
+Each drawn character gets a 12-byte record at `0x03003e50` (in use: bit 15 of the first
+halfword; then tile, x = 14 · column, y = 18 · row, colour). The writer at `0x0801fd6c` turns
+the records into OAM entries 2, 3, ... every frame:
+
+* normally y + 116 and x + 9 (the box rows);
+* if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
+  messages: save prompts, the chapter names): y − 64, and no centring;
+* otherwise, with alignment set (`TXT+0x22` low nibble, command `0x5d`): the line is centred,
+  and alignment 2 (captions) puts it at y 62 + 18 · row, or at y 71 when `TXT+0x1a` is 0;
+* in the free-slot mode (`TXT+0x1c` bit 2) the record already holds the position
+  (14 + 14 · column + `TXT+0x4c`, 36 + 18 · row + `TXT+0x4d`).
+
+Command `0x42 0` (bit 2 of `SYS+0x25c`) is used for every line shown without the text box:
+captions, the episode-select prompt (common section 2), phone calls and voices over a black
+screen, "To be continued".
+
+Screens that are opened over the game (the save screen, ...) save the records and the text
+state and put them back when they close; `0x08020024` then redraws the text sprites from the
+records (called at `0x0800bcc4`, `0x0800dcd4` and `0x08014464`).
+
 ## Captions and choices
 
 * **Captions** (command `0x42 0`): the same text is dispatched again every frame from column 0,
   row 0, and the original draws it centred at `y = 62 + 18 * row` in light blue. Turning caption
   mode off is `0x42 1`.
+  The English build draws text in this mode as sprites (16×16 cells in OBJ tiles 0–191, OAM
+  entries 3–50) and places the lines by the rules above, taking the section, alignment and
+  number of lines at the first character; the system messages are centred (the English lines
+  have no padding), and a page with a third English line uses the three-line box's rows
+  (y 112 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
+  shows its Yes / No in entries 40 and 41.
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
   mode), the question stays in the top rows and the labels are drawn as text in the lower part.
@@ -104,6 +132,7 @@ the old font area.
 | `0x0800577a`, `0x08005784` | `0xe0 → 0xd0`: partial redraw starts one row higher |
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
 | `0x08022166` | box clear loop replaced by `bl vwf_boxclear; b 0x08022186` |
+| `0x0800bcc4`, `0x0800dcd4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024` |
 | every copy of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) | entries 13–15 become the text colours (`167f`, `7eed`, `2be7`) |
 
 Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028100` (BSS of

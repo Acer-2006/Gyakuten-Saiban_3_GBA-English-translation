@@ -25,5 +25,7 @@ typedef int s32;
 #define OBJPAL ((volatile u16*)0x05000200)
 #define SYS_CAPTION (*(volatile u8*)0x03003a0c)   /* bit2: caption text mode (command 0x42) */
 #define TXT_ALIGN (*(volatile u8*)0x03007222)     /* low nibble: 1 = centred (command 0x5d) */
+#define TXT_SECTION (*(volatile u16*)0x0300720c)  /* current section (< 0x80: common bank) */
+#define TXT_1A (*(volatile u16*)0x0300721a)       /* 0: alignment-2 text sits at y 71 */
 #define VRAM ((volatile u8*)0x06000000)
 #define OBJVRAM ((volatile u16*)0x06010000)

@@ -97,24 +97,82 @@ description pictures were drawn with the dialogue font, so `tools/dsimgtext.py` 
 back exactly (see its docstring for the two quirks of the tool that drew them). The info panels
 ("Type: ...", "Age: ...") use a small font that is not in the ROM and are not used.
 
+## Talk topics and Move destinations
+
+The boxes listed by Talk (霧緒のこと, ...) and Move (高菱屋・地下倉庫, ...) are pictures: a
+**table of pointers at `0x08045d1c`**, entries 0–127 the talk topics and 128–149 the places
+(entry 150, the 5120-byte block after them, is the first Court Record picture and not part of
+the list). Each entry is LZ: 2048 bytes, a 128×32 4bpp picture stored as two 64×32 sprites (1D
+tile order). The code at `0x08011158` unpacks the ones the scene lists into `0x0200afc0` and
+copies them to OBJ tile `0x1a0 + 0x40 * row`; the highlighted box uses OBJ palette 9, the
+others palette 10, both loaded from `0x082231cc`. The frame is the same in all 150 pictures:
+fill index 12, frame 9 / 15 / 13; inside, 2..12 is a ramp from the lettering colour to the fill
+(dark red in palette 9, grey in palette 10), lettering in columns 3–124, rows 8–23.
+
+The DS keeps the same boxes as 128×32 16-colour texture files laid out one after another in
+`data.bin` (2228 bytes each), in the same order. The arm9 holds their offsets at `0x020b24a4`:
+places (Japanese, English, English), then topics (Japanese, English, English); the three words
+before that (`0x020b2498`) are the 128×128 8bpp place thumbnails. In the DS pictures index 2 is
+the fill and 4–15 a ramp from the fill to the lettering. The English lettering is an
+anti-aliased face that is not in either game's fonts, so the build copies the pictures: it takes
+each pixel's ink (how far its colour is from the fill towards the lettering colour) and sets it
+again with the GBA ramp inside the GBA frame, narrowing lettering wider than 122 pixels.
+
 ## Episode-select screen
 
-The sprite sheet is ten LZ blocks of 3840 bytes each:
+The background is the chunked image object at `0x08254afc` (8bpp, the courtroom, tinted green
+at run time); its pointer is in a small table before the image table (`0x0803b364`). The boxes
+and the 第n話 label are effects of the effects archive (below):
 
-```
-0x08254d24 0x082558b0 0x08256614 0x08257300 0x08257ef0
-0x08258ae0 0x08259570 0x0825a0d8 0x0825ae68 0x0825b974
-```
+* effects 10–20, sub-archive `0x8f4c`, two palettes (white and grey): 10 is an empty box, 11–15
+  the five titled boxes on palette 0 (the highlighted one, VRAM `0x06012300`) and 16–20 the same
+  boxes on palette 1 (VRAM `0x06013300` + `0x1000` · n). A box is 128×64 and 23–24 sprites: the
+  frame and the empty inside are shared cells (0–12), the title row (y −8..8) has cells of its
+  own. Each box takes 128 OBJ tiles;
+* effects 21–25, sub-archive `0x9ca0`: 第n話, three 16×16 sprites at y −60 (第, the digit, 話),
+  VRAM `0x06011000` (tile 128); the arrows (effects 26, 27) follow at tiles 140 and 146, so the
+  label has 12 tiles (48×16).
 
-They are decompressed through the wrapper `0x0803a048` to EWRAM `0x0202cfc0` and `0x5000` bytes
-are DMA'd to OBJ VRAM `0x06013400` (4bpp tile 416) by the routine at `0x0800c354`.
+The prompt under the boxes (エピソードを選んでください) is common-bank section 2, drawn as sprite
+text (see text-engine.md).
 
-As observed in OAM while the screen is up (not cross-checked against the loader in every detail):
+The English build reads the five titles from the DS common bank (the sections the save menu
+uses: two centred lines, the episode title and the part) and builds the boxes on the empty box's layout:
+nine 32×16 cells inside, the title in two lines of the DS font. The label is EPISODE n in
+condensed capitals (Spleen 5x8 at double height).
 
-* selected episode box: objects 101–124, tiles 280–404, palette 10; its interior is 96×48 at
-  x 72–168, y 48–96, background index 12, title lettering in indices 4–11 and 14;
-* unselected box: palette 12, tiles 540–663;
-* the "episode n" label: objects 125–127, tiles 128–136, palette 13, at y = 12.
+## Save screen
+
+START during an investigation opens it; common-bank section 0 or 1 asks the question, and the
+game state is saved and restored around it (`0x0800bca8` copies the sprite records and the text
+state back, then calls `0x08020024`, which redraws text sprites from the records).
+
+* Header 記録: two 32×32 glyphs in the UI BG tile sheet (`0x08180820`, 256 tiles DMA'd to BG
+  char block 0 by eight loaders), tiles `0x60`–`0x6f` and `0x70`–`0x7f` (`0x08181420`), placed by
+  the BG2 map at `0x0803bf44` (32 wide, rows 2–11 are the box) at columns 10–13 and 18–21 of
+  rows 3–6. BG palette 0: grey (3) lettering, white (8) outline, dark red (9) background. The
+  English build draws SAVE as one 64×32 picture in the same 32 tiles and places it at columns
+  12–19. The sheet stays in VRAM between screens: a savestate made with an older ROM shows the
+  old tiles until a screen reloads the sheet (the episode select does).
+* はい / いいえ: `0x0819a070`, two 64×32 sprites (1D) in the Talk-topic box style, DMA'd to OBJ
+  tile `0x1e0`; OAM entries 40 and 41 at (48, 96) and (128, 96), palette 9 for the highlighted
+  one and 10 for the other.
+* The note ※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。: `0x0818e720`, 80 tiles
+  at OBJ tile `0x220`, a 160×32 line at (40, 128): two 64×32 sprites, then a 32×32 column of four
+  32×8 sprites whose tiles are stored in the order of rows 0, 2, 1, 3. OBJ palette 13
+  (`0x08198cd0`): white (1) lettering with grey (4) anti-aliasing and a dark (5) outline, the
+  highlighted words light blue (6, 8, 9).
+
+## The verdict
+
+Script command `0x44` (handler `0x080209dc`, one argument: 0 not guilty, otherwise guilty) shows
+two 64×64 affine sprites that slam in one after the other, left then right, from raw 4bpp
+pictures (8×8 tiles, 1D order, 2 KB each) DMA'd to OBJ tiles `0x1a0` and `0x1e0`: not guilty
+copies 無 (`0x0818bb00`) and 罪 (`0x0818cb00`) with palette `0x08198b70`; guilty copies 4 KB from
+`0x0818c300` (literal at `0x08020a30`), 有 followed by the same 罪, with palette `0x08198b50`.
+Index 1 is the lettering, 2 its outline, 5 an outer edge, 3 and 4 greys for the corners; the
+not-guilty palette makes the lettering white on black, the guilty one black on white. 敗訴
+follows at `0x0818d300`; no code reference to it was found.
 
 ## Effects archive: banners and speech bubbles
 
@@ -173,6 +231,18 @@ use it for the banners.
 
 **Testimony label** (証言中, top left during a testimony): raw 64×32 sprite at `0x08189f20`
 (1D tile order), OBJ palette 5, white (2) with a green outline (1).
+
+**Psyche-Lock banner** (解除成功, "unlock successful"): sub-archive `0xa4b4`, four palettes (the
+last three for the flash at the end), 13 cells with the banner's roles: 解除 (0) and 成功 (1) as
+64×32, quarter 2 (2), quarter 1 with the sheen coming in (3, 4), quarter 1 (5), quarter 2 with
+the sheen (6), quarter 3 with it (7, 9), quarter 3 (10), quarter 4 (8) and with the sheen (11,
+12). Effects 104 (the whole sequence, frames `0x086df030`) and 105–107 (the halves, `0x086df168`,
+`0x086df188`). The English build writes a new sub-archive and sets the three frame blocks'
+sub-archive offset to 0.
+
+Other effects with writing: 69 and 70 (脱獄囚に関するデータ, 脱獄から再逮捕までの推移, a data
+screen) and 71–73 (PICTURE, DATA1, DATA2), sub-archive `0x2d240`. The DS keeps a copy of that
+sub-archive in `data.bin` at `0x76c254`, still in Japanese.
 
 ## Buttons
 

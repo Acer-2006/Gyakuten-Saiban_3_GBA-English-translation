@@ -44,8 +44,15 @@ struct vwf_state {
     s16 lbl_row0;
     u8 lbl_line;
     u8 lbl_width[LBL_LINES];
-    u8 lbl_caption;     /* sprite text is a caption screen (centred rows) rather than menu labels */
+    u8 lbl_caption;     /* sprite text outside the box (command 0x42) rather than menu labels */
     u8 lbl_shown;       /* OAM entries LBL_OBJ0.. currently carry sprite text */
+    u8 lbl_used[LBL_LINES];   /* ... how many of each line's 16 entries (the others are left
+                                 alone: the save screen puts its Yes / No in entries 40-41) */
+    u8 lbl_align;       /* ... and how the engine places it, latched at its first character */
+    u8 lbl_rows;
+    u8 lbl_sys;
+    u8 lbl_low;
+    u8 lbl_full[LBL_LINES];   /* width of each line of the page (measured ahead) */
 };
 static struct vwf_state vs;
 
@@ -180,7 +187,27 @@ static void labels_reset(void) {
     vs.lbl_pen = 0; vs.lbl_line = 0;
 }
 
-/* Sprite text (choice labels / caption screens).  The engine hands us (col, row) cell
+/* The rest of the page from the character being drawn (code at `row`, the script pointer just
+   after it): the number of rows, and the width of each line (for centring before it is typed). */
+static int page_scan(const u16* p, u32 code, int row) {
+    int L = row - vs.lbl_row0;
+    int w = font_w[glyph_index(code)];
+    for (int n = 0; n < 1024; n++) {
+        u32 t = *p++;
+        if (t >= 0x80) { w += font_w[glyph_index(t)]; continue; }
+        if (t == 0x01) {
+            if (L >= 0 && L < LBL_LINES) vs.lbl_full[L] = w > 255 ? 255 : w;
+            row++; L++; w = 0; continue;
+        }
+        if (t == 0x00 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
+            t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36 || t == 0x42) break;
+        p += cmd_args[t];
+    }
+    if (L >= 0 && L < LBL_LINES) vs.lbl_full[L] = w > 255 ? 255 : w;
+    return row + 1;
+}
+
+/* Sprite text (choice labels / text outside the box).  The engine hands us (col, row) cell
    positions; col 0 marks the start of a line.  Captions are re-dispatched every frame from
    the first character, so the surface is only cleared when the text state is reset. */
 static void label_draw_char(u32 code, int col, int row) {
@@ -188,6 +215,13 @@ static void label_draw_char(u32 code, int col, int row) {
         labels_reset();
         vs.lbl_caption = (SYS_CAPTION & 4) ? 1 : 0;
         vs.lbl_row0 = vs.lbl_caption ? 0 : row;
+        /* where the engine's sprite writer (0x0801fd6c) puts this text: see labels_oam */
+        u32 sec = TXT_SECTION;
+        vs.lbl_sys = (sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31));
+        vs.lbl_align = TXT_ALIGN & 0xf;
+        vs.lbl_low = TXT_1A == 0;
+        for (int i = 0; i < LBL_LINES; i++) vs.lbl_full[i] = 0;
+        vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
     }
     int L = row - vs.lbl_row0;
     if (L < 0 || L >= LBL_LINES) return;
@@ -202,29 +236,50 @@ static void label_draw_char(u32 code, int col, int row) {
 
 static void labels_hide(void) {
     if (!vs.lbl_shown) return;
-    for (int i = 0; i < LBL_LINES * LBL_CELLS; i++) OAMBUF[(LBL_OBJ0 + i) * 4 + 0] = 0x0200;   /* disabled */
+    for (int L = 0; L < LBL_LINES; L++) {
+        for (int c = 0; c < vs.lbl_used[L]; c++) OAMBUF[(LBL_OBJ0 + L * LBL_CELLS + c) * 4 + 0] = 0x0200;   /* disabled */
+        vs.lbl_used[L] = 0;
+    }
     vs.lbl_shown = 0;
 }
 
 static void labels_oam(void) {
     OBJPAL[2 * 16 + 13] = 0x167f; OBJPAL[2 * 16 + 14] = 0x7eed; OBJPAL[2 * 16 + 15] = 0x2be7;
+    /* white (index 8) is the UI palette's; screens that load their own palette 2 (the episode
+       select) leave it black */
+    if (!(OBJPAL[2 * 16 + 8] & 0x7fff)) OBJPAL[2 * 16 + 8] = 0x7fff;
     vs.lbl_shown = 1;
     for (int L = 0; L < LBL_LINES; L++) {
         int w = vs.lbl_width[L];
         int ncells = (w + 15) >> 4;
         int x = LBL_X0, y = LBL_Y0 + L * 16;
         if (vs.lbl_caption) {
-            y = CAP_Y0 + L * CAP_PITCH;
-            x = (TXT_ALIGN & 0xf) ? (240 - w) / 2 : 8;
+            /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
+               three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
+               otherwise centred text is centred, and alignment 2 (captions) is drawn at
+               y 62 + 18 * row (y 71 when TXT+0x1a is 0). */
+            int fw = vs.lbl_full[L] > w ? vs.lbl_full[L] : w;
+            x = 9;
+            y = (vs.lbl_rows > 2) ? 112 + L * 16 : 116 + L * 18;
+            if (vs.lbl_sys) {
+                /* the engine does not centre these (the Japanese pads them with spaces); the
+                   English lines are centred, as on the DS */
+                y = 52 + L * CAP_PITCH;
+                x = (240 - fw) / 2;
+            } else if (vs.lbl_align) {
+                x = (240 - fw) / 2;
+                if (vs.lbl_align == 2) y = (vs.lbl_low ? 71 : CAP_Y0) + L * CAP_PITCH;
+            }
             if (x < 0) x = 0;
         }
         for (int c = 0; c < LBL_CELLS; c++) {
             int obj = LBL_OBJ0 + L * LBL_CELLS + c;
-            if (c >= ncells) { OAMBUF[obj * 4 + 0] = 0x0200; continue; }
+            if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
             OAMBUF[obj * 4 + 0] = y | (0 << 14);
             OAMBUF[obj * 4 + 1] = ((x + c * 16) & 0x1ff) | (1 << 14);
             OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (0 << 10) | (2 << 12);
         }
+        vs.lbl_used[L] = ncells;
     }
 }
 
@@ -329,6 +384,15 @@ void vwf_frame(void) {
         OAMBUF[ARROW_OBJ * 4 + 1] = 222 | (0 << 14);          /* x, size 0 -> 16x8 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
     }
+}
+
+/* Called before 0x08020024, which redraws the text sprites from the saved sprite records when
+   an overlay screen (the save screen, for one) closes and the game state is restored: the
+   overlay's own sprite text goes with it. */
+void vwf_restore(void) {
+    labels_hide();
+    vs.lbl_row0 = -1;
+    vs.lbl_caption = 0;
 }
 
 /* Replaces the engine's "clear box rows" loop: rows 11..19 of the BG1 map. */

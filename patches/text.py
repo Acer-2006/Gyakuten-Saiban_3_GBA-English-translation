@@ -15,6 +15,8 @@ FRAME_TEMPLATE  = 0x0803b844   # 32x32 byte map template of the normal text box
 TAG_ROW14_LIT   = 0x08006678   # literal 0x3002400 (row 14) in the name-tag drawer
 TAG_ROW12_LIT   = 0x0800667c   # literal 0x3002380 (row 12)
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
+RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
+RESTORE_CALLS   = (0x0800bcc4, 0x0800dcd4, 0x08014464)
 
 UI_PAL = [0x0000,0x0400,0x1ce7,0x4210,0x739c,0x3800,0x3cc5,0x5a0c,0x7fff,0x0c6c,0x3191,0x4656,0x631b,0x3def,0x028c,0x03ff]
 TEXT_PAL = {13: 0x167f, 14: 0x7eed, 15: 0x2be7}
@@ -92,6 +94,18 @@ def apply(rom, ctx):
     assert rom.u32(0x0800674c) == 0x030037b0, hex(rom.u32(0x0800674c))
     assert rom.u32(0x08006750) == 0x03003a90, hex(rom.u32(0x08006750))
     rom.thumb(VRAMUPD_HOOK, f'bl #{tramp_fr & ~1:#x}', 'frame hook')
+
+    # 4b. overlay screens (save screen, ...) restore the game state on exit and call 0x08020024
+    # to redraw the text sprites from the restored records: drop the overlay's sprite text first
+    tramp_rs = rom.thumb_code(f'''
+        push {{lr}}
+        bl #{syms["vwf_restore"] & ~1:#x}
+        bl #{RESTORE_TEXT:#x}
+        pop {{pc}}
+    ''', note='restore trampoline')
+    for site in RESTORE_CALLS:
+        assert rom.asm_thumb(site, f'bl #{RESTORE_TEXT:#x}') == rom.read(site, 4), hex(site)
+        rom.thumb(site, f'bl #{tramp_rs & ~1:#x}', 'restore hook')
 
     # 5. taller text box: frame rows 13..19 (top edge, 5 interior rows, bottom)
     t = bytearray(rom.read(FRAME_TEMPLATE, 1024))

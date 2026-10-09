@@ -10,8 +10,8 @@ the two games:
 * `gs3_jp.gba` — Gyakuten Saiban 3 (Japan), 8 MB, CRC32 51B6CF22
 * `tt_us.nds`  — Phoenix Wright: Ace Attorney – Trials and Tribulations (USA), game code YG3E
 
-The English script, font, name tags, Court Record, menu labels and other English material are
-read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
+The English script, font, name tags, Court Record, menu labels, talk topics, episode titles and
+other English material are read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
 the script converter and the hooks); nothing from either game is stored in it.
 
 ## Use
@@ -35,14 +35,18 @@ flash cart.
   Testimony label, the cross-examination buttons (L Press / Present R) and the OK / Back
   prompts when presenting.
 * OBJECTION!, HOLD IT! and TAKE THAT! speech bubbles.
-* Investigation menu tabs (Examine, Move, Talk, Present).
-* Caption screens ("5 Years Earlier", date/location cards) in English.
+* Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
+  destinations (the DS version's pictures, copied into the GBA boxes).
+* Episode select: the episode titles (from the DS script) and EPISODE 1–5 labels.
+* Save screen: SAVE header, Yes / No and the note under them.
+* Unlock Successful when the last Psyche-Lock breaks, and the NOT GUILTY / GUILTY verdict.
+* Caption screens ("5 Years Earlier", date/location cards) in English; lines shown without the
+  text box (the episode-select prompt, "To be continued") sit where the original puts them.
 * English title screen (DS logo) and title menu.
 * The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
-Still Japanese for now: the place names in the Move menu, the pages behind the L Button
-(photos, maps, letters) and other pictures with writing in them, and the episode titles on the
-episode-select screen.
+Still Japanese for now: the pages behind the L Button (photos, maps, letters) and other
+pictures with writing in them, and one data screen in a later episode (脱獄囚に関するデータ).
 
 ## Your own voice clips (optional)
 
@@ -74,6 +78,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.10 — Talk topics and Move destinations, the episode-select titles and labels, the save
+  screen, the Psyche-Lock "Unlock Successful" banner and the verdict in English. Lines shown
+  without the text box are placed as in the original (the episode-select prompt was drawn over
+  the boxes), and the save prompt no longer stays on screen after the save screen closes.
 * 0.9.1 — fix: starting an episode from the episode select (or continuing a save at the start
   of a chapter) loaded the Japanese script for chapters 3, 7, 13, 17, 28, 32 and 34's first
   part; the loader had a second set of pointers to those banks. Investigation menu tabs in
