@@ -78,14 +78,16 @@ def to_pcm8(pcm16, rate, max_rate=MAX_RATE):
     return rate, data
 
 def apply(rom, ctx, folder):
-    """Install the clips listed in folder/voices.json.  Returns the number installed."""
+    """Install the clips listed in folder/voices.json (overriding whatever the build put in
+    place for those samples).  Returns the number installed."""
     mapping_path = os.path.join(folder, 'voices.json')
     if not os.path.exists(mapping_path): return 0
     mapping = json.load(open(mapping_path))
-    g = bytes(rom.d[:rom.orig_size])
+    g = ctx.gba   # references are looked up in the original ROM; the same spots are repointed
     known = {off for off, _, _, _ in samples(g)}
     n = 0
     for key, fname in mapping.items():
+        if key.startswith('_'): continue
         off = int(key, 0)
         if off not in known: raise SystemExit(f'voices.json: {key} is not a sample in the GBA ROM')
         rate, pcm = read_clip(os.path.join(folder, fname))

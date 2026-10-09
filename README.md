@@ -1,4 +1,8 @@
-# Gyakuten Saiban 3 — English build tool
+# Gyakuten Saiban 3 GBA English translation
+
+<img width="400" height="266" alt="image" src="https://github.com/user-attachments/assets/5b35b4c8-c8e0-4f19-8cbe-5c49a6f609d9" />
+
+A fan translation of Gyakuten Saiban 3 that uses the English DS script, features three lines, a vwf and of course, as always English!
 
 Builds an English-language ROM of *Gyakuten Saiban 3* (Game Boy Advance) from your own copies of
 the two games:
@@ -26,15 +30,15 @@ flash cart.
 * English name tags from the DS version.
 * Caption screens ("5 Years Earlier", date/location cards) in English.
 * English title screen (DS logo) and title menu.
+* The English voice clips ("Objection!", "Hold it!", "Take that!") from the DS version.
 
-Still Japanese for now: the in-court speech bubbles ("Objection!" etc.), the testimony /
-cross-examination banners, the investigation and court-record buttons, the episode titles on the
-episode-select screen, and the voice clips.
+Still Japanese for now: the in-court speech bubbles, the testimony / cross-examination banners,
+the investigation and court-record buttons, and the episode titles on the episode-select screen.
 
-## Your own voice clips
+## Your own voice clips (optional)
 
-The shouts ("Objection!" and so on) are 8-bit samples in the GBA ROM. To replace them with
-recordings of your own:
+The DS English shouts are installed automatically. If you would rather use recordings of your
+own for some or all of them:
 
 1. `python3 build.py gs3_jp.gba tt_us.nds --export-voices samples/` writes every candidate
    sample as a `.wav` named by its ROM offset, so you can hear which is which. The sample at
@@ -48,8 +52,8 @@ The `voices/` folder is ignored by git, so recordings stay on your machine.
 
 ## Version history
 
+* 0.5 — English voice clips from the DS version.
 * 0.4 — voice-clip import (`voices/`) and sample export.
-
 * 0.3 — English title screen and title menu.
 * 0.2 — Python-only build tool; English choice menus; caption screens.
 * 0.1 — first preview (script, font, three-line box, name tags).
