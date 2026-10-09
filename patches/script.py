@@ -14,15 +14,26 @@ COMMON_LITS = [(0x1ed64, 0), (0x1ed60, 4)]   # (literal address, offset from ban
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
+DIRECTORY = 0x08800000               # bank directory written for tools: 'GS3E', u32 1, u32 45, {u32 addr, u32 len} x 45
+                                     # (banks 0..43 then the common bank; len 0 = LZ-compressed at addr)
+
 def apply(rom, ctx):
     table = ctx.gba_table
     en = ctx.en_banks if ctx.en_banks is not None else ctx.convert()
-    # 1. place English banks in the expansion area
+    # 1. place English banks in the expansion area, after the bank directory
+    dir_addr = rom.alloc(16 + 45 * 8, 'ext', 4)
+    assert dir_addr == DIRECTORY, hex(dir_addr)
     bank_addr = {}
     for b in range(42):
         bank_addr[b] = rom.store(en[b], 'ext', 4, f'en bank {b}')
     common = rom.store(en['common'], 'ext', 4, 'en common bank')
     print(f"  English banks at {bank_addr[0]:#x}.., common at {common:#x}; ext used {rom.regions['ext'].used/1e6:.2f} MB")
+    entries = []
+    for b in range(44):
+        if b in bank_addr: entries.append((bank_addr[b], len(en[b])))
+        else: entries.append((0x08000000 + [t for t in table if t['idx'] == b][0]['rom_off'], 0))
+    entries.append((common, len(en['common'])))
+    rom.write(dir_addr, b'GS3E' + struct.pack('<II', 1, 45) + b''.join(struct.pack('<II', a, l) for a, l in entries), 'bank directory')
 
     # 2. compile script.c
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)

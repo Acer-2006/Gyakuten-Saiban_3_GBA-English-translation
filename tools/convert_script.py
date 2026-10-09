@@ -81,12 +81,14 @@ def map_args(cmd, args, argmap):
         else: res.append(a)
     return tuple(res)
 
-def convert_section(g, j, e, argmap, labels=None, stats=None):
+def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
+    """emap (optional dict) receives E item index -> output item index, for label entries."""
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
     out = []
     i = 0
     while i < len(e):
+        if emap is not None: emap[i] = len(out)
         it = e[i]
         if it[0] == 't':
             out.append(it); i += 1; continue
@@ -146,6 +148,7 @@ def convert_section(g, j, e, argmap, labels=None, stats=None):
             out.append(('c', c, map_args(c, it[2], argmap)))
             if stats is not None: stats['en_edit'] += 1
         i += 1
+    if emap is not None: emap[len(e)] = len(out)
     return out
 
 def items_to_words(items):
@@ -158,38 +161,63 @@ def items_to_words(items):
 def run_mem(ctx):
     """Convert using data from a BuildContext; returns ({bank idx: bytes, 'common': bytes}, stats)."""
     from labels_en import menu_labels
+    import banks as bk
     pairs = []
-    banks = {}
+    parsed = {}
     for b in range(42):
-        G = load_bank(ctx.gba_banks[b]); J = load_bank(ctx.ds_banks[2 * b]); E = load_bank(ctx.ds_banks[2 * b + 1])
-        banks[b] = (G, J, E)
-        for s in range(len(G)):
-            pairs.append((tok(words(G[s]), A), tok(words(J[s]), ADS)))
-    Graw = load_bank(ctx.gba_common); Jraw = load_bank(ctx.ds_banks[84]); Eraw = load_bank(ctx.ds_banks[85])
-    for s in range(len(Graw)):
-        pairs.append((tok(words(Graw[s]), A), tok(words(Jraw[s]), ADS)))
+        m = bk.main_bank_of(b)
+        G = bk.parse_bank(ctx.gba_banks[b], ctx.gba_banks[m] if m != b else None)
+        # the DS banks follow the GBA classification (DS-only 0x36 jumps target plain sections)
+        J = bk.parse_bank(ctx.ds_banks[2 * b], ctx.ds_banks[2 * m] if m != b else None, labels=set(G['labels']))
+        E = bk.parse_bank(ctx.ds_banks[2 * b + 1], ctx.ds_banks[2 * m + 1] if m != b else None, labels=set(G['labels']))
+        assert G['n'] == J['n'] == E['n'] and G['present'] == J['present'] == E['present'], (b, G['n'], J['n'], E['n'])
+        parsed[b] = (G, J, E)
+        for s in G['present']:
+            pairs.append((tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS)))
+    Graw = bk.parse_bank(ctx.gba_common); Jraw = bk.parse_bank(ctx.ds_banks[84]); Eraw = bk.parse_bank(ctx.ds_banks[85])
+    for s in Graw['present']:
+        pairs.append((tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][s]), ADS)))
     argmap = learn_argmap(pairs)
     stats = Counter()
     gba_menus = {}
     for b in range(42):
-        for s, sec in enumerate(banks[b][0]):
-            tg = tok(words(sec), A)
+        G = parsed[b][0]
+        for s in G['present']:
+            tg = tok(words(G['sections'][s]), A)
             if any(it[0] == 'c' and it[1] == 0x07 for it in tg): gba_menus.setdefault(b, []).append(s)
     labels = menu_labels(ctx.arm9, gba_menus)
     out = {}
     for b in range(42):
-        G, J, E = banks[b]
-        secs = []
-        for s in range(len(G)):
-            conv = convert_section(tok(words(G[s]), A), tok(words(J[s]), ADS), tok(words(E[s]), ADS), argmap,
-                                   labels=labels.get((b, s)), stats=stats)
-            secs.append(pack(items_to_words(conv)))
-        out[b] = save_bank(secs)
-    secs = []
-    for s in range(len(Graw)):   # keep the GBA section count (52); the DS has 54
-        conv = convert_section(tok(words(Graw[s]), A), tok(words(Jraw[s]), ADS), tok(words(Eraw[s]), ADS), argmap, stats=stats)
-        secs.append(pack(items_to_words(conv)))
-    out['common'] = save_bank(secs)
+        G, J, E = parsed[b]
+        secs = {}; emaps = {}
+        for s in G['present']:
+            emap = {}
+            conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
+                                   tok(words(E['sections'][s]), ADS), argmap, labels=labels.get((b, s)), stats=stats, emap=emap)
+            secs[s] = pack(items_to_words(conv)); emaps[s] = (conv, emap)
+        # label entries (command 0x36 targets): E's byte offset -> E item index -> output item -> byte offset
+        new_labels = {}
+        for idx, (sec, off) in E['labels'].items():
+            e_items = tok(words(E['sections'][sec]), ADS)
+            pos = 0; e_index = len(e_items)
+            for k, it in enumerate(e_items):
+                if pos * 2 >= off: e_index = k; break
+                pos += 1 + len(it[2])
+            conv, emap = emaps[sec]
+            o_index = emap[e_index]
+            new_off = sum(1 + len(it[2]) for it in conv[:o_index]) * 2
+            new_labels[idx] = (sec, new_off)
+            stats['labels_0x36'] += 1
+        # a partial bank's unused entries stay copies of its (already converted) main bank's
+        m = bk.main_bank_of(b)
+        stale = {i: bk.entries(out[m])[i] for i in G['stale']} if m != b and len(bk.entries(out[m])) == G['n'] else G['stale']
+        out[b] = bk.build_bank(G['n'], secs, new_labels, stale)
+    secs = {}
+    for s in Graw['present']:   # keep the GBA section count (52); the DS has 54
+        conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][s]), ADS),
+                               tok(words(Eraw['sections'][s]), ADS), argmap, stats=stats)
+        secs[s] = pack(items_to_words(conv))
+    out['common'] = bk.build_bank(Graw['n'], secs, Graw['labels'], Graw['stale'])
     return out, dict(stats)
 
 def run(out_dir):

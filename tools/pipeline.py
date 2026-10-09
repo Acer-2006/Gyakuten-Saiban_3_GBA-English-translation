@@ -13,7 +13,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GBA_CRC = 0x51b6cf22          # Gyakuten Saiban 3 (Japan)  A3JJ
 NDS_CODE = b'YG3E'            # Phoenix Wright: Ace Attorney - Trials and Tribulations (USA)
 GBA_COMMON_BANK = 0x6e3578    # uncompressed common script bank in the GBA ROM
-GBA_COMMON_SIZE = 0x3000
+GBA_COMMON_SIZE = 0x264c      # ends where chapter bank 0 begins
 
 class BuildContext:
     def __init__(self, gba_path, nds_path, verbose=True):

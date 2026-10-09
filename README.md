@@ -50,8 +50,19 @@ own for some or all of them:
 
 The `voices/` folder is ignored by git, so recordings stay on your machine.
 
+## Hacking the game yourself
+
+`hacking/` holds format notes (script, text engine, graphics, sound, memory map) and
+command-line tools for the Japanese ROM and for ROMs made by this build: dump and re-insert
+script text, extract and replace backgrounds, view tiles and the font, export and replace
+samples, find cross references, plus a headless mGBA harness for tracing. See
+[hacking/README.md](hacking/README.md).
+
 ## Version history
 
+* 0.6 — `hacking/` notes and tools. Build fixes: the three label jumps (command `0x36`) now land
+  where they should, partial banks keep their structure, the common bank's true size is used,
+  and a bank directory at `0x08800000` lets tools edit the English text.
 * 0.5 — English voice clips from the DS version.
 * 0.4 — voice-clip import (`voices/`) and sample export.
 * 0.3 — English title screen and title menu.
