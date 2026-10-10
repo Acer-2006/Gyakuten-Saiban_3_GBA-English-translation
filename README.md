@@ -84,6 +84,13 @@ The `voices/` folder is ignored by git, so recordings stay on your machine.
 
 ## Credits
 
+Thanks to Broco, whose *Comeback Courtroom 3* (2005–2007, http://comebackcourt.sourceforge.net)
+was the fan translation of this game before there was an official one: it brought Case 1 to
+English, and he closed it when the DS translation was announced. This project started from his
+ROM hacking notes, his list of the script's control codes and his character table, which showed
+where the scripts, the font, the graphics and the text routines are in the ROM and how the script
+works. Thank you, Broco.
+
 The Court Record descriptions use Spleen 5x8 by Frederic Cambus (BSD 2-Clause licence, see
 `tools/fonts/LICENSE.spleen`).
 
