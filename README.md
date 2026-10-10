@@ -10,9 +10,13 @@ the two games:
 * `gs3_jp.gba` — Gyakuten Saiban 3 (Japan), 8 MB, CRC32 51B6CF22
 * `tt_us.nds`  — Phoenix Wright: Ace Attorney – Trials and Tribulations (USA), game code YG3E
 
-The English script, font, name tags, Court Record, menu labels, talk topics, episode titles,
-pictures and other English material are read out of the DS image while the ROM is built. This tool only contains the code changes (the new text engine,
-the script converter and the hooks); nothing from either game is stored in it.
+The English script, font, name tags, Court Record, talk topics, episode titles, pictures and
+other English material are read out of the DS image while the ROM is built. This repository
+holds the code changes (the new text engine, the script converter and the hooks) and a little
+English typed in by hand: the choice-menu options, which the DS only has as pictures
+(`tools/labels_en.py`), the short words on the buttons and banners the build redraws, and the
+few DS lines the converter rewords for the GBA's buttons. Nothing else from either game is
+stored in it.
 
 ## Use
 

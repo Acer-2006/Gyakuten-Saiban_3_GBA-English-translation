@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Build context: reads the two game ROMs and prepares everything the patches need.
 
-Nothing from either game is stored in this tool; all game data (script, font, graphics, voices)
-is taken from the user's own cartridge images each time the ROM is built.
+All game data (script, font, graphics, voices) is taken from the user's own cartridge images
+each time the ROM is built.  The exceptions, typed in by hand: the English choice-menu options
+(tools/labels_en.py; the DS has them only as pictures), the words on the redrawn buttons and
+banners, and the DS lines reworded for the GBA's buttons (convert_script.GBA_WORDING).
 """
 import os, sys, struct, zlib, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
