@@ -11,12 +11,12 @@ detail are the same numbers as the GBA's) and per-language base offsets into dat
 0x020a44c0 (8 words per language: Japanese, English, English).  English names are 128x16
 textures (orange text, index 2), descriptions are 256x64 textures with three lines of dialogue-
 font text.  The names are copied as pictures; the descriptions are read back to text (see
-tools/dsimgtext.py) and set again, anti-aliased, in Inter Medium at 10 pixels (tools/crfont.py) so
-they fit the GBA panel.
+tools/dsimgtext.py) and set again in the same font, the DS's letters with the DS's gaps halved, so
+they fit the GBA panel (tools/dsdesc.py).
 """
 import os, re, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import lz, crfont, dsimgtext, textgfx
+import lz, dsdesc, dsimgtext, textgfx
 
 # the "R" switch label under the panel: 64x16 (two 32x16 sprite cells), OBJ palette 4, white text
 # (12) with a dark outline (10); copied to OBJ tile 0x1a8 when the Court Record opens
@@ -32,15 +32,11 @@ NAME_BASE, DESC_BASE = 4, 7    # ... of the name textures and the description te
 
 BG, TITLE, BODY, CLEAR = 9, 15, 8, 0
 W, H, W_USE = 160, 64, 152     # columns 152..159 stay transparent, as in the originals
-TEXT_X, TEXT_W = 3, 142        # keep the text clear of the right arrow, like the Japanese
-# The panels are shown with OBJ palette 2 = the 16 colours at PALETTE.  The Japanese text uses
-# only white (8) on the dark red (9); entries 10, 11 and 12 hold the steps between the two, which
-# give the anti-aliased text its five levels.
-PALETTE = 0x08180800
-RAMP = (BG, 10, 11, 12, BODY)
-# baselines of the description's lines: up to three lines 14 rows apart, four 12 apart (the
-# letters reach 8 rows above the baseline, 10 with an accent, and 1 below)
-BASELINES = {1: (26,), 2: (26, 40), 3: (26, 40, 54), 4: (25, 37, 49, 61)}
+TEXT_X, TEXT_W = 1, 149        # the text's ink in columns 1..149, as the Japanese
+# the panel row of each line's top (glyph row 0; the capitals start a row lower, the tails of g and
+# y end 13 rows lower): up to three lines 16 rows apart, centred on the Japanese lines; four lines
+# 12 apart, from just under the name to the bottom of the panel
+LINES = {1: (17,), 2: (17, 33), 3: (17, 33, 49), 4: (14, 26, 38, 50)}
 
 def ds_items(arm9):
     o = DS_ITEMS - DS_ARM9
@@ -72,9 +68,9 @@ def join_lines(lines):
             out = (out + ' ' + ln) if out else ln
     return out
 
-def panel(name_px, text):
-    """name_px: 16 rows of the DS name texture (text = index 2).  -> 64 rows x 160 indices, or
-    None when the text does not fit."""
+def panel(name_px, text, font):
+    """name_px: 16 rows of the DS name texture (text = index 2).  -> (64 rows x 160 indices, the
+    word gap narrowing), or (None, None) when the text does not fit."""
     img = [[BG] * W_USE + [CLEAR] * (W - W_USE) for _ in range(H)]
     xs = [x for x in range(len(name_px[0])) if any(row[x] == 2 for row in name_px)]
     if xs:
@@ -82,23 +78,14 @@ def panel(name_px, text):
         for y, row in enumerate(name_px):
             for x, v in enumerate(row):
                 if v == 2 and 0 <= x + dx < W_USE: img[y][x + dx] = TITLE
-    lines = crfont.wrap(text, TEXT_W)
-    if len(lines) not in BASELINES: return None
-    levels = [[0] * W for _ in range(H)]
-    for base, line in zip(BASELINES[len(lines)], lines):
-        crfont.render(line, levels, TEXT_X, base - crfont.ASCENT)
-    for y in range(H):
-        for x in range(W_USE):
-            if levels[y][x]: img[y][x] = RAMP[levels[y][x]]
-    return img
-
-def check_palette(rom):
-    """The ramp has to run from the background to the text colour, getting lighter."""
-    def light(c): return (c & 31) + (c >> 5 & 31) + (c >> 10 & 31)
-    pal = [rom.u16(PALETTE + 2 * i) for i in range(16)]
-    ls = [light(pal[i]) for i in RAMP]
-    if ls != sorted(set(ls)):
-        raise SystemExit(f'court record: palette at {PALETTE:#x} has no ramp at {RAMP}')
+    name = [sum(1 << y for y in range(H) if img[y][x] == TITLE) for x in range(W)]
+    lines, tops, cut = dsdesc.choose(font, text, TEXT_W, name, TEXT_X, LINES)
+    if lines is None: return None, None
+    for line, top in zip(lines, tops):
+        for x, m in enumerate(font.masks(line, TEXT_X, W_USE, cut)):
+            for k in range(16):
+                if m >> k & 1 and 0 <= top + k < H: img[top + k][x] = BODY
+    return img, cut
 
 def cells(img):
     """64x160 -> 5120 bytes: 32x32 cells 5 across, 2 down, each 4x4 tiles row-major, 4bpp."""
@@ -116,7 +103,6 @@ def cells(img):
 
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
-    check_palette(rom)
     recs = ds_items(arm9)
     # the DS and GBA item tables have to agree (icon and detail picture of every item)
     for i, r in enumerate(recs):
@@ -127,9 +113,10 @@ def apply(rom, ctx):
     nb, db = bases[NAME_BASE], bases[DESC_BASE]
     nsz, dsz = dsimgtext.texture_size(d, nb), dsimgtext.texture_size(d, db)
     reader = dsimgtext.TextReader(d, arm9)
+    font = dsdesc.Font(d, arm9)
     orig = [rom.u32(GBA_ITEMS + 8 * i) for i in range(COUNT)]
     texts, stored, new = {}, {}, {}
-    unread = []
+    unread, tight = [], []
     for i, r in enumerate(recs):
         if r[4] not in texts:
             px, w, h, _ = dsimgtext.texture(d, db + r[4] * dsz)
@@ -139,9 +126,10 @@ def apply(rom, ctx):
         if any(l is None for l in lines):
             unread.append(i); continue
         name_px, _, _, _ = dsimgtext.texture(d, nb + r[1] * nsz)
-        img = panel(name_px, adapt(join_lines(lines), r[5] != 0))
+        img, cut = panel(name_px, adapt(join_lines(lines), r[5] != 0), font)
         if img is None:
             unread.append(i); continue
+        if cut: tight.append(i)
         data = lz.compress(cells(img))
         if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i}')
         new[i] = stored[data]
@@ -153,6 +141,7 @@ def apply(rom, ctx):
     for i, addr in new.items():
         rom.w32(GBA_ITEMS + 8 * i, addr)
     print(f"  court record: {len(new)} of {COUNT} panels in English ({len(stored)} pictures)" +
+          (f", narrower word gaps in {tight}" if tight else '') +
           (f"; could not read the DS text of {unread}" if unread else ''))
     font = textgfx.Font.from_ctx(ctx)
     for addr, text in LABELS.items():

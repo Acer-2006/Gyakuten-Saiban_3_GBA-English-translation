@@ -119,11 +119,13 @@ sheet holds 決定 (`0x0818ab20`) and もどる (`0x0818ac20`), 32×16 each, and
 buttons from `0x0818a720`.
 
 The English build makes new pictures: the name is the DS version's name picture (copied pixel
-for pixel), the description is the DS text set again in Inter Medium at 10 pixels, anti-aliased
-(`tools/crfont.py`), so it fits 142 pixels in three lines 14 rows apart or four 12 apart. The
-palette (`0x08180800`) has three colours between the background and the white that the Japanese
-pictures leave unused, 10, 11 and 12, which give the text its five levels: 9, 10, 11, 12, 8.
-Where the DS says "Touch the Check Button", the GBA text says "Press L".
+for pixel), the description is the DS text set again in the font the DS pictures use, the
+dialogue font, white (8) only like the DS's and the Japanese text (`tools/dsdesc.py`). The DS
+lines run to 228 pixels with letters 2 pixels apart and words 10; the build halves every gap
+(letters 1, words 5) and breaks the text into lines of up to 149 pixels: three lines 16 rows
+apart when it fits (as the Japanese), otherwise four 12 rows apart, broken so that the letters
+of two lines touch as little as possible (they are 13 rows tall). Where the DS says "Touch the Check Button",
+the GBA text says "Press L".
 
 ### Where the DS version keeps them
 

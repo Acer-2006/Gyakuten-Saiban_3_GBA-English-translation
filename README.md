@@ -42,8 +42,9 @@ the next page of text.
   and its centred date and place cards and testimony titles.
 * English name tags from the DS version.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
-  description (the DS text, set in Inter with smoothed edges so it fits the GBA panel; "Touch
-  the Check Button" becomes "Press L"), and the R Profiles / R Evidence switch.
+  description (the DS text in the DS's own description font, set a little tighter so it fits
+  the GBA panel; "Touch the Check Button" becomes "Press L"), and the R Profiles / R Evidence
+  switch.
 * The DS version's Witness Testimony / Cross Examination banners (shrunk to the GBA's banner
   width) and Testimony label; the cross-examination buttons (L Press / Present R) and the OK /
   Back prompts when presenting.
@@ -93,10 +94,6 @@ ROM hacking notes, his list of the script's control codes and his character tabl
 where the scripts, the font, the graphics and the text routines are in the ROM and how the script
 works. Thank you, Broco.
 
-The Court Record descriptions are set in Inter by Rasmus Andersson and The Inter Project
-Authors (https://rsms.me/inter/), SIL Open Font License 1.1: `tools/fonts/inter-medium-10.txt`
-holds its Medium weight drawn at 10 pixels (see `tools/fonts/LICENSE.inter`).
-
 ## Hacking the game yourself
 
 `hacking/` holds format notes (script, text engine, graphics, sound, memory map) and
@@ -107,6 +104,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.1 — the Court Record descriptions are in the DS version's own description font (the
+  dialogue font, sharp, read from your DS ROM) instead of Inter: the DS's letters with the gaps
+  between them halved, so the text fits the GBA panel. A description that fits in three lines
+  gets them where the Japanese has its three; a longer one takes four lines closer together,
+  broken so that the letters of two lines touch as little as possible.
 * 0.15 — the Court Record descriptions are set in Inter, a typeface made for screens, at 10
   pixels with smoothed edges (in the shades between the panel's red and white that its palette
   already had), instead of the 5×8 pixel font, in three lines (four where the text needs them)
