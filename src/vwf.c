@@ -89,11 +89,20 @@ static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 *
 #define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
 #define MODE_RECORD 7       /* SYS+8 while the Court Record is open */
 
-/* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too
-   (patches/text.py TEXT_PAL puts the same into every copy of the UI palette). */
+/* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too.
+   They live in BG palette 0 entries 13-15 only while the page is mapped; the UI palette's own
+   values go back the moment it is not, because the Court Record's panel (on a background while
+   it slides) names its items in entry 15. */
 #define TEXT_ORANGE 0x1dde
 #define TEXT_BLUE   0x7b0d
 #define TEXT_GREEN  0x03c0
+#define UI_13 0x3def
+#define UI_14 0x028c
+#define UI_15 0x03ff
+static void text_colours(int on) {
+    if (on) { BGPAL[13] = TEXT_ORANGE; BGPAL[14] = TEXT_BLUE; BGPAL[15] = TEXT_GREEN; }
+    else    { BGPAL[13] = UI_13;       BGPAL[14] = UI_14;     BGPAL[15] = UI_15; }
+}
 
 /* Sprite text uses OBJ palette 0, as the engine's own does: the same in every scene, with white
    at 3 and the three text colours at 6, 9 and 12 (the BG text has them at 8 and 13-15). */
@@ -242,7 +251,7 @@ static void canvas_map(void) {
         for (int tx = 0; tx < CV_COLS; tx++)
             BG1MAP[(CV_MAPROW + ty) * 32 + tx] = CV_TILE0 + ty * CV_COLS + tx;
     SYS_BGDIRTY |= 2;
-    BGPAL[13] = TEXT_ORANGE; BGPAL[14] = TEXT_BLUE; BGPAL[15] = TEXT_GREEN;
+    text_colours(1);
     arrow_load();
     vs.mapped = 1;
 }
@@ -253,6 +262,7 @@ static void canvas_unmap(void) {
         for (int tx = 0; tx < CV_COLS; tx++)
             BG1MAP[(CV_MAPROW + ty) * 32 + tx] = BOX_TEMPLATE[(CV_MAPROW + ty) * 32 + tx];
     SYS_BGDIRTY |= 2;
+    if (vs.mapped) text_colours(0);
     vs.mapped = 0;
 }
 
@@ -429,7 +439,9 @@ static void labels_oam(void) {
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
             OAMBUF[obj * 4 + 0] = y | (0 << 14);
             OAMBUF[obj * 4 + 1] = ((x + c * 16) & 0x1ff) | (1 << 14);
-            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (0 << 10) | (0 << 12);
+            /* priority 1 like the engine's own sprite text: under the Court Record's panel
+               (BG2, priority 0), as a choice's options are in the original */
+            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (1 << 10) | (0 << 12);
         }
         vs.lbl_used[L] = ncells;
     }
@@ -717,6 +729,8 @@ void vwf_frame(void) {
         if (vs.mapped) choice_frame();
         return;
     }
+    /* the box text's colours, kept in BG palette 0 against the scene's palette loads */
+    if (vs.mapped) text_colours(1);
     if (vs.lost && vs.lbl_shadow && SYS[8] == MODE_RECORD && box_open()) {
         labels_oam();                     /* the page stays up under the Court Record's panel */
     } else {
@@ -789,6 +803,7 @@ void vwf_restore(void) {
 /* Replaces the engine's "clear box rows" loop: rows 11..19 of the BG1 map. */
 void vwf_boxclear(void) {
     for (int i = 11 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
+    if (vs.mapped) text_colours(0);
     vs.mapped = 0;
 }
 

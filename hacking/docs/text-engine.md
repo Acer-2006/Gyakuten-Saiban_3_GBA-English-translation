@@ -97,7 +97,9 @@ Each drawn character gets a 12-byte record at `0x03003e50` (in use: bit 15 of th
 halfword; then tile, x = 14 · column, y = 18 · row, colour). The writer at `0x0801fd6c` turns
 the records into OAM entries 2, 3, ... every frame, unless `SYS+0x19` is 0: then it hides
 entries 2–33 and the records stay as they are (the episode select clears the byte as soon as an
-episode is picked, with its prompt still on the page). Where it puts them:
+episode is picked, with its prompt still on the page). The entries are at priority 1, under
+BG2: the Court Record's panel (priority 0) covers a choice's options while it is open, and the
+English build's sprite text uses the same priority. Where it puts them:
 
 * normally y + 116 and x + 9 (the box rows);
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
@@ -234,7 +236,7 @@ the old font area.
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
 | `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |
-| every copy of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) | entries 13–15 become the text colours (`1dde`, `7b0d`, `03c0`: the orange, light blue and green of the Japanese sprite text's OBJ palette 0, entries 6, 9 and 12, which the DS uses too) |
+| BG palette 0, entries 13–15 (`0x0500001a`) | the text colours (`1dde`, `7b0d`, `03c0`: the orange, light blue and green of the Japanese sprite text's OBJ palette 0, entries 6, 9 and 12, which the DS uses too), written by `vwf.c` each frame while a page is mapped and put back to the UI palette's own values (`3def 028c 03ff`) when it is not: the ROM's copies of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) stay as they are, since they also load into OBJ palette 2, whose entry 15 is the Court Record's item-name yellow, and the Record's panel uses BG entry 15 for the same while it slides |
 
 Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028800` (BSS of
 `script.c`). The script loader is replaced at its seven call sites so that banks placed above

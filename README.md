@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.11 — the Court Record's item names turned green while the panel slid from one item to
+  the next (the ROM's copies of the UI palette had the text colours in entries 13–15, and the
+  sliding panel names its items in entry 15; the copies are the original's again and the box's
+  colours are set in the BG palette only while a page is mapped); a choice's options no longer
+  show through the Court Record's panel (sprite text is at the engine's own priority).
 * 0.15.10 — the Court Record's item names turned green while a choice's options or the page
   were shown as sprites (the sprite text used the panel's palette; it now uses the engine's own
   sprite-text palette); a choice's options are set on the rows the cursor is placed on, so the

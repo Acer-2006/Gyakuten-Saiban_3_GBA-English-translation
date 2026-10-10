@@ -28,11 +28,14 @@ PACE_RELOAD     = 0x0801f960   # ldrb r2, [r2]; adds r0, r2, r0  (wait = TXT+0x2
 BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x0801f858 (no blip)
 TEXT_LOOP       = 0x0801f858
 
-UI_PAL = [0x0000,0x0400,0x1ce7,0x4210,0x739c,0x3800,0x3cc5,0x5a0c,0x7fff,0x0c6c,0x3191,0x4656,0x631b,0x3def,0x028c,0x03ff]
-# the text colours of commands {03 1}, {03 2} and {03 3}: orange, light blue and green, the values
-# the Japanese GBA keeps in OBJ palette 0 for its sprite text (entries 6, 9 and 12) and that the DS
-# uses too (its orange is this one, pixel for pixel)
-TEXT_PAL = {13: 0x1dde, 14: 0x7b0d, 15: 0x03c0}
+# The text colours of commands {03 1}, {03 2} and {03 3} (orange, light blue, green) are the
+# values the Japanese sprite text keeps in OBJ palette 0 (entries 6, 9 and 12), which the DS uses
+# too.  The box text, drawn on BG1 with BG palette 0 (the UI palette: 0000 0400 1ce7 4210 739c
+# 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff), has them in entries 13-15: src/vwf.c
+# writes them there every frame a page is mapped and puts the UI values back when it is not (the
+# Court Record's panel names its items in entry 15 while it slides).  The ROM's copies of the UI
+# palette stay as they are: the same copies are loaded into OBJ palette 2, where sprites do use
+# 13-15 (the Court Record's item names are 15).
 
 def call_hook(rom, site, target, displaced, note='', keep=('r0', 'r1', 'r2', 'r3')):
     """Replace the 4 bytes at `site` with a bl to a trampoline that calls C function `target`
@@ -189,14 +192,3 @@ def apply(rom, ctx):
     ''', note='text blip trampoline')
     rom.thumb(BLIP_AT, f'bl #{tramp & ~1:#x}\n adds r7, r0, #0', 'text blip hook')
 
-    # 6. UI palette: add text colours to every embedded copy of bank 0
-    pal = b''.join(struct.pack('<H', v) for v in UI_PAL)
-    newpal = list(UI_PAL)
-    for k, v in TEXT_PAL.items(): newpal[k] = v
-    newb = b''.join(struct.pack('<H', v) for v in newpal)
-    d = bytes(rom.d[:rom.orig_size]); i = 0; n = 0
-    while True:
-        i = d.find(pal, i)
-        if i < 0: break
-        rom.write(0x08000000 + i, newb, 'ui palette'); n += 1; i += 32
-    print(f"  patched {n} UI palette copies")
