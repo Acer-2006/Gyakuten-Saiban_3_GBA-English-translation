@@ -190,3 +190,9 @@ Two commands differ between the versions:
 * `0x53` (no arguments) exists on both: 27 uses in the GBA chapter banks, 117 in the DS ones. The
   handler (`0x080235b9`) clears `SYS+0x256` and calls `0x0801a8b4(2)`. The converter keeps the
   GBA's uses and drops the ones the DS added.
+* What the converter does with a command the DS has where the GBA has none: a sound (`0x05`,
+  `0x06`) is kept, as is a screen shake (`0x27`), a flash (`0x47`), a sprite animation
+  (`0x12`), an item shown in court (`0x13`) or a wait (`0x4e`) — 25 in all, with their arguments
+  as they are, since the two scripts agree on them wherever both have the command (`DS_EFFECTS`
+  in `tools/convert_script.py`). The rest (the DS's graphic loads, `0x69`/`0x6b`, the box
+  hide/shows around its top-screen updates, `0x53`, the DS-only `0x74`...) is dropped.

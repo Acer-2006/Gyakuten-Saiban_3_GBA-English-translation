@@ -25,6 +25,13 @@ CHOICE_END = {0x08, 0x09, 0x0a}
 # music (0x05) and sound effects (0x06): the two games number them the same (but for one DS
 # effect, 0x197, which the argument map turns into the GBA's 0x17c)
 SOUND_CMDS = {0x05, 0x06}
+# Direction the DS added where the GBA has none, kept: screen shakes (0x27), flashes (0x47),
+# sprite animations (0x12), an item shown in court (0x13) and waits (0x4e).  Their arguments
+# mean the same on both (identical wherever the two scripts have the command in the same
+# place), so they go in as they are.  Everything else the DS added is its own plumbing
+# (graphic loads for its assets and top screen, box hide/shows around them, touch flow) and is
+# dropped; its sounds are handled above.
+DS_EFFECTS = {0x27, 0x47, 0x12, 0x13, 0x4e}
 # text layout (0x5d): the DS centres the date and place cards and the testimony titles
 # ({5d 1} ... {5d 0}, 332 pairs the GBA's script does not have); the DS's are kept
 ALIGN_CMD = 0x5d
@@ -172,6 +179,10 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
             if c == ALIGN_CMD:
                 out.append(it)
                 if stats is not None: stats['ds_align'] += 1
+                i += 1; continue
+            if c in DS_EFFECTS:
+                out.append(('c', c, map_args(c, it[2], argmap)))
+                if stats is not None: stats['ds_effects'] += 1
                 i += 1; continue
             # DS-only insertion (J has it, G doesn't): drop
             if stats is not None: stats['dropped_ds_ins'] += 1

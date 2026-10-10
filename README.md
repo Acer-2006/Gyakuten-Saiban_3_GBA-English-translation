@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.15 — the direction the DS added is in: its three extra screen shakes, a flash, eleven
+  sprite animations, seven moments an item is shown in court while it is talked about, and ten
+  short waits (25 in all; the GBA's own direction was already the backbone, and the sounds are
+  as they were).
 * 0.15.14 — the Court Record icons that carry writing (the Coldkiller X bottle, the Ami jar, the
   newspapers, magazines and letters: 18 of them) are the DS English pictures; the name tag was
   half solid, half see-through while an item was shown in court (the window that keeps the
