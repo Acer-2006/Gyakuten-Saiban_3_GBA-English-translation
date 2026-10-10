@@ -70,9 +70,14 @@ SQUARE = dspic.SHAPE[(64, 64)] << 12
 
 # the "Testimony" label in the top left corner during a testimony (証言中): a raw 64x32 sprite
 # (1D tiles, OBJ palette 5); data.bin has the Japanese one (the GBA's, byte for byte) and the
-# English one 2 KB after it
+# English one 2 KB after it.  Its palette (0x081988b0, copied to OBJ palette 5 with the sprite by
+# the code at 0x0800dc40 and 0x0800e928) has green (1) and white (2); the Japanese label uses only
+# those, the English one also 3, a light green on the curves of its letters, which the GBA's
+# palette has black.  data.bin has the DS's English palette with that colour.
 LABEL = 0x08189f20
 DS_LABEL_JP, DS_LABEL_EN = 0x1c900, 0x1d100
+LABEL_PAL = 0x081988b0
+DS_LABEL_PAL_JP, DS_LABEL_PAL_EN = 0x27180, 0x271a0
 
 def ds_palette(attr, hi):
     if hi & 1: return attr >> 9 & 7
@@ -169,6 +174,12 @@ def label(rom, data):
     if data[DS_LABEL_JP:DS_LABEL_JP + 1024] != rom.read(LABEL, 1024):
         raise SystemExit(f'banners: no DS testimony label at data.bin {DS_LABEL_JP:#x}')
     rom.write(LABEL, data[DS_LABEL_EN:DS_LABEL_EN + 1024], 'testimony label')
+    if data[DS_LABEL_PAL_JP:DS_LABEL_PAL_JP + 32] != rom.read(LABEL_PAL, 32):
+        raise SystemExit(f'banners: no DS testimony label palette at data.bin {DS_LABEL_PAL_JP:#x}')
+    en = struct.unpack_from('<4H', data, DS_LABEL_PAL_EN)
+    if en[1:3] != struct.unpack_from('<2H', rom.read(LABEL_PAL + 2, 4)):
+        raise SystemExit(f'banners: unexpected DS testimony label palette at data.bin {DS_LABEL_PAL_EN:#x}')
+    rom.w16(LABEL_PAL + 6, en[3])
 
 def apply(rom, ctx):
     total = 0

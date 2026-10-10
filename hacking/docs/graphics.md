@@ -395,7 +395,11 @@ use it for the banners.
 **Testimony label** (証言中, top left during a testimony): raw 64×32 sprite at `0x08189f20`
 (1D tile order), OBJ palette 5, white (2) with a green outline (1). `data.bin` has it at
 `0x1c900` and the English Testimony 2 KB after it (`0x1d100`, with a few pixels of index 3), which
-the English build copies.
+the English build copies. Its palette is `0x081988b0`, loaded into OBJ palette 5 with the sprite
+(literal pools at `0x0800dc40` and `0x0800e928`); entry 3 there is black, so the English
+letters showed black dots on their curves. `data.bin` has the Japanese palette at `0x27180` and
+the English one at `0x271a0`, whose entry 3 is the light green `0x5bd4`; the English build puts
+that colour in entry 3.
 
 **Psyche-Lock banner** (解除成功, "unlock successful"): sub-archive `0xa4b4`, four palettes (the
 last three for the flash at the end), 13 cells with the banner's roles: 解除 (0) and 成功 (1) as
