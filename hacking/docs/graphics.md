@@ -252,18 +252,26 @@ The DS's English verdict is letters, raw 4bpp sprites in `data.bin` (64×64 or 3
 in indices 1–6. The arm9 lists the letters of each verdict (`0x020aca58` not guilty,
 `0x020ac9c8` guilty), 24 bytes each: `{u32 frame, s16 x, s16 y, s16 x, s16 y, u16 512, u16 256,
 u32 data.bin offset, u32 size}`, x and y the corner of the double-size box. Each letter zooms in
-from twice its size about its own centre at its frame: Not, then Guilty 60 frames later; Guilty
-alone letter by letter, 10 frames apart.
+from twice its size about its own centre at its frame: Not at 0, then Guilty at 60; Guilty alone
+letter by letter at 10, 20, ... 60. The size goes from 512 to 256 in ten steps (`0x0202fb58`), and
+as the ninth begins the letter lands: a 4-frame shake of the screen (strength 1, in the fields
+the DS's shake command `0x27` sets) and sound `0x56` (`0x0202fd70`), so
+Guilty slams six times where the Japanese 有罪 slams twice, and there is no flash. 61 frames after
+the last letter has landed they all go at once (no rise, unlike the Japanese words), and the
+confetti follows for not guilty.
 
 The English build (`patches/verdict.py`, `src/verdict.c`) shrinks the letters to 4/5, each into a
 32×64 sprite (OBJ tiles `0x1a0`–`0x2bf` for the nine of not guilty), laid out as on the DS around
-the middle of the screen at the original's height, and keeps the original's two words (Not /
-Guilty, Guil / ty), zooming from 2 instead of 2.5. Entries 49 and 50 stay as the mode sets them
-but 8×8 and off the screen; the letters are entries 51–59, set after each frame of the mode from
-their word's entry: affine with its matrix while the word zooms in, so that each letter grows
-about its own centre, and plain sprites at its height otherwise. (Nine affine sprites with double
-size take 9 × 138 cycles of the 1210 a line has for sprites, and the judge behind them would
-not be drawn.)
+the middle of the screen at the original's height. `verdict_mode` takes the place of the mode's
+handler in the mode table and runs the DS's timeline itself until the letters go: the letters
+are entries 51–59, affine (matrix 0 or 1) with the DS's ten sizes while they zoom in and plain
+sprites once they have landed; each landing sets off the GBA's shake as command `0x27 4 1` would
+(`SYS+0x14` frames, `SYS+0x16` strength, bit 0 of `SYS+0xe8`; run by `0x0800024c`) and plays
+sound `0x56`. Then it hides the
+letters, sets state 4 with its timer run out (`SYS+0xa` = `0x21`) and calls the original, which
+hides its two words (entries 49 and 50, hidden from the start) and goes on to the confetti, or
+back to the court. (Nine affine sprites with double size take 9 × 138 cycles of the 1210 a line
+has for sprites, and the judge behind them would not be drawn.)
 
 ## Effects archive: banners and speech bubbles
 

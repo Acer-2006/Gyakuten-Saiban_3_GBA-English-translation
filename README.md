@@ -35,8 +35,11 @@ the next page of text.
 
 ## What the English build changes
 
-* Variable-width English font (the DS font) in a three-line text box.
-* The complete DS English script, including the choice-menu options.
+* Variable-width English font (the DS font) in a three-line text box, with the DS English
+  version's text speed and text blips (every other letter, never on a space, on all three
+  lines).
+* The complete DS English script, including the choice-menu options, with its sound effects
+  and its centred date and place cards and testimony titles.
 * English name tags from the DS version.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
   description (the DS text, set in a small font so it fits the GBA panel; "Touch the Check
@@ -54,7 +57,7 @@ the next page of text.
 * College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
   writing is gone, as in the DS version's sprites.
 * The DS version's Unlock Successful banner when the last Psyche-Lock breaks, and its Not Guilty
-  / Guilty verdict letters.
+  / Guilty verdict letters, each landing with a slam and a shake as on the DS.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
   exhibition poster and the signs in the backgrounds.
@@ -94,6 +97,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.14 — sound and layout as in the DS version: the date and place cards and the testimony titles
+  are centred; the text runs at the DS English version's speed (the usual speed is 2 frames a
+  letter instead of 3) and blips as it does, on every other letter and never on a space, and the
+  third line of the box blips too (it was silent); the verdict slams once a letter, with a short
+  shake, and its letters go without rising, as on the DS; three sound commands of the DS script
+  are back (two at the end of episode 2's trial, and in episode 5 the stop of a looping sound,
+  which was left playing). The other differences found between the two versions' sounds are
+  listed in `hacking/docs/sound.md`.
 * 0.13 — the Witness Testimony / Cross Examination and Unlock Successful banners, the Testimony
   label and the Not Guilty / Guilty verdict come from the DS version too: the banners shrunk to
   the width of the GBA's, with the DS's shine and flash; the verdict in the DS's serif letters,

@@ -22,6 +22,12 @@ DS_ONLY = {0x74, 0x75, 0x76, 0x77, 0x78}                       # never emitted
 # 0x53 exists on both (33 uses on the GBA, 117 on the DS): it is kept where it lines up with a GBA
 # 0x53 and dropped where the DS added it.
 CHOICE_END = {0x08, 0x09, 0x0a}
+# music (0x05) and sound effects (0x06): the two games number them the same (but for one DS
+# effect, 0x197, which the argument map turns into the GBA's 0x17c)
+SOUND_CMDS = {0x05, 0x06}
+# text layout (0x5d): the DS centres the date and place cards and the testimony titles
+# ({5d 1} ... {5d 0}, 332 pairs the GBA's script does not have); the DS's are kept
+ALIGN_CMD = 0x5d
 
 def tok(ws, tab):
     out = []; i = 0
@@ -98,8 +104,11 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
     out = []
+    epos = {}                       # e index -> output index
+    ds_sounds = Counter()           # sound commands of the DS that line up with none of the GBA's
     i = 0
     while i < len(e):
+        epos[i] = len(out)
         if emap is not None: emap[i] = len(out)
         it = e[i]
         if it[0] == 't':
@@ -154,6 +163,16 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
             i += 1; continue
         gk = gj.get(jk)
         if gk is None:
+            if c in SOUND_CMDS:
+                # a sound the DS plays where the GBA's does not line up: the DS's
+                args = map_args(c, it[2], argmap)
+                out.append(('c', c, args)); ds_sounds[(c, args)] += 1
+                if stats is not None: stats['ds_sounds'] += 1
+                i += 1; continue
+            if c == ALIGN_CMD:
+                out.append(it)
+                if stats is not None: stats['ds_align'] += 1
+                i += 1; continue
             # DS-only insertion (J has it, G doesn't): drop
             if stats is not None: stats['dropped_ds_ins'] += 1
             i += 1; continue
@@ -165,6 +184,24 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
             if stats is not None: stats['en_edit'] += 1
         i += 1
     if emap is not None: emap[len(e)] = len(out)
+    # the GBA's sounds that line up with none of the DS's: the same sound the DS plays a little
+    # elsewhere is that one; otherwise the GBA's goes after the command it follows there
+    g_e = {gj[jk]: ek for ek, jk in je.items() if jk in gj}
+    matched = set(gj.values())
+    inserts = []
+    for gk, gi in enumerate(g):
+        if gi[0] != 'c' or gi[1] not in SOUND_CMDS or gk in matched: continue
+        if ds_sounds[(gi[1], gi[2])]:
+            ds_sounds[(gi[1], gi[2])] -= 1; continue
+        prev = max((k for k in g_e if k < gk), default=None)
+        ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
+        inserts.append((0 if ek is None else epos[ek] + 1, gi))
+        if stats is not None: stats['gba_sounds'] += 1
+    for pos, gi in reversed(sorted(inserts, key=lambda x: x[0])):   # (in order where they meet)
+        out.insert(pos, gi)
+    if emap is not None and inserts:
+        for k, v in emap.items():
+            emap[k] = v + sum(1 for pos, _ in inserts if pos <= v)
     return out
 
 # The DS script tells the player to touch things; on the GBA the same actions are buttons (the

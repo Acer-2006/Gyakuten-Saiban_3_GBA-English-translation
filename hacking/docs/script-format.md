@@ -114,12 +114,16 @@ DS version of the script.
 | `0x02` | – | end of page: wait for the button, then clear the box |
 | `0x2d`, `0x2e` | – | end of page variants (`0x2e` clears the text state without waiting) |
 | `0x03 c` | 1 | text colour `c`, stored in the low nibble of `TXT+0x25` (0 white; the English build maps 1 → orange, 2 → light blue, 3 → green) |
-| `0x0b`, `0x0c`, `0x45` | 1, 1, 0 | text-flow commands whose exact meaning was not worked out; they are identical in the GBA and DS scripts and the English converter copies them verbatim |
+| `0x0b n` | 1 | text speed: `n` frames from one character to the next (`0xff` = 3), at `TXT+0x26`; the DS's English text maps it through a table first (see text-engine.md, "Pace and text blips") |
+| `0x0c n` | 1 | pause for `n` frames |
+| `0x45` | 0 | a text-flow command whose exact meaning was not worked out; the English converter copies it, `0x0b` and `0x0c` verbatim from the DS script |
+| `0x30 n` | 1 | blips: `n = 2` the typewriter (`TXT+0x16` = 0); the GBA ignores 0 and 1 (the low and the high blip), which it takes from the speaker |
 | `0x42 n` | 1 | caption mode: `n = 0` sets bit 2 of `SYS+0x25c` (`0x03003a0c`), `n = 1` clears it. Caption text is re-dispatched every frame from column 0 / row 0 and drawn centred at `y = 62 + 18*row` |
 | `0x5d a` | 1 | text layout flags in `TXT+0x22`: 0 clears the low nibble (alignment), 1 and 2 set it (centred; 2 = caption height), 3 sets bit 4, 4 clears the high nibble, 5 sets bit 5: the rest of the line fades out (see text-engine.md) |
 | `0x48 x y` | 2 | offset of free-slot sprite text: `TXT+0x4c` = x, `TXT+0x4d` = y (see text-engine.md) |
-| `0x0e n` | 1 | background music, stored at `TXT+0x24` |
+| `0x0e n` | 1 | speaker: `(n >> 8) & 0x7f` at `TXT+0x24` (the name tag, and the blip) |
 | `0x0f a b` | 2 | stores `a` at `TXT+0x10` |
+| `0x27 n s` | 2 | shake the screen for `n` frames with strength `s` (`SYS+0x14`, `SYS+0x16`, bit 0 of `SYS+0xe8`; strength 0 moves the screen by up to 1 pixel, 1 by up to 3, 2 by up to 6) |
 | `0x10 f` | 1 | set flag |
 | `0x1b v` | 1 | stores `v` at `TXT+0x12` |
 

@@ -32,10 +32,13 @@ newline — `0x0802172d`).
 | +0x10 | u16 | argument of command `0x0f` |
 | +0x12 | u16 | property bits of the current command (`0x08049834[cmd] | 0x0804991c[cmd]`) |
 | +0x14 | u16 | property bits of the previous command |
+| +0x16 | u16 | text blips: 0 = the typewriter (command `0x30 2`, and every text reset), 2 after a name tag (command `0x0e`); the original counts 2, 1 in it to blip on every other letter |
 | +0x1c | u16 | flags. Bit 2 selects the "free sprite slot" text path (used for text drawn outside the dialogue box); bit 15 is cleared on every command except `0x0c`. The bit is *not* a reliable "choice menu" indicator — it stays set after caption screens |
 | +0x22 | u8 | alignment (command `0x5d`): low nibble non-zero = centred; bit 5 enables colour-by-column (thresholds: the 5 words at `0x08049c1c`) |
-| +0x24 | u8 | background music number (command `0x0e`) |
+| +0x24 | u8 | speaker (command `0x0e`, high byte): the name tag, and the blip from the table at `0x08049af2` (0 the low blip, sound `0x2d`; 1 the high one, `0x2e`) |
 | +0x25 | u8 | colour: low nibble = palette index used for glyph pixels, high nibble = colour-by-column state |
+| +0x26 | u8 | text speed (command `0x0b`; `0xff` = 3): frames from one character to the next |
+| +0x27 | u8 | low nibble: frames left before the next character |
 | +0x28 | u8 | column of the next character |
 | +0x29 | u8 | row of the next character |
 | +0x44 | u16 | current script block number (command `0x6a`) |
@@ -162,6 +165,34 @@ script uses it for the last line of a page when a character trails off. The DS k
 table at `0x020a1ca0` and one for English after it, (8, 16, 22, 28, 32), counted in characters;
 the English build uses that one, with the greys 4, 3, 3 and 2 of the UI palette.
 
+## Pace and text blips
+
+After a character is drawn the dispatcher (`0x0801f7f8`) reloads the wait before the next one
+from the speed (`0x0801f958`: `TXT+0x27` = `TXT+0x26`) and, unless it was a space, the text is
+instant or the row (`TXT+0x29`) is past 1, plays the speaker's blip on every other letter
+(`0x0801f9b8`; on every letter at speeds above 5, and the typewriter, sound `0x44`, on every
+letter): none in the common bank's first 29 sections (the system messages), in caption mode, or
+twice in one frame.
+
+The DS's English text runs faster than its Japanese. The DS waits the speed through a table
+first (`0x020ac050`: 0, 1, 1, 2, 2, 3, 3, ..., 8 for speeds 0-15, so the usual speed 3 is 2
+frames a character), and blips on every other letter after a blip, every third when the mapped
+speed is 1, the typewriter included, and never on a space (`0x0202370c`; the Japanese counts
+1 instead of 2). The English build does the same: `text_pace` (`src/vwf.c`) gives the wait at
+`0x0801f960`, and `text_blip` replaces the original's blip from `0x0801f9b0` on, which also
+gives the third line of the three-line box its blips (the original had none past the second
+row).
+
+## Centred lines
+
+The DS centres the date and place cards ("April 11, 9:40 AM / District Court / ...") and the
+testimony titles ("-- The Victim and I --") with command `0x5d 1` before them and `0x5d 0`
+after: it measures the line at its first character and starts it at (256 − width) / 2
+(`0x02023840`). The GBA's script has none of these (332 pairs); the English converter keeps the
+DS's, and the canvas starts a line under alignment 1 at (236 − width) / 2 into the box. The
+engine itself only uses the alignment for its sprite cells (`0x0801f014`: the offsets at
+`TXT+0x18`), which the English build does not draw.
+
 ## Captions and choices
 
 * **Captions** (command `0x42 0`): the same text is dispatched again every frame from column 0,
@@ -188,6 +219,8 @@ the old font area.
 | dispatch entry 1 (`0x08163b00`) | trampoline: `vwf_newline`, then the original handler `0x0802172d` |
 | `0x08021ab0`, `0x08022622`, `0x0801fc00`, `0x0801fa6c` | call `vwf_clear` before the original instructions |
 | `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: remaps the canvas, handles caption / choice sprites, and clears the arrow cells (row 19, columns 14–15) that the engine writes after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
+| `0x0801f960` | `bl` to a trampoline: the wait before the next character from `text_pace` (the DS English pace) |
+| `0x0801f9b0` | `bl` to a trampoline that calls `text_blip` (the DS English blips, on every row), then back to the loop |
 | `0x0803b844` | template rewritten to a three-line box: rows 13–19 = top edge, 5 interior rows, bottom |
 | `0x0800577a`, `0x08005784` | `0xe0 → 0xd0`: partial redraw starts one row higher |
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |

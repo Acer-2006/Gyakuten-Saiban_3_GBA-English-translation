@@ -69,6 +69,8 @@ struct vwf_state {
     u8 resume_colour, resume_align;
     u32 resume_page, resume_cur;
     u8 inset;           /* this page is a statement (STMT_X0) */
+    s16 line_x0;        /* where the line starts: centred lines (command 0x5d 1) further in */
+    u8 blip_n, blip_mode;     /* text blips (text_blip) */
 };
 static struct vwf_state vs;
 
@@ -480,10 +482,13 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
         vs.squeeze = 0;
         if (w > maxw) vs.squeeze = 1;
         if (w - 24 > maxw) vs.squeeze = 2;
+        /* command 0x5d 1 (the date and place cards, the testimony titles): the line centred, as
+           the DS centres it (0x02023840) */
+        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (maxw - w) / 2 : 0;
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;
-    int x = (vs.inset ? STMT_X0 : TEXT_X0) + vs.pen_x;
+    int x = (vs.inset ? STMT_X0 : TEXT_X0) + vs.line_x0 + vs.pen_x;
     if (x > 240 - 4) return;
     u32 c = text_colors[TXT_COLOR & 0xf];
     int draw = code != 0x17f;
@@ -506,6 +511,41 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
     int adv = font_w[gi] - vs.squeeze;
     if (adv < 1) adv = 1;
     vs.pen_x += adv;
+}
+
+/* ---------------------------------------------------------------- pace and text blips */
+/* The DS's English text runs faster than its Japanese: the speed of command 0x0b (frames a
+   character) goes through a table first (0x020ac050), and the speaker's blip comes on every
+   other letter, every third at the fastest speeds, never on a space (0x0202370c).  The engine
+   (0x0801f7f8) waits the speed itself and blips every other letter, on the first two rows of
+   its two-line box only; these replace its reload of the wait and its blip. */
+#define PLAY_SE(n)   ((void (*)(u32))0x08015bc9)(n)
+#define TXT_SPEED    (TXT[0x26])
+#define TXT_BLIPS    (*(volatile u16*)0x03007216)   /* 0: the typewriter (command 0x30 2) */
+#define TXT_SPEAKER  (TXT[0x24])
+#define SPEAKER_BLIP ((const u8*)0x08049af2)        /* per speaker: 0 the low blip, 1 the high */
+#define SE_TYPE      0x44
+#define SE_HIGH      0x2e
+#define SE_LOW       0x2d
+static const u8 en_pace[16] = { 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8 };
+
+/* frames to the next character (0x0801f960) */
+u32 text_pace(u32 speed) { return speed < 16 ? en_pace[speed] : speed; }
+
+/* after a character other than a space, the text not instant (0x0801f9b0): `n` is the number of
+   blips played this frame, returned with this one's */
+u32 text_blip(u32 n) {
+    u32 pace = text_pace(TXT_SPEED), mode = TXT_BLIPS;
+    if (vs.blip_n > 2 || (!mode && vs.blip_mode)) vs.blip_n = 0;   /* (the typewriter starts with a blip) */
+    vs.blip_mode = mode != 0;
+    if (vs.blip_n && !(pace >= 2 && vs.blip_n <= 1)) { vs.blip_n--; return n; }
+    vs.blip_n = 2;
+    /* as the engine: none in the system messages, in caption mode or twice in a frame */
+    if (TXT_SECTION <= 0x1c || n || (SYS_CAPTION & 4)) return n;
+    if (!mode) PLAY_SE(SE_TYPE);
+    else if (SPEAKER_BLIP[TXT_SPEAKER] == 1) PLAY_SE(SE_HIGH);
+    else if (SPEAKER_BLIP[TXT_SPEAKER] == 0) PLAY_SE(SE_LOW);
+    return n + 1;
 }
 
 void vwf_newline(void) {

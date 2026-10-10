@@ -13,15 +13,20 @@ N o t G u i l t y) with the palettes 0x27540 (white letters, not guilty) and 0x2
 guilty).  The arm9 lists them for each verdict (0x020aca58 not guilty, 0x020ac9c8 guilty), 24
 bytes each: {u32 frame, s16 x, s16 y, s16 x, s16 y, u16 512, u16 256, u32 data.bin offset, u32
 size}, x and y the corner of the double-size box.  Each letter zooms in from twice its size about
-its centre at its frame: Not, then Guilty 60 frames later; Guilty alone letter by letter.
+its centre at its frame (frames 0 and 60: Not, then Guilty; Guilty alone letter by letter at
+10-60), the size going from 512 to 256 in ten steps, and as the ninth begins the DS shakes the
+screen for 4 frames (strength 1) and plays sound 0x56 (0x0202fd70), once for each letter.  The
+letters stay 61 frames after the last has landed, then go at once (they do not rise as the
+Japanese words do), and the confetti follows for not guilty.
 
 The English build shrinks the letters to 4/5 (area average), each into a 32x64 sprite from OBJ
 tile 0x1a0 (nine take the tiles up to the characters' at 0x2c0), laid out as on the DS around the
-middle of the screen at the height of the original's words.  It keeps the original's two zooms,
-from twice the size as on the DS instead of 2.5 (SYS+0xa0 = 0x280, set by the handler and by
-state 1), so that a letter fills its double-size box: Not and Guilty, or Guil and ty.
-src/verdict.c copies the tiles at the end of the command's handler and, after each frame of the
-verdict mode, puts the letters in OAM entries 51-59 after their word's entry (see there).
+middle of the screen at the height of the original's words.  src/verdict.c copies the tiles at
+the end of the command's handler and takes the verdict mode's place in the mode table: until
+the letters go it runs the DS's timeline itself (each letter zooming in from its frame, a shake
+and the slam 0x56 as each lands, as the DS's English verdict does, which plays the slam once a
+letter), then hands over to the original's state 4 with its timer run out, which goes on to the
+confetti or back to the court.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -31,8 +36,6 @@ from .text import call_hook
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 HANDLER_END = 0x08020a82                  # movs r0, #0x80; lsls r0, r0, #2 (entry 50 hidden)
-ZOOM_FROM = [(0x080209f0, 'movs r0, #0xa0', 'movs r0, #0x80'),       # the scale, << 2: 2.5 -> 2
-             (0x0800f37c, 'movs r1, #0xa0', 'movs r1, #0x80')]
 MODE_TABLE, VERDICT_MODE = 0x08161088, 9
 VERDICT_STEP = 0x0800f23c
 GBA_PALS = (0x08198b70, 0x08198b50)       # not guilty, guilty
@@ -42,7 +45,6 @@ DS_PALS = (0x27540, 0x27520)              # data.bin
 SCALE = 0.8                               # N, G and y fit 32 wide
 TILE0, TILE_END = 0x1a0, 0x2c0            # the characters' sprites start at 0x2c0
 CX = 120                                  # the middle of the screen
-SPLIT = 4                                 # guilty: Guil | ty
 BSS = 0x02029800                          # after src/menu.c's
 
 def ds_letters(ctx, kind):
@@ -77,14 +79,13 @@ def apply(rom, ctx):
             ink += [cx - w // 2 + cols[0], cx - w // 2 + cols[-1] + 1]
         mid = (min(ink) + max(ink)) / 2
         frames = sorted({fr for fr, *_ in letters})
+        if frames[-1] > 200: raise SystemExit('verdict: unexpected DS letter frames')
         tiles = bytearray(); recs = bytearray()
         for k, (fr, cx, px, w) in enumerate(letters):
-            word = (frames.index(fr) if len(frames) == 2 else int(k >= SPLIT))
+            matrix = frames.index(fr) & 1          # letters that zoom at the same time share one
             gx = CX + round((cx - mid) * SCALE)
             tiles += dspic.rows_to_tiles(letter_picture(px, w, pal), 0, 0, 32, 64)
-            recs += struct.pack('<BBhHH', word, 0, gx - 32, (TILE0 + 32 * k) | 5 << 12, 0)
-        if [r for r in recs[::8]] != sorted(recs[::8]):
-            raise SystemExit('verdict: the words are not in order')
+            recs += struct.pack('<BBhHH', fr, matrix, gx - 32, (TILE0 + 32 * k) | 5 << 12, 0)
         t = rom.store(bytes(tiles), 'ext', 4, f'verdict letters {kind}')
         l = rom.store(bytes(recs), 'ext', 4, f'verdict layout {kind}')
         tables.append(struct.pack('<HHII', len(letters), len(tiles) // 4, t, l))
@@ -96,24 +97,14 @@ def apply(rom, ctx):
                                   os.path.join(ROOT, 'build/verdict'), ld_defsyms={'verdicts': table})
     assert rom.store(binary, 'font', 4, 'verdict code') == text_addr
     assert bss <= 0x100, bss
-    for site, old, new in ZOOM_FROM:
-        if rom.read(site, 2) != rom.asm_thumb(site, old): raise SystemExit(f'verdict: unexpected code at {site:#x}')
-        rom.thumb(site, new, 'verdict zoom')
     # the tiles, at the end of the command's handler
     displaced = 'movs r0, #0x80\n lsls r0, r0, #2'
     if rom.read(HANDLER_END, 4) != rom.asm_thumb(HANDLER_END, displaced):
         raise SystemExit('verdict: unexpected code in the verdict command')
     call_hook(rom, HANDLER_END, syms['verdict_start'], displaced, 'verdict start')
-    # the letters, after each frame of the verdict mode
+    # the verdict mode (called with SYS in r0), which calls the original for the rest
     entry = MODE_TABLE + 4 * VERDICT_MODE
     if rom.u32(entry) != VERDICT_STEP | 1: raise SystemExit('verdict: unexpected mode table')
-    tramp = rom.thumb_code(f'''
-        push {{r4, lr}}
-        bl #{VERDICT_STEP:#x}
-        bl #{syms["verdict_letters"] & ~1:#x}
-        pop {{r4}}
-        pop {{r0}}
-        bx r0
-    ''', note='verdict mode trampoline')
-    rom.w32(entry, tramp | 1)
-    print(f"  verdict: Not Guilty / Guilty from the DS letters ({DS_COUNT[0]} and {DS_COUNT[1]})")
+    rom.w32(entry, syms['verdict_mode'] | 1)
+    print(f"  verdict: Not Guilty / Guilty from the DS letters ({DS_COUNT[0]} and {DS_COUNT[1]}), "
+          f"a slam for each as on the DS")

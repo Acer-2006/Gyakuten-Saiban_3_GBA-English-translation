@@ -24,6 +24,9 @@ TAG_ERASE_DST   = 0x08006596   # movs r5, #0xc0 (<< 2: map byte offset 0x300, ro
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
 RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
 RESTORE_CALLS   = (0x0800bcc4, 0x08014464)   # 0x0800dcd4, continuing a save: patches/script.py
+PACE_RELOAD     = 0x0801f960   # ldrb r2, [r2]; adds r0, r2, r0  (wait = TXT+0x26, the speed)
+BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x0801f858 (no blip)
+TEXT_LOOP       = 0x0801f858
 
 UI_PAL = [0x0000,0x0400,0x1ce7,0x4210,0x739c,0x3800,0x3cc5,0x5a0c,0x7fff,0x0c6c,0x3191,0x4656,0x631b,0x3def,0x028c,0x03ff]
 TEXT_PAL = {13: 0x167f, 14: 0x7eed, 15: 0x2be7}
@@ -138,6 +141,37 @@ def apply(rom, ctx):
     for site, after, setup in BOX_CLEARS:
         assert rom.u16(after) == 0x2001, hex(after)          # movs r0, #1
         rom.thumb(site, f'{setup}\n bl #{syms["vwf_boxclear"] & ~1:#x}\n b #{after:#x}', 'box clear')
+
+    # 5b. the DS English version's pace and text blips (see text_pace and text_blip): the wait
+    # before each character, and the blip after it on every row of the box
+    if rom.read(PACE_RELOAD, 4) != rom.asm_thumb(PACE_RELOAD, 'ldrb r2, [r2]\n adds r0, r2, r0') or \
+            rom.read(BLIP_AT, 8) != rom.asm_thumb(BLIP_AT, f'ldrb r6, [r6]\n cmp r6, #1\n bls #{BLIP_AT + 8:#x}\n b #{TEXT_LOOP:#x}'):
+        raise SystemExit('text: unexpected code in the text loop')
+    tramp = rom.thumb_code(f'''
+        push {{r0, r3, lr}}
+        mov r0, r12
+        push {{r0}}
+        ldrb r0, [r2]
+        bl #{syms["text_pace"] & ~1:#x}
+        adds r2, r0, #0
+        pop {{r0}}
+        mov r12, r0
+        pop {{r0, r3}}
+        adds r0, r2, r0
+        pop {{pc}}
+    ''', note='text pace trampoline')
+    rom.thumb(PACE_RELOAD, f'bl #{tramp & ~1:#x}', 'text pace hook')
+    tramp = rom.thumb_code(f'''
+        push {{lr}}
+        mov r0, r12
+        push {{r0}}
+        adds r0, r7, #0
+        bl #{syms["text_blip"] & ~1:#x}
+        pop {{r1}}
+        mov r12, r1
+        pop {{pc}}
+    ''', note='text blip trampoline')
+    rom.thumb(BLIP_AT, f'bl #{tramp & ~1:#x}\n adds r7, r0, #0', 'text blip hook')
 
     # 6. UI palette: add text colours to every embedded copy of bank 0
     pal = b''.join(struct.pack('<H', v) for v in UI_PAL)

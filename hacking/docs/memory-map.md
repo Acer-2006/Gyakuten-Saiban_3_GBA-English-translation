@@ -89,7 +89,7 @@ before the pointer and the one at it (`src/script.c`, `script_save`, called inst
 | `0x03002fa0` | BG0 map shadow |
 | `0x030028c0` | inventory: `+0x10` number of evidence items, `+0x11` number of profiles, `+0x1c` evidence ids (u8, `0xff` = empty), `+0x3c` profile ids |
 | `0x030037a0` | keys: `+0` held, `+2` newly pressed, `+8` auto-repeat |
-| `0x030037b0` | `SYS` game state (`+8` mode, `+9` its state, `+0xa` a timer, `+0xc` the mode to go back to; `+0x17` episode shown on the episode select, `+0x1a` BG dirty bits, `+0xc1` chapter, `+0xc2` high nibble: episodes unlocked (write `0x50` at the episode select to choose any), `+0x25c` caption flags, `+0x2d0` testimony flags) |
+| `0x030037b0` | `SYS` game state (`+8` mode, `+9` its state, `+0xa` a timer, `+0xb` confetti after the verdict, `+0xc` the mode to go back to; `+0x14` / `+0x16` screen shake frames and strength (command `0x27`, while bit 0 of `+0xe8` is set); `+0xa0` the verdict's zoom; `+0x17` episode shown on the episode select, `+0x1a` BG dirty bits, `+0xc1` chapter, `+0xc2` high nibble: episodes unlocked (write `0x50` at the episode select to choose any), `+0x25c` caption flags, `+0x2d0` testimony flags) |
 | `0x03003a90` | second struct referenced by the per-frame VRAM update |
 | `0x03003e50` | 64 sprite records × 12 bytes |
 | `0x03007200` | `TXT` text engine state (see text-engine.md) |

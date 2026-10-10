@@ -80,3 +80,36 @@ at `0x020a1d08` (12 entries, `u32[6]`, one id per language, 0x18 bytes apart). I
 are SSEQ records; higher ones are entries of sequence archive 0 (`0x20 + id * 12` →
 `{u32 offset, u16 bank, u8 volume, ...}`) whose banks point at the voice SWAR waves
 (16 000 Hz, about 1.3 s). `tools/sdat.py` in the build tool reads all of this.
+
+## Compared with the DS version
+
+What differs between the two games' sound, and what the English build does about it (0.14):
+
+* **Sound numbers** are the same on both machines: the GBA's song numbers are the DS's SSEQ /
+  sequence-archive ids, for music and effects, in the script (`0x05`, `0x06`) and in the code
+  (the engine's own calls to `0x08015bc8` use the ids the DS's calls to `0x02025484` use, apart
+  from the DS's touch-screen sounds). The one exception is a looping effect the DS numbers
+  `0x197` and the GBA `0x17c`; the script converter learns that from the two Japanese scripts
+  and turns it back.
+* **Language.** The DS swaps only the twelve shouts per language (the table above); the English
+  build puts the DS's English clips in their place (`patches/voices.py`).
+* **The script's sounds.** The DS's English script plays the same sounds as its Japanese one.
+  Up to 0.13 the converter dropped every DS command that has no counterpart in the GBA's script,
+  and three of those were sounds: `0x175` and the looping `0x187` at the end of episode 2's trial
+  (bank 12, section 17), and the command that stops `0x187` again in episode 5 (bank 38, section
+  29; without it the loop went on). They are kept now. The GBA's script has two sound commands
+  the DS's has not, in bank 39, section 59 (`0xa4` stopped, then `0xa5`, its fade-out): `0xa4`
+  loops on the GBA, so they stay.
+* **The verdict.** The DS's English verdict slams once a letter (Guilty six times) with a short
+  shake of the screen where the Japanese one flashes once a word; the English build does the
+  same (see graphics.md, "The verdict").
+* **Text blips.** The DS's English text runs faster and blips on every other letter (every third
+  at the fastest speeds), the typewriter included, never on a space; the GBA's blips on every
+  other letter of its first two rows only, the typewriter on every letter. The English build
+  takes the DS's pace and blips, on all three rows (see text-engine.md, "Pace and text blips").
+* **The recordings.** Nearly every effect is the same recording on both machines; the DS keeps
+  most at 15 768 or 22 050 Hz where the GBA has 10 512 Hz. A few ambient effects that the GBA
+  makes from one short looping noise sample (`0x80f156c`), shaped by its sequence's volume
+  (`0x176`, `0x177`, `0x17a`–`0x17d`, `0x187`, `0x188`, `0x195`), are longer recordings of their
+  own on the DS, and a few short ones are cut differently (`0x76`, `0x9d`, `0x135`, `0x18e`).
+  The English build keeps the GBA's samples.
