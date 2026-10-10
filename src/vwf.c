@@ -59,6 +59,9 @@ struct vwf_state {
     u8 csum_ok;
     u16 glog_n;
     u32 csum;
+    u8 resume;          /* a continued save's page is to be drawn again (see vwf_resume) */
+    u8 resume_colour, resume_align;
+    u32 resume_page, resume_cur;
 };
 static struct vwf_state vs;
 
@@ -394,10 +397,11 @@ static void choice_frame(void) {
 
 /* ---------------------------------------------------------------- hooks */
 
+static void canvas_glyph(u32 code, u32 col);
+
 /* Replaces the engine's cell draw: r0 = code-0x80, r1 = col, r2 = row. */
 void vwf_draw_char(u32 code80, u32 col, u32 row) {
     u32 code = code80 + 0x80;
-    int gi = glyph_index(code);
     if ((vs.lbl_row0 >= 0 && vs.lbl_caption) || (SYS_CAPTION & 4) || fullscreen_box()) {
         label_draw_char(code, col, row); return;
     }
@@ -407,6 +411,12 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
         canvas_map();
     }
     else if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+    canvas_glyph(code, col);
+}
+
+/* One character onto the canvas at the pen (the script pointer is just after it). */
+static void canvas_glyph(u32 code, u32 col) {
+    int gi = glyph_index(code);
     if (vs.pen_x == 0) {
         /* start of a line: decide on squeeze */
         int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
@@ -454,10 +464,100 @@ void vwf_clear(void) {
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     canvas_reset();
     vs.lost = 0;
+    vs.resume = 0;
+}
+
+/* ---------------------------------------------------------------- continuing a saved game */
+/* The save keeps the engine's sprite records, which hold the original's text, and the game
+   draws them again when a save is continued; the English text is on the canvas (and the choice
+   labels in OBJ VRAM), which the save does not keep.  When the game stopped on a page waiting
+   for the button or on a choice, vwf_resume finds that page in the script (from the last page
+   end before the script pointer) and resume_frame draws it again once the box is up. */
+
+/* Command 0x5d on the layout byte (TXT+0x22). */
+static u32 align_cmd(u32 a, u32 v) {
+    switch (v) {
+    case 0: return a & 0xf0;
+    case 1: case 2: return (a & 0xf0) | v;
+    case 3: return a | 0x10;
+    case 4: return a & 0x0f;
+    case 5: return a | 0x20;
+    }
+    return a;
+}
+
+static int page_end(u32 t) { return t == 0x02 || t == 0x2d || t == 0x2e; }
+
+/* Called when a saved game is continued, after script_resume has put the script pointer back. */
+void vwf_resume(void) {
+    vs.resume = 0;
+    const u16* cur = (const u16*)TXT_PTR;
+    u32 t = *cur;
+    if (t != 0x02 && t != 0x2d && t != 0x08 && t != 0x09 && t != 0x0a) return;
+    const u16* p = (const u16*)TXT_START;
+    const u16* page = p;
+    u32 c = 0, a = 0, pc = 0, pa = 0, caption = 0;
+    while (p < cur) {
+        u32 w = *p++;
+        if (w >= 0x80) continue;
+        if (w == 0x03) c = *p & 0xf;
+        else if (w == 0x5d) a = align_cmd(a, *p);
+        else if (w == 0x42) caption = *p == 0;
+        p += cmd_args[w];
+        if (page_end(w)) { page = p; pc = c; pa = a; }
+    }
+    /* a caption (command 0x42) is dispatched again every frame by the engine itself */
+    if (p != cur || caption) return;
+    vs.resume_page = (u32)page; vs.resume_cur = (u32)cur;
+    vs.resume_colour = pc; vs.resume_align = pa;
+    vs.resume = 1;
+}
+
+/* Lay the page out again as the engine typed it: the canvas for the text, the labels for the
+   options of a choice. */
+static void resume_replay(int choice) {
+    const u16* p = (const u16*)vs.resume_page;
+    const u16* cur = (const u16*)vs.resume_cur;
+    u32 ptr = TXT_PTR;
+    u8 colour = TXT_COLOR, align = TXT_ALIGN;
+    vwf_clear();
+    TXT_COLOR = (colour & 0xf0) | vs.resume_colour;
+    TXT_ALIGN = vs.resume_align;
+    int labels = 0, caption = 0, col = 0, row = 0;
+    while (p < cur) {
+        u32 t = *p++;
+        if (t >= 0x80) {
+            if (caption) continue;
+            TXT_PTR = (u32)p;
+            if (labels) label_draw_char(t, col, row);
+            else canvas_glyph(t, col);
+            col++;
+            continue;
+        }
+        if (t == 0x01) { if (caption) {} else if (labels) row++; else vwf_newline(); col = 0; }
+        else if (t == 0x03) TXT_COLOR = (TXT_COLOR & 0xf0) | (*p & 0xf);
+        else if (t == 0x5d) TXT_ALIGN = align_cmd(TXT_ALIGN, *p);
+        else if (t == 0x42) caption = *p == 0;
+        else if (t == 0x07) { labels = choice; col = 0; row = 0; }
+        p += cmd_args[t];
+    }
+    TXT_PTR = ptr; TXT_COLOR = colour; TXT_ALIGN = align;
+    if (choice) vs.mapped = 1;          /* choice_frame shows the question at the top */
+    else canvas_map();
+}
+
+static void resume_frame(void) {
+    u32 p = TXT_PTR;
+    if ((p != vs.resume_cur && p != vs.resume_cur + 2) || (SYS_CAPTION & 4)) { vs.resume = 0; return; }
+    int choice = fullscreen_box();
+    if (!choice && !box_open()) return;
+    vs.resume = 0;
+    resume_replay(choice);
 }
 
 /* Per frame (before the BG map / OAM DMA). */
 void vwf_frame(void) {
+    if (vs.resume) resume_frame();
     if (vs.lbl_row0 >= 0 && vs.lbl_caption) { labels_oam(); return; }
     if (fullscreen_box()) {
         if (vs.mapped) choice_frame();

@@ -23,9 +23,11 @@ Requires Python 3.8 or newer, nothing else.
 Takes about 20–30 seconds. The output `gs3_en.gba` (16 MB) runs in any GBA emulator or on a
 flash cart.
 
-In-game saves are tied to the build for now: a save made with an older build can resume at the
-wrong place if that part of the script changed in between. Emulator savestates made with an older
-build can show a garbled text box until the next page of text.
+In-game saves carry over to newer builds: a save also notes where in the script you stopped,
+and a newer build finds that place in its own script. Saves made with 0.11.6 or older are placed
+by their position, which is right unless that part of the script changed in between. Emulator
+savestates do not carry over: one made with an older build can show a garbled text box until
+the next page of text.
 
 ## What the English build changes
 
@@ -84,6 +86,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.7 — continuing a save shows the page you stopped on again (the text box came back
+  empty, and a choice came back with no question and no options), and saves carry over to
+  newer builds of the patch (they kept a ROM address that moves when the script changes).
 * 0.11.6 — fix: the shared script lines the game calls up by number were two places off from
   the DS ones from the continue screen on (the DS added two messages there). Examining a spot
   with nothing in it showed a debug line and the game stopped; presenting the wrong evidence

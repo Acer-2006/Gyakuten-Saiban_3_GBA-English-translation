@@ -12,6 +12,8 @@ typedef int s32;
 /* ---- engine addresses (GBA Gyakuten Saiban 3, A3JJ) ---- */
 #define TXT ((volatile u8*)0x03007200)      /* text engine state struct */
 #define TXT_PTR (*(volatile u32*)0x03007200) /* current script pointer */
+#define TXT_START (*(volatile u32*)0x03007204) /* start of the current section */
+#define TXT_CMD (*(volatile u16*)0x03007208) /* the command being run */
 #define TXT_FLAGS (*(volatile u16*)0x0300721c)
 #define TXT_COLOR (*(volatile u8*)0x03007225)
 #define TXT_COL (*(volatile u8*)0x03007228)

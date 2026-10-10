@@ -107,7 +107,30 @@ screen, "To be continued".
 
 Screens that are opened over the game (the save screen, ...) save the records and the text
 state and put them back when they close; `0x08020024` then redraws the text sprites from the
-records (called at `0x0800bcc4`, `0x0800dcd4` and `0x08014464`).
+records (called at `0x0800bcc4`, `0x0800dcd4` and `0x08014464`). Continuing a saved game does
+the same from the save (`0x0800dcd4`, see memory-map.md, "Saved games").
+
+## Continuing a saved game
+
+The save holds the text state (`TXT`) and the sprite records, so the original shows the page it
+stopped on again from the records. Two things change in the English build:
+
+* **The script pointer.** `TXT+0` and `TXT+4` are saved as addresses, and the English banks
+  are used in place in ROM, so their addresses move whenever a newer build changes the script.
+  When a save is written, `script_save` (`src/script.c`) also records the section number and
+  the 16 script words before the pointer and the one at it (SRAM `0x0e007f00`). On continuing,
+  `script_resume` takes the section's start from this build's bank and looks for those words in
+  the section, nearest the old offset; without a record (saves from 0.11.6 and older), or if
+  the words are not there any more, it takes the nearest place with the command the game
+  stopped on when that is a page end or a choice (`TXT+8`), then the old offset if it is still
+  on a token boundary, and as a last resort the start of the section.
+* **The page.** The English text is on the canvas (and the choice options in OBJ tiles), which
+  the save does not keep, and the records are empty. When the game stopped on a page end
+  (`0x02`, `0x2d`) or a choice (`0x08`–`0x0a`), `vwf_resume` finds the page (from the last page
+  end before the pointer, with the colour and layout commands before it), and the first frame
+  that shows the box (or the full-screen choice box) lays it out again: the text on the canvas,
+  the options after `0x07` as labels. A caption (`0x42 0`) is left to the engine, which draws
+  it again every frame.
 
 ## Fading lines
 
@@ -149,7 +172,9 @@ the old font area.
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
 | `0x08022166` | box clear loop replaced by `bl vwf_boxclear; b 0x08022186` |
 | BG tiles `0xe0`–`0x193` | the canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, shows the engine's empty box (template rows) until no background uses those tiles any more, then draws the page again from a log of the glyphs blitted since the last clear |
-| `0x0800bcc4`, `0x0800dcd4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024` |
+| `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024` |
+| `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
+| `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |
 | every copy of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) | entries 13–15 become the text colours (`167f`, `7eed`, `2be7`) |
 
 Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028800` (BSS of

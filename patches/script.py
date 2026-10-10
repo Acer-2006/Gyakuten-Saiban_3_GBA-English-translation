@@ -16,6 +16,10 @@ JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
 SCRIPT_BSS = 0x02028800               # after the renderer's state (patches/text.py)
+SAVE_WRITE = 0x0800ac22               # bl WriteSramEx(0x02000000, 0x0e000000, 0x2c54): the game's save
+CONTINUE_REDRAW = 0x0800dcd4          # bl 0x08020024 after a saved game's state is put back
+RESTORE_TEXT = 0x08020024
+SRAM_SYMS = {'sram_write': 0x0803a1ad, 'sram_read': 0x0803a075}   # WriteSramEx, ReadSram
 DIRECTORY = 0x08800000               # bank directory written for tools: 'GS3E', u32 1, u32 45, {u32 addr, u32 len} x 45
                                      # (banks 0..43 then the common bank; len 0 = LZ-compressed at addr)
 
@@ -43,7 +47,7 @@ def apply(rom, ctx):
                                   os.path.join(ROOT, 'build/script'),
                                   defines=[f'COMMON_BANK_ADDR={common:#x}'], ld_defsyms={
                                       'f_801e210': 0x0801e211, 'f_801e4ac': 0x0801e4ad, 'f_801fb98': 0x0801fb99,
-                                      'common_bank_addr': common})
+                                      'common_bank_addr': common, **SRAM_SYMS})
     rom.store(binary, 'font', 4, 'script code')
     print(f"  script code at {text_addr:#x} ({len(binary)} bytes)")
 
@@ -75,3 +79,18 @@ def apply(rom, ctx):
     for lit, off in COMMON_LITS:
         assert rom.u32(0x08000000 + lit) == 0x086e3578 + off
         rom.w32(0x08000000 + lit, common + off)
+
+    # 6. saved games (src/script.c): the save also records where the script stopped, and continuing
+    # a save finds that place in this build's script, then draws the page again (src/vwf.c)
+    assert rom.read(SAVE_WRITE, 4) == rom.asm_thumb(SAVE_WRITE, f'bl #{SRAM_SYMS["sram_write"] & ~1:#x}')
+    rom.thumb(SAVE_WRITE, f'bl #{syms["script_save"] & ~1:#x}', 'save hook')
+    assert rom.read(CONTINUE_REDRAW, 4) == rom.asm_thumb(CONTINUE_REDRAW, f'bl #{RESTORE_TEXT:#x}')
+    tramp = rom.thumb_code(f'''
+        push {{lr}}
+        bl #{syms["script_resume"] & ~1:#x}
+        bl #{rom.syms["vwf_restore"] & ~1:#x}
+        bl #{RESTORE_TEXT:#x}
+        bl #{rom.syms["vwf_resume"] & ~1:#x}
+        pop {{pc}}
+    ''', note='continue trampoline')
+    rom.thumb(CONTINUE_REDRAW, f'bl #{tramp & ~1:#x}', 'continue hook')

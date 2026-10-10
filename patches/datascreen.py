@@ -9,6 +9,8 @@ The DS keeps the sub-archive twice in data.bin, Japanese at 0x76c254 and English
 the English one has the same cap and tabs and new lettering pieces.  The build copies the cap and
 the pieces into a sub-archive of their own (plus a plain 32x32 piece made of two 16x32 ones) and
 lays the bars out again: the caps stay where they are, the lettering is centred between them.
+The new frame data replaces the old in place: a game saved while the bars are up keeps the
+address of their frames.
 """
 import struct
 from .banners import rle16, unrle16, FX_ARCHIVE, effect_entries
@@ -63,7 +65,12 @@ def apply(rom, ctx):
             new[off] = caps + [(x, y, w, 32, c, SHAPE[(w, 32)] << 12) for x, w, c in inside]
         entries = effect_entries(rom, [fp])
         if len(entries) != 1: raise SystemExit('datascreen: unexpected effects')
-        frames = rom.store(write_frames(fl, new), 'ext', 4, 'data screen bar frames')
+        # in place of the old frames (a saved game keeps the address of a running effect's frames,
+        # so it stays the same from build to build)
+        data = write_frames(fl, new)
+        size = max([8 + 8 * len(fl)] + [off + 4 + 4 * len(sp) for off, sp in defs.items()])
+        if len(data) > size: raise SystemExit('datascreen: new frames do not fit')
+        rom.write(fp, data, 'data screen bar frames')
         for e in entries:
-            rom.w32(e, arch); rom.w32(e + 8, frames)
+            rom.w32(e, arch)
     print("  data screen: title bars from the DS")

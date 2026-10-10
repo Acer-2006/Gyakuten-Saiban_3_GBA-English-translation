@@ -16,7 +16,7 @@ TAG_ROW14_LIT   = 0x08006678   # literal 0x3002400 (row 14) in the name-tag draw
 TAG_ROW12_LIT   = 0x0800667c   # literal 0x3002380 (row 12)
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
 RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
-RESTORE_CALLS   = (0x0800bcc4, 0x0800dcd4, 0x08014464)
+RESTORE_CALLS   = (0x0800bcc4, 0x08014464)   # 0x0800dcd4, continuing a save: patches/script.py
 
 UI_PAL = [0x0000,0x0400,0x1ce7,0x4210,0x739c,0x3800,0x3cc5,0x5a0c,0x7fff,0x0c6c,0x3191,0x4656,0x631b,0x3def,0x028c,0x03ff]
 TEXT_PAL = {13: 0x167f, 14: 0x7eed, 15: 0x2be7}

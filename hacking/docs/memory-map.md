@@ -52,6 +52,31 @@ puts all of its code there), while data can go anywhere.
 | `0x0202cfc0` | episode-select sprite sheet after decompression (`0x9600` bytes) |
 | `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script) |
 
+## Saved games
+
+The save is the first `0x2c54` bytes of EWRAM, written to SRAM `0x0e000000` with the SDK's
+`WriteSramEx` (`0x0803a1ac`; `ReadSram` is `0x0803a074`). It starts with the header
+`0x08045cbc` (the title and version, checked by `0x0800ac40` to offer Continue). When the save
+screen opens, `0x0800b458` copies the running game into it:
+
+| Image offset | From |
+| --- | --- |
+| `+0x35c` | `TXT`, `0x9c` bytes: the script pointer and its section's start are ROM or EWRAM addresses |
+| `+0x3f8` | `0x030071d0`, `0x24` bytes |
+| `+0xdd4` | the 64 sprite records (`0x03003e50`) |
+| `+0x18d4` | the BG1 map shadow (`0x03002080`), then `0x03000000` (`0x800` bytes each) |
+| `+0x2b74` | the animation objects (`0x03000844`, 31 × `0x44` bytes), 28 bytes each: effect number, x and y, frame data, frame index, … , current frame |
+
+Yes on the save question writes it (`0x0800abf8`, the call at `0x0800ac22`); erasing all data
+writes zeros (`0x0800b10c`). Continuing puts it back (the code around `0x0800da4c`–`0x0800dd9e`): the
+animation objects (`0x0800dae4`), the text state, the chapter's bank (`0x0801ee08` with
+`TXT+0x44`), the sprite records, then `0x08020024` redraws the sprite text (`0x0800dcd4`).
+
+The English build adds a record at SRAM `0x0e007f00` (52 bytes, past the game's save): magic
+`SG3R`, the saved script pointer and section start, the section number and the 16 script words
+before the pointer and the one at it (`src/script.c`, `script_save`, called instead of
+`WriteSramEx` at `0x0800ac22`). See text-engine.md, "Continuing a saved game".
+
 ## IWRAM
 
 | Address | Contents |

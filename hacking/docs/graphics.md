@@ -290,7 +290,9 @@ the lettering from 16×32 to 64×32. The DS keeps the sub-archive in `data.bin` 
 `0x76c254` and English at `0x76d2c0`: the same cap and tabs (cells 8–16), and for the bars a
 plain 16×32 piece (1) and the lettering pieces 2–7 (64×32, and 32×32 for 4 and 7). The English
 build copies cells 0–7 into a sub-archive of their own, adds a plain 32×32 piece and gives the
-two effects new frames: the caps, then the lettering centred between them.
+two effects new frames: the caps, then the lettering centred between them. The new frame data
+takes the place of the old (it is not larger), because a saved game keeps the address of a
+running effect's frames (see memory-map.md, "Saved games").
 
 The animation table has 241 entries (0–240); the ones after 141 are characters and objects for
 cut-scenes and the ending, with no writing.
