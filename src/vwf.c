@@ -17,6 +17,11 @@
 #define MAX_LINES  3
 #define TEXT_X0    2          /* left padding inside the box */
 #define TEXT_MAXW  236        /* usable width in pixels */
+/* cross-examination statements: the engine's arrows to the previous and next statement are
+   sprites over the box's edge columns at the second line (x 0-8 and 232-239), so the text keeps
+   clear of them */
+#define STMT_X0    10
+#define STMT_MAXW  220
 
 #define OAMBUF ((volatile u16*)0x03002ba0)
 
@@ -62,6 +67,7 @@ struct vwf_state {
     u8 resume;          /* a continued save's page is to be drawn again (see vwf_resume) */
     u8 resume_colour, resume_align;
     u32 resume_page, resume_cur;
+    u8 inset;           /* this page is a statement (STMT_X0) */
 };
 static struct vwf_state vs;
 
@@ -397,7 +403,7 @@ static void choice_frame(void) {
 
 /* ---------------------------------------------------------------- hooks */
 
-static void canvas_glyph(u32 code, u32 col);
+static void canvas_glyph(u32 code, u32 col, int blit);
 
 /* Replaces the engine's cell draw: r0 = code-0x80, r1 = col, r2 = row. */
 void vwf_draw_char(u32 code80, u32 col, u32 row) {
@@ -411,22 +417,39 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
         canvas_map();
     }
     else if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
-    canvas_glyph(code, col);
+    canvas_glyph(code, col, 1);
 }
 
-/* One character onto the canvas at the pen (the script pointer is just after it). */
-static void canvas_glyph(u32 code, u32 col) {
+/* Does the page end in command 0x15 (the text stays up while the game waits: a cross-examination
+   statement) rather than in a page end? */
+static int page_is_statement(const u16* p) {
+    for (int n = 0; n < 1024; n++) {
+        u32 t = *p++;
+        if (t >= 0x80) continue;
+        if (t == 0x15) return 1;
+        if (t == 0x00 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
+            t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) return 0;
+        p += cmd_args[t];
+    }
+    return 0;
+}
+
+/* One character onto the canvas at the pen (the script pointer is just after it); with `blit`
+   0 only into the glyph log. */
+static void canvas_glyph(u32 code, u32 col, int blit) {
     int gi = glyph_index(code);
     if (vs.pen_x == 0) {
+        if (vs.line == 0) vs.inset = page_is_statement((const u16*)TXT_PTR);
         /* start of a line: decide on squeeze */
         int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
+        int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
         vs.squeeze = 0;
-        if (w > TEXT_MAXW) vs.squeeze = 1;
-        if (w - 24 > TEXT_MAXW) vs.squeeze = 2;
+        if (w > maxw) vs.squeeze = 1;
+        if (w - 24 > maxw) vs.squeeze = 2;
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;
-    int x = TEXT_X0 + vs.pen_x;
+    int x = (vs.inset ? STMT_X0 : TEXT_X0) + vs.pen_x;
     if (x > 240 - 4) return;
     u32 c = text_colors[TXT_COLOR & 0xf];
     int draw = code != 0x17f;
@@ -442,7 +465,7 @@ static void canvas_glyph(u32 code, u32 col) {
         else if (k) c = fade_col[k];
     }
     if (draw) {
-        blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
+        if (blit) blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
         if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | (L * LINE_H) << 17 | c << 23;
         vs.csum_ok = 0;
     }
@@ -465,6 +488,7 @@ void vwf_clear(void) {
     canvas_reset();
     vs.lost = 0;
     vs.resume = 0;
+    vs.inset = 0;
 }
 
 /* ---------------------------------------------------------------- continuing a saved game */
@@ -493,7 +517,8 @@ void vwf_resume(void) {
     vs.resume = 0;
     const u16* cur = (const u16*)TXT_PTR;
     u32 t = *cur;
-    if (t != 0x02 && t != 0x2d && t != 0x08 && t != 0x09 && t != 0x0a) return;
+    /* a page end, a choice, a statement (0x15), the Court Record opened to present (0x21) */
+    if (t != 0x02 && t != 0x2d && t != 0x08 && t != 0x09 && t != 0x0a && t != 0x15 && t != 0x21) return;
     const u16* p = (const u16*)TXT_START;
     const u16* page = p;
     u32 c = 0, a = 0, pc = 0, pa = 0, caption = 0;
@@ -513,14 +538,19 @@ void vwf_resume(void) {
     vs.resume = 1;
 }
 
-/* Lay the page out again as the engine typed it: the canvas for the text, the labels for the
-   options of a choice. */
+/* Lay the page out again as the engine typed it: the text into the glyph log (drawn on the canvas
+   as a lost page is, once no other background uses the canvas tiles: the Court Record may be
+   open), and for a choice the question on the canvas and the options as labels. */
 static void resume_replay(int choice) {
     const u16* p = (const u16*)vs.resume_page;
     const u16* cur = (const u16*)vs.resume_cur;
     u32 ptr = TXT_PTR;
     u8 colour = TXT_COLOR, align = TXT_ALIGN;
-    vwf_clear();
+    vs.pen_x = 0; vs.line = 0; vs.squeeze = 0; vs.inset = 0;
+    vs.lbl_row0 = -1;
+    for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
+    vs.glog_n = 0; vs.lost = 0;
+    if (choice) canvas_tiles();
     TXT_COLOR = (colour & 0xf0) | vs.resume_colour;
     TXT_ALIGN = vs.resume_align;
     int labels = 0, caption = 0, col = 0, row = 0;
@@ -530,7 +560,7 @@ static void resume_replay(int choice) {
             if (caption) continue;
             TXT_PTR = (u32)p;
             if (labels) label_draw_char(t, col, row);
-            else canvas_glyph(t, col);
+            else canvas_glyph(t, col, choice);
             col++;
             continue;
         }
@@ -543,7 +573,7 @@ static void resume_replay(int choice) {
     }
     TXT_PTR = ptr; TXT_COLOR = colour; TXT_ALIGN = align;
     if (choice) vs.mapped = 1;          /* choice_frame shows the question at the top */
-    else canvas_map();
+    else { canvas_unmap(); vs.lost = 1; }
 }
 
 static void resume_frame(void) {

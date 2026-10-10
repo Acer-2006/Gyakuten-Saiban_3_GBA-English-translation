@@ -124,14 +124,16 @@ int script_save(const void* src, u32 dst, u32 size) {
 /* The place in this build's section at `start` that matches where the save stopped, `off`
    bytes into the section in the build that made it: the nearest one with the saved words before
    it (b), else (no record, or the words are gone) the nearest one with the command the game
-   stopped on if that is a page end or a choice, else `off` itself if it is still on a token
-   boundary.  0 if none of these. */
+   stopped on if that is a page end, a choice, a cross-examination statement's end (0x15) or the
+   Court Record opened to present (0x21), else `off` itself if it is still on a token boundary.
+   0 if none of these. */
 static u32 resume_find(u32 start, u32 off, const struct resume_info* b, u32 cmd) {
     const u16* p = (const u16*)start;
     const u16* old = (const u16*)(start + off);
     const u16* lo = (const u16*)(start + (off > SEARCH ? off - SEARCH : 0));
     const u16* hi = (const u16*)(start + off + SEARCH);
-    int stop = cmd == 0x02 || cmd == 0x2d || cmd == 0x08 || cmd == 0x09 || cmd == 0x0a;
+    int stop = cmd == 0x02 || cmd == 0x2d || cmd == 0x08 || cmd == 0x09 || cmd == 0x0a ||
+               cmd == 0x15 || cmd == 0x21;
     u32 words = 0, words_d = ~0u, same = 0, same_d = ~0u, here = 0;
     while (p <= hi) {
         if (p >= lo) {

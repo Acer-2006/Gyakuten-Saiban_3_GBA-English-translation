@@ -86,6 +86,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.11.8 — cross-examination statements keep clear of the arrows to the previous and next
+  statement (the left arrow covered the first letter of the second line); a save made during
+  a cross-examination shows its statement again when continued.
 * 0.11.7 — continuing a save shows the page you stopped on again (the text box came back
   empty, and a choice came back with no question and no options), and saves carry over to
   newer builds of the patch (they kept a ROM address that moves when the script changes).

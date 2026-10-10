@@ -126,11 +126,24 @@ stopped on again from the records. Two things change in the English build:
   on a token boundary, and as a last resort the start of the section.
 * **The page.** The English text is on the canvas (and the choice options in OBJ tiles), which
   the save does not keep, and the records are empty. When the game stopped on a page end
-  (`0x02`, `0x2d`) or a choice (`0x08`–`0x0a`), `vwf_resume` finds the page (from the last page
-  end before the pointer, with the colour and layout commands before it), and the first frame
-  that shows the box (or the full-screen choice box) lays it out again: the text on the canvas,
-  the options after `0x07` as labels. A caption (`0x42 0`) is left to the engine, which draws
-  it again every frame.
+  (`0x02`, `0x2d`), a choice (`0x08`–`0x0a`), a statement (`0x15`) or the Court Record opened to
+  present (`0x21`), `vwf_resume` finds the page (from the last page end before the pointer,
+  with the colour and layout commands before it), and the first frame that shows the box (or
+  the full-screen choice box) lays it out again: the text into the glyph log, drawn as a lost
+  page is once no other background uses the canvas tiles, and for a choice the question on the
+  canvas and the options after `0x07` as labels. A caption (`0x42 0`) is left to the engine,
+  which draws it again every frame.
+
+## Cross-examination statements
+
+A statement is a section of its own whose text ends in command `0x15` instead of a page end: the
+text stays up while the game waits for Press (L), Present (R) or the next statement (A). While
+it waits, two 16×16 sprites show the arrows to the previous and next statement: OAM entries 0
+and 1 at (0, 128) and (224, 128), OBJ tiles `0x1a0` and `0x1a4`, over the box's edge columns at
+the height of the second line. The original's two lines start at x 9 and stay clear of them;
+the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide
+(narrowing the letter spacing for longer lines, as for every line that does not fit), instead
+of from x 2 and up to 236 pixels.
 
 ## Fading lines
 
