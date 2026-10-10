@@ -150,19 +150,24 @@ def gba_box(rom, sa):
     if not rows or not cols: raise SystemExit('episodes: the GBA box has no inside')
     return g, (cols[0], rows[0], cols[-1] + 1, rows[-1] + 1)
 
-def box_picture(base, inside, lines, px, ds_pal, gba_pal):
+def box_picture(base, inside, lines, px, ds_pal, ds_fill, gba_pal):
     """The GBA box with the DS lettering lines ([(x0, x1)] of the DS texture's lettering band, top
-    to bottom) inside it -> rows of GBA palette indices."""
+    to bottom) inside it -> rows of GBA palette indices.  The DS box's fill around the letters
+    (a light grey, which is also one of the GBA lettering shades) stays the GBA box's white; the
+    letters' shades are matched by lightness, so their dark cores stay dark."""
     g = [row[:] for row in base]
     if not lines: return g
     by0, by1, bands = lines
     ix0, iy0, ix1, iy1 = inside
     h = by1 - by0
+    def light(c): return 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2]
     shades = {i: resample.bgr555_to_rgb(gba_pal[i]) for i in GBA_INK}
+    white = resample.bgr555_to_rgb(ds_pal[ds_fill])
     top = iy0 + (iy1 - iy0 - (h + LINE_PITCH * (len(bands) - 1))) // 2
     cache = {}
     for i, (a, b) in enumerate(bands):
-        rgb = [[resample.bgr555_to_rgb(ds_pal[px[by0 + y][a + x]]) for x in range(b - a)] for y in range(h)]
+        rgb = [[white if px[by0 + y][a + x] == ds_fill else resample.bgr555_to_rgb(ds_pal[px[by0 + y][a + x]])
+                for x in range(b - a)] for y in range(h)]
         w = b - a
         if w > ix1 - ix0 - 4:                                 # wider than the inside: scaled down
             nw = ix1 - ix0 - 4; nh = round(h * nw / w)
@@ -171,8 +176,12 @@ def box_picture(base, inside, lines, px, ds_pal, gba_pal):
         x0 = ix0 + (ix1 - ix0 - w) // 2
         for y, row in enumerate(rgb):
             for x, p in enumerate(row):
+                if p == white: continue
                 if p not in cache:
-                    cache[p] = min(shades, key=lambda k: sum((shades[k][c] - p[c]) ** 2 for c in range(3)))
+                    # the DS letters run from near black to the fill; the GBA shades from dark red
+                    # to white: the same place on each ramp
+                    t = light(p) / light(white)
+                    cache[p] = min(shades, key=lambda k: abs(light(shades[k]) / 255 - t))
                 if cache[p] != GBA_FILL: g[top + LINE_PITCH * i + y][x0 + x] = cache[p]
     return g
 
@@ -197,7 +206,7 @@ def boxes(rom, ctx, titles):
         px, ps, col, (bx0, by0, bx1, by1), spaces = ds_box(ctx.data, k)
         if len(spaces) != titles[k].count(' '):
             raise SystemExit(f'episodes: the DS box of episode {k + 1} does not read {titles[k]!r}')
-        pics[k] = box_picture(base, inside, (by0, by1, split2(bx0, bx1, spaces)), px, ps[0], gba_pal)
+        pics[k] = box_picture(base, inside, (by0, by1, split2(bx0, bx1, spaces)), px, ps[0], col[2], gba_pal)
     pics['blank'] = base
     index = {}
     for key, g in pics.items():

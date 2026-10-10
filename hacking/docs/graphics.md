@@ -197,9 +197,10 @@ palettes (normal, touched, faded, greyed). The label is one 128×64 texture (`0x
 digits 1–5, the arrows and the word Episode. The English build (`patches/episodes.py`) keeps the
 GBA's own box (effect 10, the empty one, composed from its first frame) and its two palettes, and
 sets the DS title lettering inside it in two lines cut at a word space, at the DS size (a line
-is at most 92 pixels wide in the box's 124), each pixel taking the nearest of the GBA lettering
-shades (indices 4–11, dark red to white, and the white fill 12), so the grey palette greys the
-English titles too: two 64×64 sprites in the same 128 tiles. The label is the DS word
+is at most 92 pixels wide in the box's 124), each pixel taking the GBA lettering shade (indices
+4–11, dark red to white, and the white fill 12) at the same place on the ramp by lightness, the
+DS fill around the letters left as the GBA's white, so the grey palette greys the English titles
+too: two 64×64 sprites in the same 128 tiles. The label is the DS word
 Episode and the digit, 96×24 in six sprites (three 32×16 over three 32×8) at OBJ tile 24. The five
 titles read from the DS common bank (the sections the save screen uses: two centred lines, the
 episode title and the part) check that each box is the episode it should be.

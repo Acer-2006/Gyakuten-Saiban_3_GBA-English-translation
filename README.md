@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.7 — episode cards: the DS titles in the GBA boxes no longer sit on a faint grey
+  rectangle (the DS box's fill, copied with the letters), and their shades are matched to the
+  box's dark red by lightness, so they are as dark as the Japanese titles.
 * 0.15.6 — New Game on the title menu: a pixel between every pair of letters (the letters are
   unchanged; the word now fills its sprite edge to edge).
 * 0.15.5 — four fixes: the Court Record opened during a choice drew its panel over the third
