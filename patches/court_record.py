@@ -11,11 +11,12 @@ detail are the same numbers as the GBA's) and per-language base offsets into dat
 0x020a44c0 (8 words per language: Japanese, English, English).  English names are 128x16
 textures (orange text, index 2), descriptions are 256x64 textures with three lines of dialogue-
 font text.  The names are copied as pictures; the descriptions are read back to text (see
-tools/dsimgtext.py) and set again in a small font so they fit the GBA panel.
+tools/dsimgtext.py) and set again, anti-aliased, in Inter Medium at 10 pixels (tools/crfont.py) so
+they fit the GBA panel.
 """
 import os, re, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import lz, smallfont, dsimgtext, textgfx
+import lz, crfont, dsimgtext, textgfx
 
 # the "R" switch label under the panel: 64x16 (two 32x16 sprite cells), OBJ palette 4, white text
 # (12) with a dark outline (10); copied to OBJ tile 0x1a8 when the Court Record opens
@@ -32,6 +33,14 @@ NAME_BASE, DESC_BASE = 4, 7    # ... of the name textures and the description te
 BG, TITLE, BODY, CLEAR = 9, 15, 8, 0
 W, H, W_USE = 160, 64, 152     # columns 152..159 stay transparent, as in the originals
 TEXT_X, TEXT_W = 3, 142        # keep the text clear of the right arrow, like the Japanese
+# The panels are shown with OBJ palette 2 = the 16 colours at PALETTE.  The Japanese text uses
+# only white (8) on the dark red (9); entries 10, 11 and 12 hold the steps between the two, which
+# give the anti-aliased text its five levels.
+PALETTE = 0x08180800
+RAMP = (BG, 10, 11, 12, BODY)
+# baselines of the description's lines: up to three lines 14 rows apart, four 12 apart (the
+# letters reach 8 rows above the baseline, 10 with an accent, and 1 below)
+BASELINES = {1: (26,), 2: (26, 40), 3: (26, 40, 54), 4: (25, 37, 49, 61)}
 
 def ds_items(arm9):
     o = DS_ITEMS - DS_ARM9
@@ -73,15 +82,23 @@ def panel(name_px, text):
         for y, row in enumerate(name_px):
             for x, v in enumerate(row):
                 if v == 2 and 0 <= x + dx < W_USE: img[y][x + dx] = TITLE
-    lines = smallfont.wrap(text, TEXT_W)
-    n = len(lines)
-    if n <= 3: tops = [17 + 16 * i for i in range(n)]
-    elif n == 4: tops = [16 + 12 * i for i in range(n)]
-    elif n == 5: tops = [15 + 10 * i for i in range(n)]
-    else: return None
-    for t, line in zip(tops, lines):
-        smallfont.render(line, img, TEXT_X, t + 2, BODY)
+    lines = crfont.wrap(text, TEXT_W)
+    if len(lines) not in BASELINES: return None
+    levels = [[0] * W for _ in range(H)]
+    for base, line in zip(BASELINES[len(lines)], lines):
+        crfont.render(line, levels, TEXT_X, base - crfont.ASCENT)
+    for y in range(H):
+        for x in range(W_USE):
+            if levels[y][x]: img[y][x] = RAMP[levels[y][x]]
     return img
+
+def check_palette(rom):
+    """The ramp has to run from the background to the text colour, getting lighter."""
+    def light(c): return (c & 31) + (c >> 5 & 31) + (c >> 10 & 31)
+    pal = [rom.u16(PALETTE + 2 * i) for i in range(16)]
+    ls = [light(pal[i]) for i in RAMP]
+    if ls != sorted(set(ls)):
+        raise SystemExit(f'court record: palette at {PALETTE:#x} has no ramp at {RAMP}')
 
 def cells(img):
     """64x160 -> 5120 bytes: 32x32 cells 5 across, 2 down, each 4x4 tiles row-major, 4bpp."""
@@ -99,6 +116,7 @@ def cells(img):
 
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
+    check_palette(rom)
     recs = ds_items(arm9)
     # the DS and GBA item tables have to agree (icon and detail picture of every item)
     for i, r in enumerate(recs):

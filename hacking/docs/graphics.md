@@ -119,8 +119,11 @@ sheet holds 決定 (`0x0818ab20`) and もどる (`0x0818ac20`), 32×16 each, and
 buttons from `0x0818a720`.
 
 The English build makes new pictures: the name is the DS version's name picture (copied pixel
-for pixel), the description is the DS text set again in Spleen 5x8 (`tools/smallfont.py`) so it
-fits 152 pixels. Where the DS says "Touch the Check Button", the GBA text says "Press L".
+for pixel), the description is the DS text set again in Inter Medium at 10 pixels, anti-aliased
+(`tools/crfont.py`), so it fits 142 pixels in three lines 14 rows apart or four 12 apart. The
+palette (`0x08180800`) has three colours between the background and the white that the Japanese
+pictures leave unused, 10, 11 and 12, which give the text its five levels: 9, 10, 11, 12, 8.
+Where the DS says "Touch the Check Button", the GBA text says "Press L".
 
 ### Where the DS version keeps them
 
@@ -237,6 +240,12 @@ state back, then calls `0x08020024`, which redraws text sprites from the records
   32×8 sprites whose tiles are stored in the order of rows 0, 2, 1, 3. OBJ palette 13
   (`0x08198cd0`): white (1) lettering with grey (4) anti-aliasing and a dark (5) outline, the
   highlighted words light blue (6, 8, 9).
+* The DS's note, Press START at any time during / the game to save your data., is a 256×32
+  texture at `0x7e9b30`: white (2) and light blue (3, the same colour as the GBA's 6) letters
+  with a dark (1) outline exactly one pixel around them (the 8 neighbours), the first line 184
+  pixels wide. The English build takes its letters, sets them one outline column apart (the DS
+  has one or two) with three or four columns between words (the DS four to six), which makes the
+  first line's letters fill the 160 columns, and draws the outline again around them.
 
 ## The verdict
 

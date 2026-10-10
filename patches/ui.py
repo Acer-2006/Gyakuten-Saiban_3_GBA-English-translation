@@ -1,5 +1,5 @@
 """Buttons drawn as raw sprites (the sheet around 0x0818a720), redrawn in English with the DS font,
-and the save and continue screens' header and buttons, taken from the DS's pictures.
+and the save and continue screens' header, buttons and note, taken from the DS's pictures.
 
 Each button graphic is 64x16 or 32x16 pixels stored as 32x16 one-dimensional sprite cells (4x2
 tiles, row-major, 256 bytes); see hacking/docs/graphics.md.
@@ -7,7 +7,7 @@ tiles, row-major, 256 bytes); see hacking/docs/graphics.md.
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 import struct
-import textgfx, smallfont, dsimgtext, dspic
+import textgfx, dsimgtext, dspic
 from rom import compile_c
 from .text import call_hook
 from . import topics
@@ -76,12 +76,22 @@ BUTTON_FILL = 12
 DS_FRAME = 9                         # the DS box's outline
 # the note under them (※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。): 0x0818e720,
 # 80 tiles shown as a 160x32 line at (40, 128): two 64x32 sprites, then a 32x32 column of four
-# 32x8 strips whose tiles are stored in the order of rows 0, 2, 1, 3; OBJ palette 13, white (1)
-# lettering, START in light blue (6), dark outline (5)
+# 32x8 strips whose tiles are stored in the order of rows 0, 2, 1, 3; OBJ palette 13 (0x08198cd0),
+# white (1) lettering, START in light blue (6), dark outline (5).  The DS has its note, Press START
+# at any time during / the game to save your data., as a 256x32 texture (data.bin 0x7e9b30): white
+# (2) and light blue (3) letters with a dark (1) outline one pixel around them, the first line 184
+# pixels wide.  The build takes the DS letters as they are and sets them closer: one outline column
+# between letters (the DS has one or two) and three or four columns between words (the DS has four
+# to six), which makes the first line's letters 160 pixels wide; the outline is drawn again around
+# them, as on the DS (only the first line's two outermost columns of it fall outside the note).
 HELP = 0x0818e720
-HELP_LINES = ('You can save at any time during', 'the game by pressing START.')
-HELP_HIGHLIGHT = 'START'
-HELP_FILL, HELP_HL, HELP_OUTLINE = 1, 6, 5
+HELP_PAL = 0x08198cd0
+HELP_DS = 0x7e9b30
+HELP_DS_PAL = (0x0842, 0x7fff, 0x7fb5)       # DS indices 1 (outline), 2 (white), 3 (light blue)
+HELP_COLOURS = {2: 1, 3: 6}                  # DS letters -> GBA palette 13
+HELP_OUTLINE = 5
+HELP_W, HELP_H = 160, 32
+WORD_GAP = (3, 4)                            # the narrowest and widest space between words
 
 def ds_buttons(rom, data):
     levels = topics.ramp_gba(rom)
@@ -104,20 +114,63 @@ def ds_buttons(rom, data):
         rom.write(addr, b''.join(textgfx.sprite_cells([r[64 * i:64 * i + 64] for r in g], 64, 32)
                                  for i in range(n)), 'button ' + name)
 
-def help_note(rom):
-    cv = [[0] * 160 for _ in range(32)]
-    for i, line in enumerate(HELP_LINES):
-        x = (160 - smallfont.measure(line)) // 2
-        y = 6 + 12 * i
-        for j, part in enumerate(line.split(HELP_HIGHLIGHT)):
-            if j:
-                smallfont.render(HELP_HIGHLIGHT, cv, x, y, HELP_HL); x += smallfont.measure(HELP_HIGHLIGHT)
-            smallfont.render(part, cv, x, y, HELP_FILL); x += smallfont.measure(part)
+def note_letters(px, w, h):
+    """The DS note's letters, line by line: 8-connected groups of lettering pixels, kept together
+    where their columns overlap (an i and its dot, a kerned pair).  -> per line, left to right,
+    [(x0, x1, [(x, y, index)])]."""
+    seen, groups = set(), []
+    for y in range(h):
+        for x in range(w):
+            if px[y][x] in HELP_COLOURS and (x, y) not in seen:
+                stack, pts = [(x, y)], []
+                seen.add((x, y))
+                while stack:
+                    cx, cy = stack.pop()
+                    pts.append((cx, cy, px[cy][cx]))
+                    for ny in (cy - 1, cy, cy + 1):
+                        for nx in (cx - 1, cx, cx + 1):
+                            if 0 <= nx < w and 0 <= ny < h and (nx, ny) not in seen and px[ny][nx] in HELP_COLOURS:
+                                seen.add((nx, ny)); stack.append((nx, ny))
+                groups.append(pts)
+    lines = [[], []]
+    for pts in groups:
+        lines[min(y for x, y, v in pts) >= h // 2].append(pts)
+    out = []
+    for line in lines:
+        letters = []
+        for pts in sorted(line, key=lambda p: min(x for x, y, v in p)):
+            x0, x1 = min(x for x, y, v in pts), max(x for x, y, v in pts)
+            if letters and x0 <= letters[-1][1]:
+                a0, a1, apts = letters[-1]; letters[-1] = (a0, max(a1, x1), apts + pts)
+            else:
+                letters.append((x0, x1, pts))
+        out.append(letters)
+    return out
+
+def help_note(rom, data):
+    px, w, h, pal = dsimgtext.texture(data, HELP_DS)
+    if (w, h) != (256, HELP_H) or struct.unpack_from('<3H', pal, 2) != HELP_DS_PAL:
+        raise SystemExit(f'ui: unexpected DS save note at data.bin {HELP_DS:#x}')
+    gba = [rom.u16(HELP_PAL + 2 * i) for i in range(16)]
+    if [gba[HELP_COLOURS[i]] for i in (2, 3)] != list(HELP_DS_PAL[1:]):
+        raise SystemExit('ui: the save note palette lacks the DS colours')
+    cv = [[0] * HELP_W for _ in range(HELP_H)]
+    for letters in note_letters(px, w, h):
+        gaps = [b[0] - a[1] - 1 for a, b in zip(letters, letters[1:])]
+        words = sum(g >= 4 for g in gaps)
+        body = sum(x1 - x0 + 1 for x0, x1, _ in letters) + sum(min(g, 1) for g in gaps if g < 4)
+        word = min(WORD_GAP[1], (HELP_W - body) // max(words, 1))
+        if word < WORD_GAP[0]: raise SystemExit('ui: the DS save note does not fit')
+        x = (HELP_W - body - word * words) // 2
+        for (x0, x1, pts), g in zip(letters, gaps + [0]):
+            for lx, y, v in pts:
+                cv[y][x + lx - x0] = HELP_COLOURS[v]
+            x += x1 - x0 + 1 + (word if g >= 4 else min(g, 1))
     src = [r[:] for r in cv]
-    for y in range(32):
-        for x in range(160):
-            if not src[y][x] and any(0 <= y + dy < 32 and 0 <= x + dx < 160 and src[y + dy][x + dx] in (HELP_FILL, HELP_HL)
-                                     for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
+    for y in range(HELP_H):
+        for x in range(HELP_W):
+            if not src[y][x] and any(src[yy][xx] for yy in range(max(y - 1, 0), min(y + 2, HELP_H))
+                                     for xx in range(max(x - 1, 0), min(x + 2, HELP_W))):
                 cv[y][x] = HELP_OUTLINE
     out = textgfx.sprite_cells([r[0:64] for r in cv], 64, 32) + textgfx.sprite_cells([r[64:128] for r in cv], 64, 32)
     for row in (0, 2, 1, 3):                     # the 32x8 strips
@@ -254,6 +307,7 @@ def apply(rom, ctx):
         rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'tab ' + text)
     save_header(rom, ctx)
     ds_buttons(rom, ctx.data)
-    help_note(rom)
-    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn and the save note; from the DS: "
-          f"{' / '.join(n.upper() for n in HDR_DS)} headers, {' / '.join(n for a, w, o, n in DS_BUTTONS)}")
+    help_note(rom, ctx.data)
+    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn; from the DS: "
+          f"{' / '.join(n.upper() for n in HDR_DS)} headers, {' / '.join(n for a, w, o, n in DS_BUTTONS)}, "
+          f"the save note")

@@ -15,8 +15,8 @@ other English material are read out of the DS image while the ROM is built. This
 holds the code changes (the new text engine, the script converter and the hooks) and a little
 English typed in by hand: the choice-menu options, which the DS only has as pictures
 (`tools/labels_en.py`), the short words on the buttons the build draws itself (Press, Present,
-OK, Back and the investigation tabs), the note on the save screen, and the few DS lines the
-converter rewords for the GBA's buttons. Nothing else from either game is stored in it.
+OK, Back and the investigation tabs), and the few DS lines the converter rewords for the GBA's
+buttons. Nothing else from either game is stored in it.
 
 ## Use
 
@@ -42,8 +42,8 @@ the next page of text.
   and its centred date and place cards and testimony titles.
 * English name tags from the DS version.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
-  description (the DS text, set in a small font so it fits the GBA panel; "Touch the Check
-  Button" becomes "Press L"), and the R Profiles / R Evidence switch.
+  description (the DS text, set in Inter with smoothed edges so it fits the GBA panel; "Touch
+  the Check Button" becomes "Press L"), and the R Profiles / R Evidence switch.
 * The DS version's Witness Testimony / Cross Examination banners (shrunk to the GBA's banner
   width) and Testimony label; the cross-examination buttons (L Press / Present R) and the OK /
   Back prompts when presenting.
@@ -51,9 +51,10 @@ the next page of text.
 * Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
   destinations (the DS version's pictures, copied into the GBA boxes).
 * Episode select: the DS version's episode boxes and Episode 1–5 labels.
-* Save screen: the DS version's SAVE header and Yes / No buttons, and the note under them; the
-  continue screen has the DS LOAD header, names the part you saved in and offers the DS
-  buttons From save point. / From chapter start.
+* Save screen: the DS version's SAVE header and Yes / No buttons, and its note under them
+  (Press START at any time during the game to save your data.); the continue screen has the
+  DS LOAD header, names the part you saved in and offers the DS buttons From save point. /
+  From chapter start.
 * The DS version's W, V and K markers (witness, victim, killer) on maps and diagrams.
 * College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
   writing is gone, as in the DS version's sprites.
@@ -92,8 +93,9 @@ ROM hacking notes, his list of the script's control codes and his character tabl
 where the scripts, the font, the graphics and the text routines are in the ROM and how the script
 works. Thank you, Broco.
 
-The Court Record descriptions use Spleen 5x8 by Frederic Cambus (BSD 2-Clause licence, see
-`tools/fonts/LICENSE.spleen`).
+The Court Record descriptions are set in Inter by Rasmus Andersson and The Inter Project
+Authors (https://rsms.me/inter/), SIL Open Font License 1.1: `tools/fonts/inter-medium-10.txt`
+holds its Medium weight drawn at 10 pixels (see `tools/fonts/LICENSE.inter`).
 
 ## Hacking the game yourself
 
@@ -105,6 +107,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15 — the Court Record descriptions are set in Inter, a typeface made for screens, at 10
+  pixels with smoothed edges (in the shades between the panel's red and white that its palette
+  already had), instead of the 5×8 pixel font, in three lines (four where the text needs them)
+  and with no lone word on the last line. The note on the save screen is the DS version's (Press
+  START at any time during the game to save your data., START and save in light blue), its
+  letters set a little closer so that it fits the GBA's note.
 * 0.14.1 — the witness, victim and killer markers on maps and diagrams are the DS version's W, V
   and K instead of 目, 被 and 犯.
 * 0.14 — sound and layout as in the DS version: the date and place cards and the testimony titles
