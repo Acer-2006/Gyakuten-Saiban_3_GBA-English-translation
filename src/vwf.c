@@ -31,7 +31,6 @@
 
 /* choice-menu labels: 3 lines of 16 sprite cells (16x16) in OBJ tiles 0x00..0xbf */
 #define LBL_X0     24
-#define LBL_Y0     72
 #define LBL_CELLS  16
 #define LBL_LINES  3
 /* OAM entries of each line's cells.  The engine's own sprite text takes entries 2-67 (one a
@@ -78,6 +77,7 @@ struct vwf_state {
     u8 blip_n, blip_mode;     /* text blips (text_blip) */
     u8 q_noedge;        /* the canvas's bottom edge is taken out for the choice box (frame_bottom) */
     u8 lbl_shadow;      /* the lost page shown as sprite text in the box (the Court Record is open) */
+    u8 lbl_base;        /* a choice: the engine's row of the first option (see label_draw_char) */
 };
 static struct vwf_state vs;
 
@@ -94,6 +94,12 @@ static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 *
 #define TEXT_ORANGE 0x1dde
 #define TEXT_BLUE   0x7b0d
 #define TEXT_GREEN  0x03c0
+
+/* Sprite text uses OBJ palette 0, as the engine's own does: the same in every scene, with white
+   at 3 and the three text colours at 6, 9 and 12 (the BG text has them at 8 and 13-15). */
+static u32 lbl_colour(u32 c) {
+    return c == 13 ? 6 : c == 14 ? 9 : c == 15 ? 12 : 3;
+}
 
 static const u16 text_colors[16] = {
     /* colour index per text colour argument (command 0x03) */
@@ -342,6 +348,9 @@ static void label_draw_char(u32 code, int col, int row) {
         labels_reset();
         vs.lbl_caption = (SYS_CAPTION & 4) ? 1 : 0;
         vs.lbl_row0 = vs.lbl_caption ? 0 : row;
+        /* a choice's options go on the rows the engine's cursor is placed on: its row counter
+           (the question's lines) plus the blank row it adds, 18 px a row from y 18 */
+        vs.lbl_base = TXT_ROW + 1;
         /* where the engine's sprite writer (0x0801fd6c) puts this text: see labels_oam */
         u32 sec = TXT_SECTION;
         vs.lbl_sys = (sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31));
@@ -360,7 +369,7 @@ static void label_draw_char(u32 code, int col, int row) {
     if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = 0; }
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
-    if (vs.lbl_pen + 16 <= LBL_CELLS * 16 && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, c, label_rowptr);
+    if (vs.lbl_pen + 16 <= LBL_CELLS * 16 && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
     vs.lbl_pen += font_w[gi];
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
@@ -379,15 +388,13 @@ static void labels_oam(void) {
     /* the engine's sprite-text writer shows nothing while SYS+0x19 is 0 (the episode select
        clears it as soon as an episode is picked, with its prompt still on the page) */
     if (!SYS[0x19] && !fullscreen_box()) { labels_hide(); return; }
-    OBJPAL[2 * 16 + 13] = TEXT_ORANGE; OBJPAL[2 * 16 + 14] = TEXT_BLUE; OBJPAL[2 * 16 + 15] = TEXT_GREEN;
-    /* white (index 8) is the UI palette's; screens that load their own palette 2 (the episode
-       select) leave it black */
-    if (!(OBJPAL[2 * 16 + 8] & 0x7fff)) OBJPAL[2 * 16 + 8] = 0x7fff;
     vs.lbl_shown = 1;
     for (int L = 0; L < LBL_LINES; L++) {
         int w = vs.lbl_width[L];
         int ncells = (w + 15) >> 4;
-        int x = LBL_X0, y = LBL_Y0 + L * 16;
+        /* a choice's options: the rows the engine's cursor is placed on, 18 px apart from
+           y 18, after the question's lines and a blank row (lbl_row0 is the first option's) */
+        int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
         if (vs.lbl_shadow) {
             /* the page as the canvas showed it: cell for cell over the box's text rows */
             x = 0; y = CV_MAPROW * 8 + L * 16; ncells = 240 / 16;
@@ -422,7 +429,7 @@ static void labels_oam(void) {
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
             OAMBUF[obj * 4 + 0] = y | (0 << 14);
             OAMBUF[obj * 4 + 1] = ((x + c * 16) & 0x1ff) | (1 << 14);
-            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (0 << 10) | (2 << 12);
+            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (0 << 10) | (0 << 12);
         }
         vs.lbl_used[L] = ncells;
     }
@@ -730,7 +737,7 @@ void vwf_frame(void) {
             labels_reset();
             for (int i = 0; i < vs.glog_n; i++) {
                 u32 g = glog[i];
-                blit_to(g & 0x1ff, (g >> 9) & 0xff, (g >> 17) & 0x3f, g >> 23, label_rowptr);
+                blit_to(g & 0x1ff, (g >> 9) & 0xff, (g >> 17) & 0x3f, lbl_colour(g >> 23), label_rowptr);
             }
             vs.lbl_shadow = 1;
             labels_oam();
