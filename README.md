@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.12 — the defence bench showed through the text box (brighter, over the box's bottom
+  edge) once the Court Record had been scrolled or swapped, and stayed so after it closed: the
+  page's third line of sprite text sat after the bench's sprites in OAM, and the hardware lifts
+  an earlier sprite to the priority of a later one it overlaps; the sprite text is now in
+  entries 3–26, before every scene sprite, as the original's own is.
 * 0.15.11 — the Court Record's item names turned green while the panel slid from one item to
   the next (the ROM's copies of the UI palette had the text colours in entries 13–15, and the
   sliding panel names its items in entry 15; the copies are the original's again and the box's

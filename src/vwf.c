@@ -29,15 +29,18 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 
-/* choice-menu labels: 3 lines of 16 sprite cells (16x16) in OBJ tiles 0x00..0xbf */
+/* choice-menu labels: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00..0xbf */
 #define LBL_X0     24
-#define LBL_CELLS  16
+#define LBL_CELLS  8
+#define LBL_CELLW  32
 #define LBL_LINES  3
-/* OAM entries of each line's cells.  The engine's own sprite text takes entries 2-67 (one a
-   character, after the choice cursor in 57); the Court Record draws its arrows in 0-1 and its
-   panel in 34-47 while a choice's options stay on screen under it, and the save screen its
-   Yes / No in 40-41, so the third line keeps clear of all of those. */
-static const u8 lbl_obj0[LBL_LINES] = {3, 19, 58};
+/* OAM entries of each line's cells: 3-26, within the entries 2-33 the engine's own sprite text
+   takes.  They must come before the scene's sprites (the defence bench is in 48-51, at
+   priority 3): the hardware draws an earlier, lower-priority sprite that overlaps a later,
+   higher-priority one with the latter's priority, so a line of text in entries after 48 lifted
+   the bench above the box.  The Court Record draws its arrows in 0-1 and its panel in 34-47,
+   the save screen its Yes / No in 40-41, and the choice cursor is 57. */
+static const u8 lbl_obj0[LBL_LINES] = {3, 11, 19};
 #define Q_MAPROW   2          /* question canvas rows in choice mode: its first line at y 17, as the
                                  original's question (row 1 put it against the box's top edge) */
 #define CAP_Y0     62         /* caption screen: first row y, 18 px pitch */
@@ -56,7 +59,7 @@ struct vwf_state {
     u8 lbl_width[LBL_LINES];
     u8 lbl_caption;     /* sprite text outside the box (command 0x42) rather than menu labels */
     u8 lbl_shown;       /* OAM entries lbl_obj0[].. currently carry sprite text */
-    u8 lbl_used[LBL_LINES];   /* ... how many of each line's 16 entries (the others are left
+    u8 lbl_used[LBL_LINES];   /* ... how many of each line's 8 entries (the others are left
                                  alone: the save screen puts its Yes / No in entries 40-41) */
     u8 lbl_align;       /* ... and how the engine places it, latched at its first character */
     u8 lbl_rows;
@@ -145,9 +148,9 @@ static volatile u32* canvas_rowptr(int tx, int ty, int r) {
 }
 
 static volatile u32* label_rowptr(int tx, int ty, int r) {
-    if (tx < 0 || tx >= LBL_CELLS * 2 || ty >= LBL_LINES * 2) return 0;
-    int cell = (ty >> 1) * LBL_CELLS + (tx >> 1);
-    int tile = cell * 4 + (ty & 1) * 2 + (tx & 1);
+    if (tx < 0 || tx >= LBL_CELLS * 4 || ty >= LBL_LINES * 2) return 0;
+    int cell = (ty >> 1) * LBL_CELLS + (tx >> 2);
+    int tile = cell * 8 + (ty & 1) * 4 + (tx & 3);       /* 1D mapping: a 32x16 sprite's tiles */
     return (volatile u32*)(0x06010000 + tile * 32 + r * 4);
 }
 
@@ -325,7 +328,7 @@ static int measure_line(const u16* p) {
 /* ---------------------------------------------------------------- choice labels */
 static void labels_reset(void) {
     volatile u32* p = (volatile u32*)0x06010000;
-    for (int i = 0; i < LBL_LINES * LBL_CELLS * 32; i++) p[i] = 0;
+    for (int i = 0; i < LBL_LINES * LBL_CELLS * 64; i++) p[i] = 0;
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     vs.lbl_pen = 0; vs.lbl_line = 0;
 }
@@ -379,7 +382,7 @@ static void label_draw_char(u32 code, int col, int row) {
     if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = 0; }
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
-    if (vs.lbl_pen + 16 <= LBL_CELLS * 16 && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
+    if (vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
     vs.lbl_pen += font_w[gi];
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
@@ -401,13 +404,13 @@ static void labels_oam(void) {
     vs.lbl_shown = 1;
     for (int L = 0; L < LBL_LINES; L++) {
         int w = vs.lbl_width[L];
-        int ncells = (w + 15) >> 4;
+        int ncells = (w + LBL_CELLW - 1) / LBL_CELLW;
         /* a choice's options: the rows the engine's cursor is placed on, 18 px apart from
            y 18, after the question's lines and a blank row (lbl_row0 is the first option's) */
         int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
         if (vs.lbl_shadow) {
             /* the page as the canvas showed it: cell for cell over the box's text rows */
-            x = 0; y = CV_MAPROW * 8 + L * 16; ncells = 240 / 16;
+            x = 0; y = CV_MAPROW * 8 + L * 16; ncells = LBL_CELLS;
         } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
@@ -437,11 +440,11 @@ static void labels_oam(void) {
         for (int c = 0; c < LBL_CELLS; c++) {
             int obj = lbl_obj0[L] + c;
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
-            OAMBUF[obj * 4 + 0] = y | (0 << 14);
-            OAMBUF[obj * 4 + 1] = ((x + c * 16) & 0x1ff) | (1 << 14);
+            OAMBUF[obj * 4 + 0] = y | (1 << 14);                         /* wide: 32x16 */
+            OAMBUF[obj * 4 + 1] = ((x + c * LBL_CELLW) & 0x1ff) | (2 << 14);
             /* priority 1 like the engine's own sprite text: under the Court Record's panel
                (BG2, priority 0), as a choice's options are in the original */
-            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 4 | (1 << 10) | (0 << 12);
+            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 8 | (1 << 10) | (0 << 12);
         }
         vs.lbl_used[L] = ncells;
     }
