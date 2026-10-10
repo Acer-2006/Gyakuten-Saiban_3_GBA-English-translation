@@ -199,7 +199,8 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   row 0, and the original draws it centred at `y = 62 + 18 * row` in light blue. Turning caption
   mode off is `0x42 1`.
   The English build draws text in this mode as sprites (16×16 cells in OBJ tiles 0–191, OAM
-  entries 3–50) and places the lines by the rules above, taking the section, alignment and
+  entries 3–18, 19–34 and 58–73 for its three lines: the third keeps clear of the Court
+  Record's panel, entries 34–47, which can open over a choice, and of the choice cursor, 57) and places the lines by the rules above, taking the section, alignment and
   number of lines at the first character; the system messages are centred (the English lines
   have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
   a page with a third English line uses the three-line box's rows (y 112 + 16 · row). Only the OAM entries it has used are switched off again: the save screen

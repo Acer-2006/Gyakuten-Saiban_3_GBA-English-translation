@@ -73,3 +73,10 @@ def scale_indexed(pixels, w, h, palette, nw, nh):
                                  4 * (rgb[i][1] - key[1]) ** 2 + 2 * (rgb[i][2] - key[2]) ** 2)
             out.append(cache[key])
     return bytes(out)
+
+def scale_1d(samples, n_out):
+    """A sound (or any list of numbers) resampled to n_out values with the same filter."""
+    out = []
+    for ws in _weights(len(samples), n_out):
+        out.append(sum(samples[i] * w for i, w in ws))
+    return out

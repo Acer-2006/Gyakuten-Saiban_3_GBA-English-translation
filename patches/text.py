@@ -124,6 +124,19 @@ def apply(rom, ctx):
     assert rows[14][0] == 0x02 and rows[15][0] == 0x06 and rows[19][0] == 0x04, [r[:2].hex() for r in rows[12:20]]
     new = rows[:13] + [rows[14]] + [rows[15]] * 5 + [rows[19]] + rows[20:]
     rom.write(FRAME_TEMPLATE, b''.join(new), 'frame template 3 lines')
+    # The episode select draws the short box of the original (top edge at row 16, two interior
+    # rows, bottom at 19: mode 2 of the box routine at 0x0800557c, called only from 0x0800c384):
+    # template rows 0-13 to the map, rows 14-16 cleared, template row 14 (the original's top edge)
+    # to row 16.  With the taller template that put our top edge at row 13 and an interior row at
+    # 16.  Now: template rows 0-12 to the map, rows 13-16 cleared, template rows 12-13 (blank, top
+    # edge) to rows 15-16.
+    for addr, old, new in ((0x080055fa, 0x20e0, 0x20d0),    # the cleared rows start at row 13
+                           (0x08005650, 0x1bf, 0x19f),      # ... the plain copy ends at row 12
+                           (0x08005616, 0x22e0, 0x22d0),    # ... entry 0x1a0
+                           (0x0800562a, 0x22e0, 0x22c0),    # the top edge copy reads from row 12
+                           (0x0800565c, 0x1df, 0x1bf)):     # ... to row 13
+        assert rom.u16(addr) == old, hex(addr)
+        rom.w16(addr, new)
     # partial frame redraw starts at row 13 instead of 14
     assert rom.u16(0x0800577a) == 0x21e0 and rom.u16(0x08005784) == 0x25e0
     rom.w16(0x0800577a, 0x21d0); rom.w16(0x08005784, 0x25d0)

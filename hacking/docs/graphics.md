@@ -194,10 +194,12 @@ text in OBJ tiles 64–127 (see text-engine.md); tiles 24–63 are free on this 
 The DS has each episode's box as a 256×64 texture in `data.bin` (from `0x7de7b8`, `0x2094` bytes
 apart; texture format under Court Record): a 176×58 box with the title on one line and four
 palettes (normal, touched, faded, greyed). The label is one 128×64 texture (`0x7e8a9c`): the
-digits 1–5, the arrows and the word Episode. The English build (`patches/episodes.py`) draws
-128×64 boxes in the DS style (its outline, highlight, shadow and fill colours, the corners cut)
-with the DS title lettering cut into two lines at a word space, on DS palettes 0 and 3 for the
-highlighted box and the others: two 64×64 sprites in the same 128 tiles. The label is the DS word
+digits 1–5, the arrows and the word Episode. The English build (`patches/episodes.py`) keeps the
+GBA's own box (effect 10, the empty one, composed from its first frame) and its two palettes, and
+sets the DS title lettering inside it in two lines cut at a word space, at the DS size (a line
+is at most 92 pixels wide in the box's 124), each pixel taking the nearest of the GBA lettering
+shades (indices 4–11, dark red to white, and the white fill 12), so the grey palette greys the
+English titles too: two 64×64 sprites in the same 128 tiles. The label is the DS word
 Episode and the digit, 96×24 in six sprites (three 32×16 over three 32×8) at OBJ tile 24. The five
 titles read from the DS common bank (the sections the save screen uses: two centred lines, the
 episode title and the part) check that each box is the episode it should be.

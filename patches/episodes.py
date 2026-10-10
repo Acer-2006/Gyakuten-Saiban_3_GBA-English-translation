@@ -13,9 +13,12 @@ DS: each episode's box is a 256x64 texture in data.bin (from 0x7de7b8, 0x2094 by
 176x58 box with the title in one line, four palettes (normal, touched, faded, greyed).  The
 label is one 128x64 texture (0x7e8a9c): the digits 1-5, the arrows and the word Episode.
 
-The English boxes are 128x64 boxes drawn like the DS's (its outline, highlight, shadow and fill
-colours) with the DS title lettering cut into two lines at a word space (a line is wider than a
-GBA box), the DS palettes 0 and 3 for the selected box and the others; two 64x64 sprites, 128
+The English boxes are the GBA's own empty box (effect 10: white, a dark red frame with rounded
+corners, grey on the other palette) with the DS title lettering set inside it in two lines, cut at
+a word space (one DS line is wider than the box), at the DS size.  The DS lettering is a ramp
+of a dozen shades from dark red to white; each pixel takes the nearest of the shades the GBA
+box's palette has for its own lettering (indices 4-11 and the white fill, 12), so the grey
+palette greys the English letters as it greys the Japanese ones.  Two 64x64 sprites, 128
 tiles.  The label is the DS word Episode and the episode's digit, 96x24 in six sprites at OBJ tile
 24: on this screen OBJ tiles 0-63 are free (the prompt under the boxes is sprite text in tiles
 64-127), and the box of episode 5, shown next to episode 4, runs 24 tiles past the end of OBJ
@@ -23,7 +26,7 @@ VRAM, which wraps to tiles 0-23 (as in the original).
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import dsimgtext, dspic
+import dsimgtext, dspic, resample
 from mes import load_bank
 from convert_script import tok, ADS
 from .banners import rle16, unrle16, FX_ARCHIVE, effect_entries
@@ -39,10 +42,11 @@ SIZE = dspic.SIZE
 
 DS_BOX, DS_BOX_STEP = 0x7de7b8, 0x2094            # data.bin: the five boxes, one after another
 DS_LABEL = 0x7e8a9c                               # data.bin: digits, arrows, Episode
-DS_PALS = (0, 3)                                  # the selected box, the others
 BOX_W, BOX_H = 128, 64
 LINE_PITCH = 20                                   # the two lines of a title
 WORD_GAP = 4                                      # a column run this wide with no ink is a space
+GBA_FILL = 12                                     # the GBA box's inside (white, grey on palette 1)
+GBA_INK = range(4, 13)                            # ... and its lettering shades, dark red to white
 
 LABEL_W, LABEL_H = 96, 24
 LABEL_TILE = 24                                   # OBJ tile of the label (see above)
@@ -130,30 +134,46 @@ def ds_box(data, k):
             run = None
     return px, pals, (edge, light, fill, shade), (bx0, by0, bx1, by1), spaces
 
-def box_picture(colours, lines, px):
-    """A 128x64 box in the DS style with the given lettering lines ([(x0, x1)] of the DS
-    texture's lettering band, top to bottom) -> rows of DS palette indices."""
-    edge, light, fill, shade = colours
-    g = [[fill] * BOX_W for _ in range(BOX_H)]
-    for x in range(BOX_W):
-        g[0][x] = g[BOX_H - 1][x] = edge
-        g[1][x] = light; g[BOX_H - 2][x] = shade
-    for y in range(1, BOX_H - 1):
-        g[y][0] = g[y][BOX_W - 1] = edge
-        if y < BOX_H - 2: g[y][1] = light
-    for y in (0, BOX_H - 1):
-        g[y][0] = g[y][BOX_W - 1] = 0                     # the corners are cut
-    if lines:
-        by0, by1, bands = lines
-        h = by1 - by0
-        top = (BOX_H - (h + LINE_PITCH * (len(bands) - 1))) // 2
-        for i, (a, b) in enumerate(bands):
-            x0 = (BOX_W - (b - a)) // 2
-            if x0 < 3: raise SystemExit('episodes: a title line is wider than the box')
-            for y in range(h):
-                for x in range(b - a):
-                    v = px[by0 + y][a + x]
-                    if v != fill: g[top + LINE_PITCH * i + y][x0 + x] = v
+def gba_box(rom, sa):
+    """The GBA's empty episode box (effect 10, first frame) -> 128x64 rows of its palette indices,
+    and the inside: (x0, y0, x1, y1) of the fill."""
+    sub, fl, defs = read_frames(rom, BLANK_FRAMES)
+    if sub != BOX_SUB: raise SystemExit('episodes: unexpected empty box frames')
+    g = [[0] * BOX_W for _ in range(BOX_H)]
+    for x, y, w, h, c, attr in defs[fl[0][0]]:
+        t = dspic.tiles_to_rows(dspic.unrle16(rom.d, sa['cells'][c] - 0x08000000, w * h // 2), w, h)
+        for yy in range(h):
+            for xx in range(w):
+                if t[yy][xx]: g[BOX_H // 2 + y + yy][BOX_W // 2 + x + xx] = t[yy][xx]
+    rows = [y for y in range(BOX_H) if g[y].count(GBA_FILL) > BOX_W // 2]
+    cols = [x for x in range(BOX_W) if sum(g[y][x] == GBA_FILL for y in range(BOX_H)) > BOX_H // 2]
+    if not rows or not cols: raise SystemExit('episodes: the GBA box has no inside')
+    return g, (cols[0], rows[0], cols[-1] + 1, rows[-1] + 1)
+
+def box_picture(base, inside, lines, px, ds_pal, gba_pal):
+    """The GBA box with the DS lettering lines ([(x0, x1)] of the DS texture's lettering band, top
+    to bottom) inside it -> rows of GBA palette indices."""
+    g = [row[:] for row in base]
+    if not lines: return g
+    by0, by1, bands = lines
+    ix0, iy0, ix1, iy1 = inside
+    h = by1 - by0
+    shades = {i: resample.bgr555_to_rgb(gba_pal[i]) for i in GBA_INK}
+    top = iy0 + (iy1 - iy0 - (h + LINE_PITCH * (len(bands) - 1))) // 2
+    cache = {}
+    for i, (a, b) in enumerate(bands):
+        rgb = [[resample.bgr555_to_rgb(ds_pal[px[by0 + y][a + x]]) for x in range(b - a)] for y in range(h)]
+        w = b - a
+        if w > ix1 - ix0 - 4:                                 # wider than the inside: scaled down
+            nw = ix1 - ix0 - 4; nh = round(h * nw / w)
+            rgb = [[tuple(round(c) for c in p) for p in row] for row in resample.scale_rgb(rgb, nw, nh)]
+            w = nw
+        x0 = ix0 + (ix1 - ix0 - w) // 2
+        for y, row in enumerate(rgb):
+            for x, p in enumerate(row):
+                if p not in cache:
+                    cache[p] = min(shades, key=lambda k: sum((shades[k][c] - p[c]) ** 2 for c in range(3)))
+                if cache[p] != GBA_FILL: g[top + LINE_PITCH * i + y][x0 + x] = cache[p]
     return g
 
 def split2(bx0, bx1, spaces):
@@ -163,34 +183,32 @@ def split2(bx0, bx1, spaces):
         lines = [(bx0, s0), (s1, bx1)]
         wmax = max(b - a for a, b in lines)
         if best is None or wmax < best[0]: best = (wmax, lines)
-    if best is None or best[0] > BOX_W - 6: raise SystemExit('episodes: a title does not fit in two lines')
+    if best is None: raise SystemExit('episodes: a title does not fit in two lines')
     return best[1]
 
 def boxes(rom, ctx, titles):
     """-> (sub-archive, {'blank': cells, k: cells}, fill cell): cells = two 64x64 cell numbers"""
+    sa = sub_archive(rom, BOX_SUB)
+    if sa['npal'] != 2: raise SystemExit('episodes: unexpected box sub-archive')
+    gba_pal = list(struct.unpack_from('<16H', sa['pals'], 0))
+    base, inside = gba_box(rom, sa)
     cells, pics = [], {}
-    pals = None; colours = None
     for k in range(EPISODES):
         px, ps, col, (bx0, by0, bx1, by1), spaces = ds_box(ctx.data, k)
         if len(spaces) != titles[k].count(' '):
             raise SystemExit(f'episodes: the DS box of episode {k + 1} does not read {titles[k]!r}')
-        if pals is None: pals, colours = ps, col
-        elif (ps, col) != (pals, colours): raise SystemExit('episodes: the DS boxes differ in colours')
-        pics[k] = box_picture(colours, (by0, by1, split2(bx0, bx1, spaces)), px)
-    pics['blank'] = box_picture(colours, None, None)
+        pics[k] = box_picture(base, inside, (by0, by1, split2(bx0, bx1, spaces)), px, ps[0], gba_pal)
+    pics['blank'] = base
     index = {}
     for key, g in pics.items():
         index[key] = []
         for x in (0, 64):
             cells.append(dspic.rle16(dspic.rows_to_tiles(g, x, 0, 64, 64)))
             index[key].append(len(cells) - 1)
-    g = [[colours[2]] * 32 for _ in range(16)]
+    g = [[GBA_FILL] * 32 for _ in range(16)]
     cells.append(dspic.rle16(dspic.rows_to_tiles(g, 0, 0, 32, 16)))
     fill_cell = len(cells) - 1
-    sa = sub_archive(rom, BOX_SUB)
-    if sa['npal'] != 2: raise SystemExit('episodes: unexpected box sub-archive')
-    out_pals = [[0] + pals[p][1:] for p in DS_PALS]
-    blob = dspic.write_sub(2, sa['flag'], out_pals, cells)
+    blob = dspic.write_sub(2, sa['flag'], [list(struct.unpack_from('<16H', sa['pals'], 32 * i)) for i in range(2)], cells)
     return blob, index, fill_cell
 
 # --- the label -------------------------------------------------------------------------------
@@ -279,4 +297,4 @@ def apply(rom, ctx):
         rom.w32(e, arch2); rom.w32(e + 8, stored[rom.u32(e + 8)])
         rom.w32(e + 4, 0x06010000 + 32 * LABEL_TILE)
         rom.write(e + 17, bytes([len(LABEL_SPRITES)]), 'episode label sprites')
-    print(f"  episode select: the DS boxes ({', '.join(titles)}) and labels")
+    print(f"  episode select: the GBA boxes with the DS titles ({', '.join(titles)}), the DS labels")

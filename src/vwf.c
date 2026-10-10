@@ -34,8 +34,13 @@
 #define LBL_Y0     72
 #define LBL_CELLS  16
 #define LBL_LINES  3
-#define LBL_OBJ0   3
-#define Q_MAPROW   1          /* question canvas rows in choice mode */
+/* OAM entries of each line's cells.  The engine's own sprite text takes entries 2-67 (one a
+   character, after the choice cursor in 57); the Court Record draws its arrows in 0-1 and its
+   panel in 34-47 while a choice's options stay on screen under it, and the save screen its
+   Yes / No in 40-41, so the third line keeps clear of all of those. */
+static const u8 lbl_obj0[LBL_LINES] = {3, 19, 58};
+#define Q_MAPROW   2          /* question canvas rows in choice mode: its first line at y 17, as the
+                                 original's question (row 1 put it against the box's top edge) */
 #define CAP_Y0     62         /* caption screen: first row y, 18 px pitch */
 #define CAP_PITCH  18
 #define SYS_Y0     56         /* system messages in the save / continue screen box: first row y */
@@ -51,7 +56,7 @@ struct vwf_state {
     u8 lbl_line;
     u8 lbl_width[LBL_LINES];
     u8 lbl_caption;     /* sprite text outside the box (command 0x42) rather than menu labels */
-    u8 lbl_shown;       /* OAM entries LBL_OBJ0.. currently carry sprite text */
+    u8 lbl_shown;       /* OAM entries lbl_obj0[].. currently carry sprite text */
     u8 lbl_used[LBL_LINES];   /* ... how many of each line's 16 entries (the others are left
                                  alone: the save screen puts its Yes / No in entries 40-41) */
     u8 lbl_align;       /* ... and how the engine places it, latched at its first character */
@@ -71,6 +76,7 @@ struct vwf_state {
     u8 inset;           /* this page is a statement (STMT_X0) */
     s16 line_x0;        /* where the line starts: centred lines (command 0x5d 1) further in */
     u8 blip_n, blip_mode;     /* text blips (text_blip) */
+    u8 q_noedge;        /* the canvas's bottom edge is taken out for the choice box (frame_bottom) */
 };
 static struct vwf_state vs;
 
@@ -163,6 +169,30 @@ static void canvas_tiles(void) {
             fill_tile(CV_TILE0 + ty * CV_COLS + tx, frame_tiles[src]);
         }
     }
+    vs.q_noedge = 0;
+    vs.csum_ok = 0;
+}
+
+/* The canvas's last row carries the box's bottom edge (the last two pixel rows of its tiles, three
+   at the corners).  In the full-screen choice box the question canvas sits at the top, where that
+   edge would draw a line across the screen: frame_bottom(0) turns it into plain interior and side
+   edges, frame_bottom(1) puts it back.  Only frame pixels change (text has colours 8 and up). */
+static void frame_bottom(int on) {
+    for (int tx = 0; tx < CV_COLS; tx++) {
+        int edge = (tx == 0) ? 1 : (tx == CV_COLS - 1) ? 2 : 6;
+        int side = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;
+        const u32* from = frame_tiles[on ? side : edge];
+        const u32* to = frame_tiles[on ? edge : side];
+        volatile u32* d = (volatile u32*)(VRAM + (CV_TILE0 + (CV_ROWS - 1) * CV_COLS + tx) * 32);
+        for (int r = 5; r < 8; r++) {
+            u32 v = d[r];
+            for (int k = 0; k < 32; k += 4)
+                if (((v >> k) & 15) == ((from[r] >> k) & 15))
+                    v = (v & ~(15u << k)) | (to[r] & (15u << k));
+            d[r] = v;
+        }
+    }
+    vs.q_noedge = !on;
     vs.csum_ok = 0;
 }
 
@@ -193,6 +223,7 @@ static int canvas_tile(u32 e) {
 }
 
 static void canvas_map(void) {
+    if (vs.q_noedge) frame_bottom(1);
     for (int ty = 0; ty < CV_ROWS; ty++)
         for (int tx = 0; tx < CV_COLS; tx++)
             BG1MAP[(CV_MAPROW + ty) * 32 + tx] = CV_TILE0 + ty * CV_COLS + tx;
@@ -330,7 +361,7 @@ static void label_draw_char(u32 code, int col, int row) {
 static void labels_hide(void) {
     if (!vs.lbl_shown) return;
     for (int L = 0; L < LBL_LINES; L++) {
-        for (int c = 0; c < vs.lbl_used[L]; c++) OAMBUF[(LBL_OBJ0 + L * LBL_CELLS + c) * 4 + 0] = 0x0200;   /* disabled */
+        for (int c = 0; c < vs.lbl_used[L]; c++) OAMBUF[(lbl_obj0[L] + c) * 4 + 0] = 0x0200;   /* disabled */
         vs.lbl_used[L] = 0;
     }
     vs.lbl_shown = 0;
@@ -376,7 +407,7 @@ static void labels_oam(void) {
             if (x < 0) x = 0;
         }
         for (int c = 0; c < LBL_CELLS; c++) {
-            int obj = LBL_OBJ0 + L * LBL_CELLS + c;
+            int obj = lbl_obj0[L] + c;
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
             OAMBUF[obj * 4 + 0] = y | (0 << 14);
             OAMBUF[obj * 4 + 1] = ((x + c * 16) & 0x1ff) | (1 << 14);
@@ -390,6 +421,7 @@ static void labels_oam(void) {
    box-grow animation become plain interior. */
 static void choice_frame(void) {
     int dirty = 0;
+    if (!vs.q_noedge) frame_bottom(0);
     for (int row = 0; row < 20; row++) {
         int qrow = row - Q_MAPROW;
         for (int tx = 0; tx < CV_COLS; tx++) {

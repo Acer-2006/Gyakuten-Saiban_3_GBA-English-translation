@@ -51,7 +51,8 @@ the next page of text.
 * The DS version's Objection!, Hold it! and Take that! speech bubbles.
 * Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
   destinations (the DS version's pictures, copied into the GBA boxes).
-* Episode select: the DS version's episode boxes and Episode 1–5 labels.
+* Episode select: the DS version's episode titles in the GBA's boxes, and its Episode 1–5
+  labels.
 * Save screen: the DS version's SAVE header and Yes / No buttons, and its note under them
   (Press START at any time during the game to save your data.); the continue screen has the
   DS LOAD header, names the part you saved in and offers the DS buttons From save point. /
@@ -104,6 +105,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.5 — four fixes: the Court Record opened during a choice drew its panel over the third
+  option's sprites, which wrote over the panel's top row each frame (garbage where the item's
+  name and description were); the shouts of Payne, Phoenix and one more voice played a third too
+  deep and slow (their instruments play the sample at the mixer's own rate, so those clips are
+  now resampled to it); the episode select's "Select an episode." box was the tall text box
+  with its middle missing instead of the original's short box; and the episode cards are the
+  GBA's own boxes again, with the DS titles set inside them in two lines at the DS size.
 * 0.15.4 — the Testimony label in the corner during a testimony had black dots on the curves of
   its letters: the colour the DS gives them, a light green, was black in the GBA's palette.
 * 0.15.3 — New Game on the title menu: a pixel between the N and the e and between the G and
