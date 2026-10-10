@@ -87,6 +87,12 @@ static struct vwf_state vs;
 static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 */
 #define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
 
+/* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too
+   (patches/text.py TEXT_PAL puts the same into every copy of the UI palette). */
+#define TEXT_ORANGE 0x1dde
+#define TEXT_BLUE   0x7b0d
+#define TEXT_GREEN  0x03c0
+
 static const u16 text_colors[16] = {
     /* colour index per text colour argument (command 0x03) */
     8, 13, 14, 15, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8,
@@ -228,7 +234,7 @@ static void canvas_map(void) {
         for (int tx = 0; tx < CV_COLS; tx++)
             BG1MAP[(CV_MAPROW + ty) * 32 + tx] = CV_TILE0 + ty * CV_COLS + tx;
     SYS_BGDIRTY |= 2;
-    BGPAL[13] = 0x167f; BGPAL[14] = 0x7eed; BGPAL[15] = 0x2be7;
+    BGPAL[13] = TEXT_ORANGE; BGPAL[14] = TEXT_BLUE; BGPAL[15] = TEXT_GREEN;
     arrow_load();
     vs.mapped = 1;
 }
@@ -371,7 +377,7 @@ static void labels_oam(void) {
     /* the engine's sprite-text writer shows nothing while SYS+0x19 is 0 (the episode select
        clears it as soon as an episode is picked, with its prompt still on the page) */
     if (!SYS[0x19] && !fullscreen_box()) { labels_hide(); return; }
-    OBJPAL[2 * 16 + 13] = 0x167f; OBJPAL[2 * 16 + 14] = 0x7eed; OBJPAL[2 * 16 + 15] = 0x2be7;
+    OBJPAL[2 * 16 + 13] = TEXT_ORANGE; OBJPAL[2 * 16 + 14] = TEXT_BLUE; OBJPAL[2 * 16 + 15] = TEXT_GREEN;
     /* white (index 8) is the UI palette's; screens that load their own palette 2 (the episode
        select) leave it black */
     if (!(OBJPAL[2 * 16 + 8] & 0x7fff)) OBJPAL[2 * 16 + 8] = 0x7fff;

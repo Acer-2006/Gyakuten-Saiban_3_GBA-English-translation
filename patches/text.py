@@ -29,7 +29,10 @@ BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x
 TEXT_LOOP       = 0x0801f858
 
 UI_PAL = [0x0000,0x0400,0x1ce7,0x4210,0x739c,0x3800,0x3cc5,0x5a0c,0x7fff,0x0c6c,0x3191,0x4656,0x631b,0x3def,0x028c,0x03ff]
-TEXT_PAL = {13: 0x167f, 14: 0x7eed, 15: 0x2be7}
+# the text colours of commands {03 1}, {03 2} and {03 3}: orange, light blue and green, the values
+# the Japanese GBA keeps in OBJ palette 0 for its sprite text (entries 6, 9 and 12) and that the DS
+# uses too (its orange is this one, pixel for pixel)
+TEXT_PAL = {13: 0x1dde, 14: 0x7b0d, 15: 0x03c0}
 
 def call_hook(rom, site, target, displaced, note='', keep=('r0', 'r1', 'r2', 'r3')):
     """Replace the 4 bytes at `site` with a bl to a trampoline that calls C function `target`

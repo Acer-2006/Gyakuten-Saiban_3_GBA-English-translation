@@ -105,6 +105,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.8 — the three text colours (orange, light blue, green) are the Japanese game's own values,
+  which the DS shares; ours were paler (the orange yellower, the green minty).
 * 0.15.7 — episode cards: the DS titles in the GBA boxes no longer sit on a faint grey
   rectangle (the DS box's fill, copied with the letters), and their shades are matched to the
   box's dark red by lightness, so they are as dark as the Japanese titles.
