@@ -77,6 +77,7 @@ struct vwf_state {
     s16 line_x0;        /* where the line starts: centred lines (command 0x5d 1) further in */
     u8 blip_n, blip_mode;     /* text blips (text_blip) */
     u8 q_noedge;        /* the canvas's bottom edge is taken out for the choice box (frame_bottom) */
+    u8 lbl_shadow;      /* the lost page shown as sprite text in the box (the Court Record is open) */
 };
 static struct vwf_state vs;
 
@@ -86,6 +87,7 @@ static struct vwf_state vs;
 #define GLOG_MAX   192
 static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 */
 #define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
+#define MODE_RECORD 7       /* SYS+8 while the Court Record is open */
 
 /* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too
    (patches/text.py TEXT_PAL puts the same into every copy of the UI palette). */
@@ -386,7 +388,10 @@ static void labels_oam(void) {
         int w = vs.lbl_width[L];
         int ncells = (w + 15) >> 4;
         int x = LBL_X0, y = LBL_Y0 + L * 16;
-        if (vs.lbl_caption) {
+        if (vs.lbl_shadow) {
+            /* the page as the canvas showed it: cell for cell over the box's text rows */
+            x = 0; y = CV_MAPROW * 8 + L * 16; ncells = 240 / 16;
+        } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
                otherwise centred text is centred, and alignment 2 (captions) is drawn at
@@ -705,13 +710,30 @@ void vwf_frame(void) {
         if (vs.mapped) choice_frame();
         return;
     }
-    labels_hide();
+    if (vs.lost && vs.lbl_shadow && SYS[8] == MODE_RECORD && box_open()) {
+        labels_oam();                     /* the page stays up under the Court Record's panel */
+    } else {
+        labels_hide();
+        vs.lbl_shadow = 0;
+    }
     vs.lbl_row0 = -1;
     if (vs.mapped && box_moving()) return;
     if (vs.lost) {
         /* the box is still there (its top edge) and nothing shows the canvas tiles any more */
         if ((BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {
+            labels_hide(); vs.lbl_shadow = 0;
             canvas_redraw(); canvas_map(); vs.lost = 0;
+        } else if (!vs.lbl_shadow && SYS[8] == MODE_RECORD && box_open()) {
+            /* The Court Record copies its panel into the canvas's tiles (char block 0 has no
+               room for both) and the original keeps the page in view under the panel: draw the
+               page again as sprite text, cell for cell where the canvas was. */
+            labels_reset();
+            for (int i = 0; i < vs.glog_n; i++) {
+                u32 g = glog[i];
+                blit_to(g & 0x1ff, (g >> 9) & 0xff, (g >> 17) & 0x3f, g >> 23, label_rowptr);
+            }
+            vs.lbl_shadow = 1;
+            labels_oam();
         }
         return;
     }

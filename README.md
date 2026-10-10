@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.9 — the text box keeps its page in view while the Court Record is open, as in the
+  original (it went blank, since the Court Record draws its panel over the tiles the page is
+  drawn in; the page is now shown as sprite text in its place until the Record closes).
 * 0.15.8 — the three text colours (orange, light blue, green) are the Japanese game's own values,
   which the DS shares; ours were paler (the orange yellower, the green minty).
 * 0.15.7 — episode cards: the DS titles in the GBA boxes no longer sit on a faint grey
@@ -186,8 +189,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
   newspapers, the calling card, the poster and the signs in the backgrounds (39 pictures, taken
   from your DS ROM while building).
 * 0.10.1 — browsing the Court Record no longer leaves garbage in the text box: the Court Record
-  borrows the text box's tiles to slide between items; the box now shows empty during the slide
-  and the text comes back afterwards.
+  borrows the text box's tiles to slide between items; the box showed empty during the slide
+  and the text came back afterwards (0.15.9 keeps it in view).
 * 0.10 — Talk topics and Move destinations, the episode-select titles and labels, the save
   screen, the Psyche-Lock "Unlock Successful" banner and the verdict in English. Lines shown
   without the text box are placed as in the original (the episode-select prompt was drawn over
