@@ -105,6 +105,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.6 — New Game on the title menu: a pixel between every pair of letters (the letters are
+  unchanged; the word now fills its sprite edge to edge).
 * 0.15.5 — four fixes: the Court Record opened during a choice drew its panel over the third
   option's sprites, which wrote over the panel's top row each frame (garbage where the item's
   name and description were); the shouts of Payne, Phoenix and one more voice played a third too
