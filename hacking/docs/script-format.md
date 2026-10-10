@@ -123,6 +123,7 @@ DS version of the script.
 | `0x48 x y` | 2 | offset of free-slot sprite text: `TXT+0x4c` = x, `TXT+0x4d` = y (see text-engine.md) |
 | `0x0e n` | 1 | speaker: `(n >> 8) & 0x7f` at `TXT+0x24` (the name tag, and the blip) |
 | `0x0f a b` | 2 | stores `a` at `TXT+0x10` |
+| `0x39 n`, `0x3a n xy`, `0x3c n` | 1, 2, 1 | map markers: load object `n >> 8` (bit 0 clear: remove it), place it at (`xy >> 8`, `xy & 0xff`), show it (see graphics.md, "Map markers") |
 | `0x27 n s` | 2 | shake the screen for `n` frames with strength `s` (`SYS+0x14`, `SYS+0x16`, bit 0 of `SYS+0xe8`; strength 0 moves the screen by up to 1 pixel, 1 by up to 3, 2 by up to 6) |
 | `0x10 f` | 1 | set flag |
 | `0x1b v` | 1 | stores `v` at `TXT+0x12` |

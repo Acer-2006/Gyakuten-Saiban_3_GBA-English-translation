@@ -54,6 +54,7 @@ the next page of text.
 * Save screen: the DS version's SAVE header and Yes / No buttons, and the note under them; the
   continue screen has the DS LOAD header, names the part you saved in and offers the DS
   buttons From save point. / From chapter start.
+* The DS version's W, V and K markers (witness, victim, killer) on maps and diagrams.
 * College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
   writing is gone, as in the DS version's sprites.
 * The DS version's Unlock Successful banner when the last Psyche-Lock breaks, and its Not Guilty
@@ -104,6 +105,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.14.1 — the witness, victim and killer markers on maps and diagrams are the DS version's W, V
+  and K instead of 目, 被 and 犯.
 * 0.14 — sound and layout as in the DS version: the date and place cards and the testimony titles
   are centred; the text runs at the DS English version's speed (the usual speed is 2 frames a
   letter instead of 3) and blips as it does, on every other letter and never on a space, and the

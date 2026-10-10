@@ -85,6 +85,18 @@ The sheet at `0x08181820` is raw 4bpp: 10 groups of `0x800` bytes, 5 tags per gr
 `group * 0x800 + k * 0xc0` (6 tiles, 192 bytes) and the bottom row at `+ 0x400`. The tag is
 drawn into BG1 rows 12–13 above the dialogue box.
 
+## Map markers
+
+The script marks places on maps and diagrams with small sprites: command `0x39 n` loads object
+`n >> 8` (removes it when bit 0 is clear), `0x3a n xy` puts it at x = `xy >> 8`, y = `xy & 0xff`,
+and `0x3c n` shows it. The objects are listed at `0x08049c50`, 12 bytes each: `{u32 tiles, u16
+bytes, u16 attr0, u16 attr1}`, the tiles raw 4bpp (from `0x0823de08`), the palette `0x0823dde8`
+(OBJ palette 6), OAM entries from 57 on. Three of the 16×16 circles have a kanji in them: 目
+(object 0, green: the witness), 被 (1, blue: the victim) and 犯 (4, red: the killer); the others
+are lines, dots, cars and snowmobiles. `data.bin` has the same markers at `0x60980`, each
+Japanese one followed by the English one (W, V, K), and the English build copies those over
+objects 0, 1 and 4 (`patches/graphics.py`).
+
 ## Court Record
 
 **Item table: `0x08045f74`**, 211 entries of `{u32 image, u32 icon | detail << 16}`, indexed by

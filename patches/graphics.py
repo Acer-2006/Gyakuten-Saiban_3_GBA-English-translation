@@ -1,5 +1,5 @@
 """Graphics: English assets from the DS copied into the GBA ROM."""
-import os, sys
+import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -14,6 +14,13 @@ GBA_TITLE_REF = 0x0803b3d4 # table entry pointing at it
 GBA_TAGS = 0x08181820      # 10 groups x 0x800: 5 tags per group, 6x2 tiles each (top row k*0xc0, bottom +0x400)
 DS_TAGS_EN = 0x9360 + 0x5000   # same packing inside data.bin, DS index = GBA id - 1
 
+# Markers the script puts on maps and diagrams (command 0x39 n: object n of the table at
+# 0x08049c50, 12 bytes each: {u32 tiles, u16 bytes, u16 attr0, u16 attr1}; one 16x16 sprite in
+# OBJ palette 6, 0x0823dde8).  data.bin has them too, each Japanese marker followed by the
+# English one: object -> (data.bin offset of the Japanese marker, what it marks)
+MARKER_TABLE = 0x08049c50
+DS_MARKERS = {0: (0x60980, 'W (witness)'), 1: (0x60a80, 'V (victim)'), 4: (0x60c80, 'K (killer)')}
+
 def apply(rom, ctx):
     d = ctx.data
     # --- name tags ---
@@ -25,8 +32,20 @@ def apply(rom, ctx):
         grp, k = divmod(gid, 5); off = GBA_TAGS + grp * 0x800 + k * 0xc0
         rom.write(off, top, 'name tag top'); rom.write(off + 0x400, bot, 'name tag bottom')
     print("  name tags: 49 replaced")
+    markers(rom, ctx)
     title(rom, ctx)
     title_menu(rom, ctx)
+
+def markers(rom, ctx):
+    """The map markers 目, 被 and 犯 (witness, victim, killer): the DS's W, V and K."""
+    for obj, (jp, what) in DS_MARKERS.items():
+        tiles, size = struct.unpack_from('<IH', rom.read(MARKER_TABLE + 12 * obj, 6))
+        if size != 0x80 or ctx.data[jp:jp + size] != rom.read(tiles, size):
+            raise SystemExit(f'markers: the DS marker at {jp:#x} is not the GBA object {obj}')
+        en = ctx.data[jp + size:jp + 2 * size]
+        if en == rom.read(tiles, size): raise SystemExit(f'markers: no English marker after {jp:#x}')
+        rom.write(tiles, en, f'map marker {obj}')
+    print(f"  map markers: {', '.join(w for _, w in DS_MARKERS.values())} from the DS")
 
 def title_menu(rom, ctx):
     """Title menu items: rendered with the DS font into the original sprite slots."""
