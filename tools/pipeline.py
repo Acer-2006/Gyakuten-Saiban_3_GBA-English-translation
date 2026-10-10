@@ -3,10 +3,9 @@
 
 All game data (script, font, graphics, voices) is taken from the user's own cartridge images
 each time the ROM is built.  The exceptions, typed in by hand: the English choice-menu options
-(tools/labels_en.py; the DS has them only as pictures), the words on the buttons and banners the
-build draws itself (Press, Present, OK, Back, the investigation tabs, the testimony banners,
-Unlock Successful, the verdict) and the save screen's note, and the DS lines reworded for the
-GBA's buttons (convert_script.GBA_WORDING).
+(tools/labels_en.py; the DS has them only as pictures), the words on the buttons the build draws
+itself (Press, Present, OK, Back, the investigation tabs) and the save screen's note, and the DS
+lines reworded for the GBA's buttons (convert_script.GBA_WORDING).
 """
 import os, sys, struct, zlib, json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

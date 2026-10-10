@@ -106,6 +106,24 @@ def compose(data, sprites, cells, w, h, ax, ay):
                 if v: px[ay + y + yy][ax + x + xx] = v
     return px
 
+def write_frames(fl, defs, sub=0):
+    """Frame data from [(sprite list offset, duration)] and {offset: [(x, y, w, h, cell, attr)]}
+    (as frame_data returns them) with the sub-archive at offset `sub` of its archive; the lists
+    are laid out again after the frames.  The cell number replaces attr's low 9 bits."""
+    order = []
+    for off, _ in fl:
+        if off not in order: order.append(off)
+    pos = {}; body = bytearray(); base = 8 + 8 * len(fl)
+    for off in order:
+        pos[off] = base + len(body)
+        sp = defs[off]
+        body += struct.pack('<HH', len(sp), 0)
+        for x, y, w, h, cell, attr in sp:
+            body += struct.pack('<HH', (y & 0xff) << 8 | (x & 0xff), (attr & ~0x1ff) | cell)
+    out = struct.pack('<HHI', 0, len(fl), sub)
+    for off, dur in fl: out += struct.pack('<HHI', pos[off], dur, 0)
+    return out + bytes(body)
+
 def write_sub(npal, flag, pals, cells):
     """A sub-archive from palettes (lists of 16 values) and packed cells."""
     table = bytearray(); body = bytearray()

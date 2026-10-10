@@ -1,60 +1,119 @@
-"""The verdict in English: NOT GUILTY / GUILTY.
+"""The verdict from the DS version: Not Guilty / Guilty in its serif letters.
 
-Script command 0x44 (handler 0x080209dc) shows the verdict as two 64x64 sprites that slam in one
-after the other, left then right: raw 4bpp pictures (8x8 tiles, 1D order, 2 KB each) DMA'd to
-OBJ tile 0x1a0 and 0x1e0.  Not guilty copies 無 (0x0818bb00) and 罪 (0x0818cb00), 2 KB each;
-guilty copies 4 KB from 0x0818c300, 有 followed by that same 罪.  Index 1 is the lettering, 2 its
-outline, 5 an outer edge (3 and 4 are greys for the corners); the not-guilty palette makes the
-lettering white on black, the guilty one black on white.
+GBA: script command 0x44 (handler 0x080209dc, argument 0 = not guilty) DMAs two raw 64x64
+pictures (無 罪, or 有 罪) to OBJ tiles 0x1a0 and 0x1e0 and their palette (0x08198b70, or
+0x08198b50 for guilty) to OBJ palette 5, and switches to mode 9 (0x0800f23c, entry 9 of the mode
+table at 0x08161088).  That shows the words as OAM entries 49 and 50, affine with double size,
+centred at (47, 47) and (192, 47), and zooms each in from 2.5 times its size (matrices 0 and 1,
+the scale in SYS+0xa0), the second 40 frames after the first; then moves them up while zooming
+out, hides them, and for not guilty rains confetti (OAM entries 58-88).
 
-English: NOT | GUILTY in place of 無 | 罪, and for guilty a new 4 KB picture GUILTY | ! (the
-literal at 0x08020a30 is pointed at it), in tall condensed lettering: the DS dialogue font,
-emboldened by a pixel and stretched to four times its height.
+DS: the English verdict is letters, raw 4bpp sprites in data.bin (64x64 or 32x64, from 0x23c80:
+N o t G u i l t y) with the palettes 0x27540 (white letters, not guilty) and 0x27520 (black,
+guilty).  The arm9 lists them for each verdict (0x020aca58 not guilty, 0x020ac9c8 guilty), 24
+bytes each: {u32 frame, s16 x, s16 y, s16 x, s16 y, u16 512, u16 256, u32 data.bin offset, u32
+size}, x and y the corner of the double-size box.  Each letter zooms in from twice its size about
+its centre at its frame: Not, then Guilty 60 frames later; Guilty alone letter by letter.
+
+The English build shrinks the letters to 4/5 (area average), each into a 32x64 sprite from OBJ
+tile 0x1a0 (nine take the tiles up to the characters' at 0x2c0), laid out as on the DS around the
+middle of the screen at the height of the original's words.  It keeps the original's two zooms,
+from twice the size as on the DS instead of 2.5 (SYS+0xa0 = 0x280, set by the handler and by
+state 1), so that a letter fills its double-size box: Not and Guilty, or Guil and ty.
+src/verdict.c copies the tiles at the end of the command's handler and, after each frame of the
+verdict mode, puts the letters in OAM entries 51-59 after their word's entry (see there).
 """
-import os, sys
+import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import textgfx
+import dspic
+from rom import compile_c
+from .text import call_hook
 
-NOT_PIC, GUILTY_PIC = 0x0818bb00, 0x0818cb00     # 無, 罪 (2 KB each)
-GUILTY_SRC_LIT, GUILTY_SRC = 0x08020a30, 0x0818c300
-FILL, OUTLINE, EDGE = 1, 2, 5
-STRETCH = 4
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HANDLER_END = 0x08020a82                  # movs r0, #0x80; lsls r0, r0, #2 (entry 50 hidden)
+ZOOM_FROM = [(0x080209f0, 'movs r0, #0xa0', 'movs r0, #0x80'),       # the scale, << 2: 2.5 -> 2
+             (0x0800f37c, 'movs r1, #0xa0', 'movs r1, #0x80')]
+MODE_TABLE, VERDICT_MODE = 0x08161088, 9
+VERDICT_STEP = 0x0800f23c
+GBA_PALS = (0x08198b70, 0x08198b50)       # not guilty, guilty
+DS_LISTS = (0x020aca58, 0x020ac9c8)       # arm9
+DS_COUNT = (9, 6)
+DS_PALS = (0x27540, 0x27520)              # data.bin
+SCALE = 0.8                               # N, G and y fit 32 wide
+TILE0, TILE_END = 0x1a0, 0x2c0            # the characters' sprites start at 0x2c0
+CX = 120                                  # the middle of the screen
+SPLIT = 4                                 # guilty: Guil | ty
+BSS = 0x02029800                          # after src/menu.c's
 
-def word(font, text, bold=1):
-    w = font.measure(text) + 2
-    g = textgfx.render(font, text, w, 16, fill=1, align='left')
-    rows = [y for y in range(16) if any(g[y])]
-    cols = [x for x in range(w) if any(g[y][x] for y in rows)]
-    g = [r[cols[0]:cols[-1] + 1] for r in g[rows[0]:rows[-1] + 1]]
-    for _ in range(bold):                                  # embolden: each pixel one to the right too
-        g = [[1 if r[x] or (x and r[x - 1]) else 0 for x in range(len(r))] + [r[-1]] for r in g]
-    return [r for r in g for _ in range(STRETCH)]
+def ds_letters(ctx, kind):
+    """-> [(frame, centre x, picture rows, width)] in the DS layout"""
+    out = []
+    for i in range(DS_COUNT[kind]):
+        fr, x, y, x2, y2, s0, s1, off, size = struct.unpack_from('<IhhhhHHII', ctx.arm9, DS_LISTS[kind] - 0x02000000 + 24 * i)
+        if (x, y) != (x2, y2) or y != 32 or (s0, s1) != (512, 256) or size not in (0x400, 0x800):
+            raise SystemExit(f'verdict: unexpected DS letter list at {DS_LISTS[kind]:#x}')
+        w = 64 if size == 0x800 else 32
+        out.append((fr, x + w, dspic.tiles_to_rows(ctx.data[off:off + size], w, 64), w))
+    return out
 
-def picture(font, text, bold=1):
-    """64x64, 8x8 tiles in 1D order."""
-    g = word(font, text, bold)
-    h, w = len(g), len(g[0])
-    if w + 4 > 64 or h + 4 > 64: raise SystemExit(f'verdict: {text} too big')
-    cv = [[0] * 64 for _ in range(64)]
-    x0, y0 = (64 - w) // 2, (64 - h) // 2
-    for y in range(h):
-        for x in range(w):
-            if g[y][x]: cv[y0 + y][x0 + x] = FILL
-    for val, inner in ((OUTLINE, FILL), (EDGE, OUTLINE)):
-        src = [r[:] for r in cv]
-        for y in range(64):
-            for x in range(64):
-                if not src[y][x] and any(0 <= y + dy < 64 and 0 <= x + dx < 64 and src[y + dy][x + dx] == inner
-                                         for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
-                    cv[y][x] = val
-    return b''.join(textgfx.tile4(cv, tx * 8, ty * 8) for ty in range(8) for tx in range(8))
+def letter_picture(px, w, pal):
+    """A DS letter (w x 64) -> a 32x64 picture at 4/5 size about the same centre."""
+    ww, wh = round(32 / SCALE), round(64 / SCALE)
+    x0, y0 = w // 2 - ww // 2, 32 - wh // 2
+    inside = [[px[y][x] if 0 <= y < 64 and 0 <= x < w else 0 for x in range(x0, x0 + ww)] for y in range(y0, y0 + wh)]
+    if sum(v != 0 for r in inside for v in r) != sum(v != 0 for r in px for v in r):
+        raise SystemExit('verdict: a DS letter does not fit')
+    return dspic.quantize(dspic.shrink(inside, pal, 32, 64), pal, dspic.used_indices(px))
 
 def apply(rom, ctx):
-    font = textgfx.Font.from_ctx(ctx)
-    if rom.u32(GUILTY_SRC_LIT) != GUILTY_SRC or GUILTY_SRC + 0x800 != GUILTY_PIC:
-        raise SystemExit('verdict: unexpected verdict code')
-    rom.write(NOT_PIC, picture(font, 'NOT'), 'verdict NOT')
-    rom.write(GUILTY_PIC, picture(font, 'GUILTY'), 'verdict GUILTY')
-    addr = rom.store(picture(font, 'GUILTY') + picture(font, '!', bold=3), 'ext', 4, 'verdict GUILTY !')
-    rom.w32(GUILTY_SRC_LIT, addr)
-    print("  verdict: NOT GUILTY / GUILTY")
+    tables = []
+    for kind in (0, 1):
+        pal = list(struct.unpack_from('<16H', ctx.data, DS_PALS[kind]))
+        letters = ds_letters(ctx, kind)
+        if TILE0 + 32 * len(letters) > TILE_END: raise SystemExit('verdict: too many letters')
+        ink = []
+        for fr, cx, px, w in letters:
+            cols = [x for x in range(w) if any(r[x] for r in px)]
+            ink += [cx - w // 2 + cols[0], cx - w // 2 + cols[-1] + 1]
+        mid = (min(ink) + max(ink)) / 2
+        frames = sorted({fr for fr, *_ in letters})
+        tiles = bytearray(); recs = bytearray()
+        for k, (fr, cx, px, w) in enumerate(letters):
+            word = (frames.index(fr) if len(frames) == 2 else int(k >= SPLIT))
+            gx = CX + round((cx - mid) * SCALE)
+            tiles += dspic.rows_to_tiles(letter_picture(px, w, pal), 0, 0, 32, 64)
+            recs += struct.pack('<BBhHH', word, 0, gx - 32, (TILE0 + 32 * k) | 5 << 12, 0)
+        if [r for r in recs[::8]] != sorted(recs[::8]):
+            raise SystemExit('verdict: the words are not in order')
+        t = rom.store(bytes(tiles), 'ext', 4, f'verdict letters {kind}')
+        l = rom.store(bytes(recs), 'ext', 4, f'verdict layout {kind}')
+        tables.append(struct.pack('<HHII', len(letters), len(tiles) // 4, t, l))
+        old = rom.read(GBA_PALS[kind], 32)
+        rom.write(GBA_PALS[kind], old[:2] + struct.pack('<15H', *pal[1:]), f'verdict palette {kind}')
+    table = rom.store(b''.join(tables), 'ext', 4, 'verdict table')
+    text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)
+    binary, syms, bss = compile_c([os.path.join(ROOT, 'src/verdict.c')], text_addr, BSS,
+                                  os.path.join(ROOT, 'build/verdict'), ld_defsyms={'verdicts': table})
+    assert rom.store(binary, 'font', 4, 'verdict code') == text_addr
+    assert bss <= 0x100, bss
+    for site, old, new in ZOOM_FROM:
+        if rom.read(site, 2) != rom.asm_thumb(site, old): raise SystemExit(f'verdict: unexpected code at {site:#x}')
+        rom.thumb(site, new, 'verdict zoom')
+    # the tiles, at the end of the command's handler
+    displaced = 'movs r0, #0x80\n lsls r0, r0, #2'
+    if rom.read(HANDLER_END, 4) != rom.asm_thumb(HANDLER_END, displaced):
+        raise SystemExit('verdict: unexpected code in the verdict command')
+    call_hook(rom, HANDLER_END, syms['verdict_start'], displaced, 'verdict start')
+    # the letters, after each frame of the verdict mode
+    entry = MODE_TABLE + 4 * VERDICT_MODE
+    if rom.u32(entry) != VERDICT_STEP | 1: raise SystemExit('verdict: unexpected mode table')
+    tramp = rom.thumb_code(f'''
+        push {{r4, lr}}
+        bl #{VERDICT_STEP:#x}
+        bl #{syms["verdict_letters"] & ~1:#x}
+        pop {{r4}}
+        pop {{r0}}
+        bx r0
+    ''', note='verdict mode trampoline')
+    rom.w32(entry, tramp | 1)
+    print(f"  verdict: Not Guilty / Guilty from the DS letters ({DS_COUNT[0]} and {DS_COUNT[1]})")

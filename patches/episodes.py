@@ -86,21 +86,7 @@ def read_frames(rom, fp):
     """-> (sub offset, [(def offset, duration)], {def offset: [(x, y, w, h, cell, attr)]})"""
     return dspic.frame_data(rom.d, fp - 0x08000000)
 
-def write_frames(fl, defs, sub=0):
-    """Frame data with the sub-archive at offset `sub` of its archive."""
-    order = []
-    for off, _ in fl:
-        if off not in order: order.append(off)
-    pos = {}; body = bytearray(); base = 8 + 8 * len(fl)
-    for off in order:
-        pos[off] = base + len(body)
-        sp = defs[off]
-        body += struct.pack('<HH', len(sp), 0)
-        for x, y, w, h, cell, attr in sp:
-            body += struct.pack('<HH', (y & 0xff) << 8 | (x & 0xff), (attr & ~0x1ff) | cell)
-    out = struct.pack('<HHI', 0, len(fl), sub)
-    for off, dur in fl: out += struct.pack('<HHI', pos[off], dur, 0)
-    return out + bytes(body)
+write_frames = dspic.write_frames
 
 def write_sub(npal, flag, pals, cells):
     table = bytearray(); body = bytearray()

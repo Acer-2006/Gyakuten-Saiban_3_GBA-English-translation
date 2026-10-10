@@ -1,268 +1,190 @@
-"""Testimony / cross-examination banners, the Psyche-Lock banner and the "Testimony" corner label,
-in English.
+"""Witness Testimony / Cross Examination, Unlock Successful and the Testimony corner label from
+the DS version.
 
-The banners (証言開始 "testimony begins", blue; 尋問開始 "cross-examination begins", red) are
-sprite animations.  Their pictures live in an effects archive at 0x0869c8f0: the animation table
-at 0x08046b30 (20-byte entries {u32 archive, u32 VRAM destination, u32 frame data, s16 x, s16 y,
-u32 flags}, indexed by effect number; the code at 0x080173e8 reads it) points at the archive,
-and the frame data's header names the sub-archive inside it (offset 0 for the banners).  A
-sub-archive is
+The banners are sprite animations: entries of the animation table at 0x08046b30 (20 bytes each,
+indexed by effect number: {u32 archive, u32 VRAM destination, u32 frame data, s16 x, s16 y, u32
+flags}; the code at 0x080173e8 starts one; flags byte 0 is the first OBJ palette, byte 1 the
+number of sprites).  The frame data names the sub-archive of the archive that holds the cells:
 
-    u16 palettes, u16 0x8000, 32 bytes per palette,
-    u32 cell offset[n] (from the start of this table), cells
+    frame data:   u16 0, u16 frames, u32 sub-archive offset
+                  frames x {u16 sprite list offset, u16 time, u32 0}
+                  sprite lists: u16 sprites, u16 0, then per sprite u16 position (y << 8 | x,
+                  signed bytes from the anchor), u16 attribute (size and shape in the top 4
+                  bits, then the palette bits, the cell number in the low 9 bits)
+    sub-archive:  u16 palettes, u16 0x8000, 32 bytes per palette,
+                  u32 cell offset[n] (from the start of this table), cells packed with a 16-bit
+                  RLE (a token u16 t, then one u16 repeated t & 0x7fff times (t & 0x8000) or t
+                  literal u16s)
 
-and each cell is a 64x32 or 32x32 4bpp sprite (1D tile order) packed with a 16-bit RLE: a token
-u16 t, then either one u16 repeated t & 0x7fff times (t & 0x8000) or t literal u16s.
+The high byte of a frame's time says how the attribute picks the palette (0x08017eb0): 0 -> bit
+11, one of two; 8 -> bits 10-11, one of four; 1 -> bits 9-11, one of eight.
 
-Frame data: {u16 0, u16 frames, u32 sub-archive offset}, then per frame {u16 offset, u16 time,
-u32 0}, and at each offset {u16 sprites, u16 0, then per sprite u16 position (y << 8 | x, signed
-bytes), u16 attribute (size and shape in the top 4 bits, 0x0800 = second palette, cell number in
-the low bits)}.  The banner uses 19 cells: each half of the words (64x32), each quarter (32x32)
-and the quarters with a white sheen passing over them.  Both banners share the right half
-(開始), so the English build adds seven cells for the cross-examination banner and points its
-frames at them.
+The testimony banner (証言開始, blue) is three effects: its left and right halves (0x55 from x 0,
+0x56 from x 240), which the code at 0x0800e788 slides to the middle (x 120, y 60), then the whole
+banner (0x53) with a white sheen passing over it, then the halves again, sliding apart.  The
+cross-examination banner (尋問開始, red) is 0x57, 0x58 and 0x54, and Unlock Successful (解除成功,
+effects 105, 106 and 104; 107 is its right half alone) leaves up and down (0x0801a360).  The
+original pictures are 128x32: the halves in OBJ tiles 0x260 and 0x240, the whole banner in 0x280
+(two palettes, blue and red; four for Unlock, the last three for a flash at the end).
 
-The English pictures are two lines in bold italic DS-font lettering, blue (or red) with a white
-outline, after the DS version's "Witness Testimony" / "Cross Examination".
+The DS keeps its English banners in data.bin in the same formats: two lines of bold italic
+lettering (192x84 for Witness Testimony, 218x79 for Unlock Successful), and after the
+sub-archive the frame data of the whole banner: the sheen as sprites over it in four frames,
+then a flash through three lighter palettes.  The build shrinks every picture of that animation
+to 128 wide (area average, tools/dspic.py) and cuts it into two 64x64 halves, so a banner takes
+OBJ tiles 0x240-0x2bf like the original: the right half in 0x240, the left half in 0x280, and the
+whole banner in 0x240 too, right half first, so that it has the same tiles as the halves when it
+takes over from them.  The testimony banners keep two palettes (four from OBJ palette 11 would
+reach the witness's), so their flash is drawn into the pictures; Unlock Successful flashes
+through the DS's four palettes.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import textgfx, smallfont
+import dspic
 
 FX_ARCHIVE = 0x0869c8f0
 ANIM_TABLE = 0x08046b30
 ANIM_COUNT = 241                          # effects 0 (empty) .. 240
-BANNER_FRAMES = [0x086de2b8, 0x086de3b0, 0x086de4d8, 0x086de4f8, 0x086de518, 0x086de538]
+rle16, unrle16 = dspic.rle16, dspic.unrle16   # (patches/episodes.py and datascreen.py use them)
 
 def effect_entries(rom, frames):
-    """Animation table entries whose frame data is one of `frames` (effects 0x53-0x58 for the
-    banners, 1-9 for the shout bubbles)."""
+    """Animation table entries whose frame data is one of `frames`."""
     return [ANIM_TABLE + 20 * k for k in range(1, ANIM_COUNT) if rom.u32(ANIM_TABLE + 20 * k + 8) in frames]
-TESTIMONY_FRAMES = 0x086de2b8          # sheen over 証言開始 (cells 0-12)
-CROSS_FRAMES = [0x086de3b0, 0x086de538]  # sheen over 尋問開始, and its right half sliding in
-CROSS_REMAP = {0: 19, 7: 20, 8: 21, 9: 22, 10: 23, 11: 24, 12: 25}
 
-TEXT = {'testimony': ('Witness', 'Testimony'), 'cross': ('Cross', 'Examination')}
-FILL, OUTLINE, SHEEN, SHEEN_EDGE = 3, 2, 1, 4
+# GBA frame data of each banner: the whole banner, its left half, its right half
+GBA = {'testimony': (0x086de2b8, 0x086de4d8, 0x086de4f8),
+       'cross': (0x086de3b0, 0x086de518, 0x086de538),
+       'unlock': (0x086df030, 0x086df168, 0x086df188)}
+ENTRIES = {'testimony': (1, 1, 1), 'cross': (1, 1, 1), 'unlock': (1, 1, 2)}
+OLD_VRAM = (0x06015000, 0x06014c00, 0x06014800)
+# data.bin: the English sub-archive, the frame data of the whole banner, its palette
+DS = {'testimony': (0x71b000, 0x71f6f0, 0), 'cross': (0x71b000, 0x71f924, 4),
+      'unlock': (0x73f01c, 0x742df8, 0)}
+TILE0 = 0x240                             # the right half; the left half follows
+VRAM = (0x06010000 + 32 * TILE0, 0x06010000 + 32 * (TILE0 + 64), 0x06010000 + 32 * TILE0)
+W, H = 128, 64
+TOP = -16                                 # the sprites from the anchor (y 60): centred where the
+                                          # original's 128x32 was
+HI = {'testimony': 0x000, 'cross': 0x000, 'unlock': 0x800}   # palette mode on the GBA
+SQUARE = dspic.SHAPE[(64, 64)] << 12
 
-# the "Testimony" label in the top left corner during testimony (証言中): raw 64x32 sprite,
-# OBJ palette 5, white (2) with a green outline (1)
+# the "Testimony" label in the top left corner during a testimony (証言中): a raw 64x32 sprite
+# (1D tiles, OBJ palette 5); data.bin has the Japanese one (the GBA's, byte for byte) and the
+# English one 2 KB after it
 LABEL = 0x08189f20
-LABEL_TEXT = 'Testimony'
+DS_LABEL_JP, DS_LABEL_EN = 0x1c900, 0x1d100
 
-# 解除成功 ("unlock successful"), shown when the last Psyche-Lock breaks: the same kind of banner
-# in its own sub-archive (offset 0xa4b4, four palettes for the flash at the end, 13 cells), used
-# by effects 104 (the whole sequence) and 105-107 (the halves)
-UNLOCK_FRAMES = [0x086df030, 0x086df168, 0x086df188]
-UNLOCK_SUB = 0xa4b4
-UNLOCK_TEXT = ('Unlock', 'Successful')   # the DS version's wording
-# its cells: 0 left half, 1 right half, 2 quarter 2, 3/4 quarter 1 with the sheen coming in, 5
-# quarter 1, 6 quarter 2 with the sheen, 7/9 quarter 3 with it, 10 quarter 3, 8 quarter 4, 11/12
-# quarter 4 with the sheen.  (x, width, sheen position or None) in the 128x32 picture:
-UNLOCK_CELLS = [(0, 64, None), (64, 64, None), (32, 32, None), (0, 32, 6), (0, 32, 22), (0, 32, None),
-                (32, 32, 50), (64, 32, 78), (96, 32, None), (64, 32, 90), (64, 32, None), (96, 32, 104),
-                (96, 32, 118)]
+def ds_palette(attr, hi):
+    if hi & 1: return attr >> 9 & 7
+    if hi & 8: return attr >> 10 & 3
+    return attr >> 11 & 1
 
-def rle16(data):
-    """Pack bytes (even length) with the archive's 16-bit RLE."""
-    w = [struct.unpack_from('<H', data, i)[0] for i in range(0, len(data), 2)]
-    out = bytearray(); i = 0; lit = []
-    def flush():
-        while lit:
-            chunk = lit[:0x7fff]; del lit[:len(chunk)]
-            out.extend(struct.pack('<H', len(chunk)))
-            for v in chunk: out.extend(struct.pack('<H', v))
-    while i < len(w):
-        j = i
-        while j < len(w) and w[j] == w[i] and j - i < 0x7fff: j += 1
-        if j - i >= 2:
-            flush()
-            out.extend(struct.pack('<HH', 0x8000 | (j - i), w[i])); i = j
-        else:
-            lit.append(w[i]); i += 1
-    flush()
-    return bytes(out)
+def compose(data, cells, sprites, hi):
+    """A DS sprite list -> 256x192 rows of indices into its palettes laid end to end."""
+    px = [[0] * 256 for _ in range(192)]
+    for x, y, w, h, c, attr in sprites:
+        g = dspic.tiles_to_rows(dspic.unrle16(data, cells[c], w * h // 2), w, h)
+        k = 16 * ds_palette(attr, hi)
+        for yy in range(h):
+            row, src = px[96 + y + yy], g[yy]
+            for xx in range(w):
+                if src[xx]: row[128 + x + xx] = k + src[xx]
+    return px
 
-def unrle16(data, p, size):
-    out = bytearray()
-    while len(out) < size:
-        t = struct.unpack_from('<H', data, p)[0]; p += 2
-        if t & 0x8000: out += data[p:p + 2] * (t & 0x7fff); p += 2
-        else: out += data[p:p + 2 * t]; p += 2 * t
-    return bytes(out[:size])
+def bbox(px):
+    xs = [x for x in range(256) if any(r[x] for r in px)]
+    ys = [y for y in range(192) if any(px[y])]
+    return xs[0], ys[0], xs[-1] + 1, ys[-1] + 1
 
-# --- lettering ---------------------------------------------------------------------------
-def _mask(font, text, squeeze=0):
-    g = textgfx.render(font, text, font.measure(text) + 4, 16, fill=1, align='left', squeeze=squeeze)
-    return g
+def ds_banner(data, name):
+    sa, fp, base = DS[name]
+    npal, flag, pals, cells = dspic.sub_archive(data, sa)
+    sub, fl, defs = dspic.frame_data(data, fp)
+    hi = fl[0][1] >> 8
+    if sub or len(fl) != 13 or any(t >> 8 != hi for _, t in fl) or not hi & 9 or base >= npal:
+        raise SystemExit(f'banners: unexpected DS {name} banner at data.bin {fp:#x}')
+    pics = {off: compose(data, cells, sp, hi) for off, sp in defs.items()}
+    return dict(pals=pals, fl=fl, defs=defs, hi=hi, base=base, pics=pics, plain=fl[0][0])
 
-def _bold(g):
-    out = [[0] * (len(g[0]) + 1) for _ in g]
-    for y, row in enumerate(g):
-        for x, v in enumerate(row):
-            if v: out[y][x] = out[y][x + 1] = 1
-    return out
+def window(banners):
+    """The DS area every picture of these banners fits in, symmetric about the anchor."""
+    x0, y0, x1, y1 = 256, 192, 0, 0
+    for b in banners:
+        for px in b['pics'].values():
+            a, c, d, e = bbox(px)
+            x0, y0, x1, y1 = min(x0, a), min(y0, c), max(x1, d), max(y1, e)
+    half = max(128 - x0, x1 - 128)
+    return 128 - half, y0, 128 + half, y1
 
-def _italic(g, base=13, step=4):
-    sh = base // step + 1
-    out = [[0] * (len(g[0]) + sh) for _ in g]
-    for y, row in enumerate(g):
-        s = max(0, base - y) // step
-        for x, v in enumerate(row):
-            if v: out[y][x + s] = 1
-    return out
+def shrink(b, px, win, pal):
+    """A DS picture -> the W x H canvas of indices into `pal`."""
+    x0, y0, x1, y1 = win
+    s = min(W / (x1 - x0), H / (y1 - y0))
+    tw, th = round((x1 - x0) * s), round((y1 - y0) * s)
+    allpal = [v for p in b['pals'] for v in p]
+    img = dspic.shrink([r[x0:x1] for r in px[y0:y1]], allpal, tw, th)
+    q = dspic.quantize(img, pal, range(1, 16))
+    return dspic.grid(q, (W - tw) // 2, (H - th) // 2, W, H)
 
-def _crop(g):
-    xs = [x for x in range(len(g[0])) if any(r[x] for r in g)]
-    ys = [y for y in range(len(g)) if any(g[y])]
-    return [r[xs[0]:xs[-1] + 1] for r in g[ys[0]:ys[-1] + 1]]
+def halves(canvas):
+    """-> (left cell, right cell), packed"""
+    return tuple(dspic.rle16(dspic.rows_to_tiles(canvas, x, 0, 64, 64)) for x in (0, 64))
 
-def _outline(cv, fill, out):
-    src = [r[:] for r in cv]; h, w = len(cv), len(cv[0])
-    for y in range(h):
-        for x in range(w):
-            if src[y][x] == fill: continue
-            if any(0 <= y + dy < h and 0 <= x + dx < w and src[y + dy][x + dx] == fill
-                   for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
-                cv[y][x] = out
+def build(rom, ctx, names, gba_pals):
+    """One sub-archive for these banners (with the palettes `gba_pals`, DS palette numbers) and
+    the frame data of their effects -> {name: (whole, left, right) frame data}, sub-archive"""
+    data = ctx.data
+    bs = {n: ds_banner(data, n) for n in names}
+    win = window(bs.values())
+    cells, frames = [], {}
+    def cell(c):
+        if c not in cells: cells.append(c)
+        return cells.index(c)
+    for n in names:
+        b = bs[n]
+        pal = b['pals'][b['base']]
+        bits = gba_pals.index(b['base']) << 11 if not HI[n] else 0
+        lists = {}
+        plain = halves(shrink(b, b['pics'][b['plain']], win, pal))
+        for off, sp in b['defs'].items():
+            ks = {ds_palette(a, b['hi']) for *_, a in sp}
+            k = ks.pop() if len(ks) == 1 else None
+            same = [s[:5] for s in sp] == [s[:5] for s in b['defs'][b['plain']]]
+            if HI[n] and same and k is not None and k in gba_pals:
+                l, r, attr = plain[0], plain[1], gba_pals.index(k) << 10     # the DS's palette flash
+            else:
+                l, r = halves(shrink(b, b['pics'][off], win, pal)) if off != b['plain'] else plain
+                attr = bits
+            lists[off] = [(0, TOP, 64, 64, cell(r), SQUARE | attr), (-64, TOP, 64, 64, cell(l), SQUARE | attr)]
+        fl = [(off, HI[n] | (t & 0xff)) for off, t in b['fl']]
+        held = [(0, HI[n] | 1), (0, HI[n] | 0xff)]
+        frames[n] = (dspic.write_frames(fl, lists),
+                     dspic.write_frames(held, {0: [(-64, TOP, 64, 64, cell(plain[0]), SQUARE | bits)]}),
+                     dspic.write_frames(held, {0: [(0, TOP, 64, 64, cell(plain[1]), SQUARE | bits)]}))
+    b0 = bs[names[0]]
+    sub = dspic.write_sub(len(gba_pals), 0x8000, [[0] + b0['pals'][k][1:] for k in gba_pals], cells)
+    return frames, sub
 
-def banner_picture(font, lines):
-    """Two lines of bold italic lettering in a 128x32 picture (fill 3, outline 2)."""
-    cv = [[0] * 128 for _ in range(32)]
-    for i, text in enumerate(lines):
-        g = _crop(_italic(_bold(_mask(font, text))))
-        if len(g[0]) > 124: raise ValueError(f'banner line too wide: {text}')
-        x0 = (128 - len(g[0])) // 2
-        y0 = i * 16 + (16 - len(g)) // 2 + (1 if i == 0 else -1)
-        for y, row in enumerate(g):
-            for x, v in enumerate(row):
-                if v: cv[y0 + y][x0 + x] = FILL
-    _outline(cv, FILL, OUTLINE)
-    return cv
-
-def sheen(cv, pos):
-    """The white sheen: a diagonal band over the lettering, `pos` = its left edge on the top row."""
-    out = [r[:] for r in cv]
-    for y, row in enumerate(out):
-        for x, v in enumerate(row):
-            if v != FILL: continue
-            d = x - pos + y // 2
-            if 0 <= d < 4: row[x] = SHEEN
-            elif d in (-2, -1, 4, 5): row[x] = SHEEN_EDGE
-    return out
-
-def cell(cv, x0, w):
-    """Cut a w x 32 sprite out of the picture -> 4bpp tiles in 1D order."""
-    out = bytearray()
-    for ty in range(4):
-        for tx in range(w // 8):
-            for y in range(8):
-                row = cv[ty * 8 + y]
-                for x in range(x0 + tx * 8, x0 + tx * 8 + 8, 2):
-                    out.append((row[x] & 15) | ((row[x + 1] & 15) << 4))
-    return bytes(out)
-
-def banner_cells(pic):
-    """The roles of the original cells, for one banner: {role: bytes}.  Roles follow the
-    testimony banner's numbering (1/0 left/right half, 2/3 quarters 1-2, 4/5 quarter 1 with the
-    sheen, 6 quarter 2 with it, 7/9 quarter 3 with it, 10 quarter 3, 8 quarter 4, 11/12 quarter 4
-    with the sheen)."""
-    s = {p: sheen(pic, p) for p in (14, 40, 78, 90, 104, 118)}
-    return {1: cell(pic, 0, 64), 0: cell(pic, 64, 64), 2: cell(pic, 0, 32), 3: cell(pic, 32, 32),
-            4: cell(s[14], 0, 32), 5: cell(s[40], 0, 32), 6: cell(s[40], 32, 32),
-            7: cell(s[78], 64, 32), 9: cell(s[90], 64, 32), 10: cell(pic, 64, 32),
-            8: cell(pic, 96, 32), 11: cell(s[104], 96, 32), 12: cell(s[118], 96, 32)}
-
-def label_picture(text):
-    """Condensed tall lettering (Spleen 5x8 at double height), white with a green outline."""
-    w = smallfont.measure(text) + 2
-    g = [[0] * w for _ in range(8)]
-    smallfont.render(text, g, 0, 0, 1)
-    g = _crop([r for r in g for _ in range(2)])
-    cv = [[0] * 64 for _ in range(32)]
-    x0, y0 = (64 - len(g[0])) // 2, (32 - len(g)) // 2
-    for y, row in enumerate(g):
-        for x, v in enumerate(row):
-            if v: cv[y0 + y][x0 + x] = 2
-    _outline(cv, 2, 1)
-    return cv
-
-def unlock(rom, font):
-    """The Psyche-Lock banner: a new sub-archive with the same palettes and cell roles."""
-    a = FX_ARCHIVE
-    entries = effect_entries(rom, UNLOCK_FRAMES)
-    if len(entries) != 4:
-        raise SystemExit(f'banners: expected 4 unlock animation entries, found {len(entries)}')
-    for fp in UNLOCK_FRAMES:
-        if rom.u32(fp + 4) != UNLOCK_SUB:
-            raise SystemExit(f'banners: unexpected unlock frame data at {fp:#x}')
-    s = a + UNLOCK_SUB
-    npal = rom.u16(s)
-    if rom.u32(s + 4 + 32 * npal) != 4 * len(UNLOCK_CELLS):
-        raise SystemExit('banners: the unlock sub-archive does not have 13 cells')
-    pic = banner_picture(font, UNLOCK_TEXT)
-    table = bytearray(); body = bytearray()
-    for x, w, pos in UNLOCK_CELLS:
-        table += struct.pack('<I', 4 * len(UNLOCK_CELLS) + len(body))
-        body += rle16(cell(pic if pos is None else sheen(pic, pos), x, w))
-    blob = struct.pack('<HH', npal, rom.u16(s + 2)) + rom.read(s + 4, 32 * npal) + bytes(table) + bytes(body)
-    addr = rom.store(blob, 'ext', 4, 'unlock banner sub-archive')
-    for fp in UNLOCK_FRAMES:
-        rom.w32(fp + 4, 0)                       # the frames' sub-archive is now at offset 0 ...
-    for e in entries:
-        rom.w32(e, addr)                         # ... of the new archive
+def label(rom, data):
+    if data[DS_LABEL_JP:DS_LABEL_JP + 1024] != rom.read(LABEL, 1024):
+        raise SystemExit(f'banners: no DS testimony label at data.bin {DS_LABEL_JP:#x}')
+    rom.write(LABEL, data[DS_LABEL_EN:DS_LABEL_EN + 1024], 'testimony label')
 
 def apply(rom, ctx):
-    font = textgfx.Font.from_ctx(ctx)
-    a = FX_ARCHIVE
-    entries = effect_entries(rom, BANNER_FRAMES)
-    if len(entries) != 6:
-        raise SystemExit(f'banners: expected 6 animation entries, found {len(entries)}')
-    for e in entries:
-        fp = rom.u32(e + 8)
-        if rom.u32(e) != a or rom.u32(fp + 4) != 0:
-            raise SystemExit(f'banners: unexpected animation entry at {e:#x}')
-    npal = rom.u16(a)
-    pals = rom.read(a + 4, 32 * npal)
-    t = a + 4 + 32 * npal
-    if rom.u32(t) != 19 * 4:
-        raise SystemExit('banners: the banner sub-archive does not have 19 cells')
-    test = banner_cells(banner_picture(font, TEXT['testimony']))
-    cross = banner_cells(banner_picture(font, TEXT['cross']))
-    cells = [None] * 26
-    for role, data in test.items(): cells[role] = data
-    # cross-examination: left half and quarters in the original's cells 13-18 ...
-    for k, role in {13: 1, 14: 4, 15: 3, 16: 5, 17: 6, 18: 2}.items(): cells[k] = cross[role]
-    # ... and its own right half in the new cells 19-25
-    for old, new in CROSS_REMAP.items(): cells[new] = cross[old]
-    table = bytearray(); body = bytearray()
-    for c in cells:
-        table += struct.pack('<I', 4 * len(cells) + len(body))
-        body += rle16(c)
-        while len(body) % 2: body.append(0)
-    blob = struct.pack('<HH', npal, rom.u16(a + 2)) + pals + bytes(table) + bytes(body)
-    addr = rom.store(blob, 'ext', 4, 'banner sub-archive')
-    for e in entries:
-        rom.w32(e, addr)
-    # point the cross-examination frames at its own right half
-    for fp in CROSS_FRAMES:
-        n = rom.u16(fp + 2)
-        offs = sorted({rom.u16(fp + 8 + 8 * i) for i in range(n)})
-        for off in offs:
-            q = fp + off; cnt = rom.u16(q)
-            for k in range(cnt):
-                at = q + 4 + 4 * k + 2
-                attr = rom.u16(at); c = attr & 0x1ff
-                if c in CROSS_REMAP: rom.w16(at, (attr & ~0x1ff) | CROSS_REMAP[c])
-    unlock(rom, font)
-    # corner label
-    cv = label_picture(LABEL_TEXT)
-    tiles = bytearray()
-    for ty in range(4):
-        for tx in range(8):
-            for y in range(8):
-                row = cv[ty * 8 + y]
-                for x in range(tx * 8, tx * 8 + 8, 2):
-                    tiles.append((row[x] & 15) | ((row[x + 1] & 15) << 4))
-    rom.write(LABEL, bytes(tiles), 'testimony label')
-    print(f"  banners: testimony / cross-examination ({len(blob)} bytes), Unlock Successful and the Testimony label")
+    total = 0
+    for names, gba_pals in ((('testimony', 'cross'), [0, 4]), (('unlock',), [0, 1, 2, 3])):
+        frames, sub = build(rom, ctx, names, gba_pals)
+        arch = rom.store(sub, 'ext', 4, ' / '.join(names) + ' banner')
+        total += len(sub)
+        for n in names:
+            for role, (old, new, vram, count) in enumerate(zip(GBA[n], frames[n], VRAM, ENTRIES[n])):
+                es = effect_entries(rom, [old])
+                if len(es) != count or any(rom.u32(e + 4) != OLD_VRAM[role] or rom.u16(e + 14) != 60 for e in es):
+                    raise SystemExit(f'banners: unexpected animation entries for the {n} banner')
+                fp = rom.store(new, 'ext', 4, f'{n} banner frames')
+                for e in es:
+                    rom.w32(e, arch); rom.w32(e + 4, vram); rom.w32(e + 8, fp)
+                    rom.write(e + 17, bytes([2 if role == 0 else 1]), f'{n} banner sprites')
+    label(rom, ctx.data)
+    print(f"  banners: Witness Testimony / Cross Examination and Unlock Successful from the DS ({total} bytes), "
+          f"the Testimony label")

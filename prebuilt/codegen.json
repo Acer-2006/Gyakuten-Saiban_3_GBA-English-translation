@@ -1,4 +1,15 @@
 {
+"c:017acb6c0cbf04cd2acd09cfb6b4c38f40407f9946816e2535e4d5a029d79c0c": {
+"bin": "10b50f480068801e0088411e01b404bc8a410c2151430b4a52185188002905d05268094b10ca10c3491efbd1002801d1012000e002200549087010bc01bc004700720003acf3c7080034010600980202f0b587b057480078002800d1a5e00c21414355480818041f0c380688534800780490032003020121cf0380030590504da81e00885049002e39d01a0003000692134002000a403a4301922030ff210140394302912a000e32009425683400039706e04449491c118008320835641e19d029780029f8d106988342f2d10499002904d0029810806988103102e0019810806988384f3940059f39435180a9889180039fe1e71800324d009c069b00e018400190984205d11f20400229880140f0312980ea88002e3cd00498401e06901000184029491140394303912032ff211140394302910e352268224f06e02149491c298008350832761e18d011780129f8d19842f3d10699022905d20399298061214902548804e0029929805488103405993c400c436c809188a980e2e70200104d9a4209d11f20400229890140f03129810be01a409a42f5d001989842054904d00498042801d30020087007b0f0bc01bc0047c04600980202acf3c708b93700032a2d0003ff010000ff3f00007047",
+"bss": 1,
+"syms": {
+"_start": 136282300,
+"active": 33724416,
+"verdict_letters": 136281920,
+"verdict_start": 136281840,
+"verdicts": 147321772
+}
+},
 "c:3f0cffe8e330945d638894ced1a933f529009103fe295c133491a232290a0254": {
 "bin": "f0b50720800100220f4b1049441e0d0040cd80cba24202d2521cbe42f8d0be4209d00b4a0b00040020cb20c2641efbd1084a01231370044a08ca08c1401efbd1f0bc01bc0047c046d88bc408803800060090020200970202054800210170072080010449044a08ca08c1401efbd170470097020280380006d88bc408054800210170072080010449044a08ca08c1401efbd170470097020280380006d892c40810b508480178012909d107218901064a064b10cb10c2491efbd10021017010bc01bc00470097020280380006009002027047",
 "bss": 1793,
@@ -78,6 +89,8 @@
 "thumb:0x800d750:str r0, [r1, #4]\n str r2, [r1, #8]": "48608a60",
 "thumb:0x800dcd4:bl #0x8020024": "12f0a6f9",
 "thumb:0x800dcd4:bl #0x81f7db4": "eaf16ef8",
+"thumb:0x800f37c:movs r1, #0x80": "8021",
+"thumb:0x800f37c:movs r1, #0xa0": "a021",
 "thumb:0x8014464:bl #0x8020024": "0bf0defd",
 "thumb:0x8014464:bl #0x81f795c": "e3f17afa",
 "thumb:0x801ef04:bl #0x81f7968": "d8f130fd",
@@ -92,6 +105,10 @@
 "thumb:0x801fc00:bl #0x81f7910": "d7f186fe",
 "thumb:0x801fc9c:ldr r1, [pc, #0]\n bx r1\n .word 0x81f7a1d": "004908471d7a1f08",
 "thumb:0x801fcd8:ldr r1, [pc, #0]\n bx r1\n .word 0x81f7989": "0049084789791f08",
+"thumb:0x80209f0:movs r0, #0x80": "8020",
+"thumb:0x80209f0:movs r0, #0xa0": "a020",
+"thumb:0x8020a82:bl #0x81f80c0": "d7f11dfb",
+"thumb:0x8020a82:movs r0, #0x80\n lsls r0, r0, #2": "80208000",
 "thumb:0x8021ab0:bl #0x81f78e0": "d5f116ff",
 "thumb:0x8021c8e:ldr r5, [pc, #0x4c]\n bl #0x81f7264\n b #0x8021caa": "134dd5f1e8fa09e0",
 "thumb:0x8022166:adds r4, r7, #0\n adds r4, #0x23\n bl #0x81f7264\n b #0x8022186": "3c1c2334d5f17bf80ae0",
@@ -107,5 +124,7 @@
 "thumb:0x81f7e9c:\n        push {r0, r1, r2, r3, lr}\n        mov r0, r12\n        push {r0}\n        bl #0x81f7dc8\n        pop {r0}\n        mov r12, r0\n        pop {r0, r1, r2, r3}\n        str r1, [r0, #4]\n str r3, [r0, #8]\n        pop {pc}\n    ": "0fb5604601b4fff791ff01bc84460fbc4160836000bd",
 "thumb:0x81f7eb4:\n        push {r0, r1, r2, r3, lr}\n        mov r0, r12\n        push {r0}\n        bl #0x81f7e20\n        pop {r0}\n        mov r12, r0\n        pop {r0, r1, r2, r3}\n        str r1, [r0, #8]\n ldr r1, [r0, #8]\n        pop {pc}\n    ": "0fb5604601b4fff7b1ff01bc84460fbc8160816800bd",
 "thumb:0x81f7ecc:\n        push {r0, r1, r2, r3, lr}\n        mov r0, r12\n        push {r0}\n        bl #0x81f7e44\n        pop {r0}\n        mov r12, r0\n        pop {r0, r1, r2, r3}\n        str r0, [r1, #4]\n str r2, [r1, #8]\n        pop {pc}\n    ": "0fb5604601b4fff7b7ff01bc84460fbc48608a6000bd",
-"thumb:0x81f7ee4:\n        push {lr}\n        bl #0x81f7e68\n        bl #0x81f795c\n        pop {pc}\n    ": "00b5fff7bffffff737fd00bd"
+"thumb:0x81f7ee4:\n        push {lr}\n        bl #0x81f7e68\n        bl #0x81f795c\n        pop {pc}\n    ": "00b5fff7bffffff737fd00bd",
+"thumb:0x81f80c0:\n        push {r0, r1, r2, r3, lr}\n        mov r0, r12\n        push {r0}\n        bl #0x81f7ef0\n        pop {r0}\n        mov r12, r0\n        pop {r0, r1, r2, r3}\n        movs r0, #0x80\n lsls r0, r0, #2\n        pop {pc}\n    ": "0fb5604601b4fff713ff01bc84460fbc8020800000bd",
+"thumb:0x81f80d8:\n        push {r4, lr}\n        bl #0x800f23c\n        bl #0x81f7f40\n        pop {r4}\n        pop {r0}\n        bx r0\n    ": "10b517f6aff8fff72fff10bc01bc0047"
 }

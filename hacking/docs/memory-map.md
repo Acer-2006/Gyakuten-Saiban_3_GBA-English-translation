@@ -18,6 +18,7 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x0803b3a4`–`0x0803b82c` | image table (145 × {object, flags}) |
 | `0x0803b844` | text box template (32×32 bytes) |
 | `0x0803bf44` | save screen BG2 map (32 wide) |
+| `0x08161088` | mode table: the handler of each game mode (`SYS+8`), called every frame with `SYS` (9 is the verdict) |
 | `0x08163afc` | script command dispatch table (121 pointers) |
 | `0x08164640`–`0x08180000` | **unused** (`0x1b9c0` bytes of `0xff`) — the only padding of any size in the original ROM |
 | `0x08180820` | UI BG tile sheet (256 raw 4bpp tiles, loaded to BG char block 0; the save screen header 記録 is tiles `0x60`–`0x7f`) |
@@ -52,7 +53,7 @@ puts all of its code there), while data can go anywhere.
 | --- | --- |
 | `0x02011fc0` | decompressed chapter bank (appears to be `0x1b000` bytes) |
 | `0x0202cfc0` | episode-select sprite sheet after decompression (`0x9600` bytes) |
-| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script, `0x02029000` the save screen header's: the BG tiles it borrows during the game, `src/menu.c`) |
+| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script, `0x02029000` the save screen header's: the BG tiles it borrows during the game, `src/menu.c`; `0x02029800` the verdict's, `src/verdict.c`) |
 
 ## Saved games
 
@@ -88,7 +89,7 @@ before the pointer and the one at it (`src/script.c`, `script_save`, called inst
 | `0x03002fa0` | BG0 map shadow |
 | `0x030028c0` | inventory: `+0x10` number of evidence items, `+0x11` number of profiles, `+0x1c` evidence ids (u8, `0xff` = empty), `+0x3c` profile ids |
 | `0x030037a0` | keys: `+0` held, `+2` newly pressed, `+8` auto-repeat |
-| `0x030037b0` | `SYS` game state (`+0x17` episode shown on the episode select, `+0x1a` BG dirty bits, `+0xc1` chapter, `+0xc2` high nibble: episodes unlocked (write `0x50` at the episode select to choose any), `+0x25c` caption flags, `+0x2d0` testimony flags) |
+| `0x030037b0` | `SYS` game state (`+8` mode, `+9` its state, `+0xa` a timer, `+0xc` the mode to go back to; `+0x17` episode shown on the episode select, `+0x1a` BG dirty bits, `+0xc1` chapter, `+0xc2` high nibble: episodes unlocked (write `0x50` at the episode select to choose any), `+0x25c` caption flags, `+0x2d0` testimony flags) |
 | `0x03003a90` | second struct referenced by the per-frame VRAM update |
 | `0x03003e50` | 64 sprite records × 12 bytes |
 | `0x03007200` | `TXT` text engine state (see text-engine.md) |

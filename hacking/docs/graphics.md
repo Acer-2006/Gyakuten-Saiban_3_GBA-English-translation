@@ -237,6 +237,34 @@ Index 1 is the lettering, 2 its outline, 5 an outer edge, 3 and 4 greys for the 
 not-guilty palette makes the lettering white on black, the guilty one black on white. 敗訴
 follows at `0x0818d300`; no code reference to it was found.
 
+The handler sets the scale (`SYS+0xa0`) to 2.5 (`0x280`), puts the first word in OAM entry 49
+(affine, double size, matrix 0, centred at (47, 47)) and switches to mode 9, whose handler
+(`0x0800f23c`, entry 9 of the mode table at `0x08161088`, state in `SYS+9`) does the rest: state 0
+zooms the word in (the scale −0x10 a frame) and lands it with a flash and sound `0x56`; state 1
+waits 40 frames and shows the second word in entry 50 (matrix 1, centred at (192, 47)); state 2
+zooms it in; state 3 waits 64 frames; state 4 moves both up a pixel a frame while they grow for
+32 frames, then hides them; for not guilty, states 5–7 rain confetti (OAM entries 58–88, OBJ
+tile `0xfc`, palettes 5–8).
+
+The DS's English verdict is letters, raw 4bpp sprites in `data.bin` (64×64 or 32×64, from
+`0x23c80`: N o t G u i l t y; 無, 有 and 罪 are at `0x1ece0`..) with the palettes `0x27540`
+(white letters with a black outline, not guilty) and `0x27520` (black on white, guilty), a ramp
+in indices 1–6. The arm9 lists the letters of each verdict (`0x020aca58` not guilty,
+`0x020ac9c8` guilty), 24 bytes each: `{u32 frame, s16 x, s16 y, s16 x, s16 y, u16 512, u16 256,
+u32 data.bin offset, u32 size}`, x and y the corner of the double-size box. Each letter zooms in
+from twice its size about its own centre at its frame: Not, then Guilty 60 frames later; Guilty
+alone letter by letter, 10 frames apart.
+
+The English build (`patches/verdict.py`, `src/verdict.c`) shrinks the letters to 4/5, each into a
+32×64 sprite (OBJ tiles `0x1a0`–`0x2bf` for the nine of not guilty), laid out as on the DS around
+the middle of the screen at the original's height, and keeps the original's two words (Not /
+Guilty, Guil / ty), zooming from 2 instead of 2.5. Entries 49 and 50 stay as the mode sets them
+but 8×8 and off the screen; the letters are entries 51–59, set after each frame of the mode from
+their word's entry: affine with its matrix while the word zooms in, so that each letter grows
+about its own centre, and plain sprites at its height otherwise. (Nine affine sprites with double
+size take 9 × 138 cycles of the 1210 a line has for sprites, and the judge behind them would
+not be drawn.)
+
 ## Effects archive: banners and speech bubbles
 
 Animated effects (the testimony and cross-examination banners, the shout bubbles, and many
@@ -276,10 +304,34 @@ plain and with a white sheen (2–12 for 証言開始, 14–18 for 尋問). Effe
 (entries `0x080471ac` + 20·n): the sheen over 証言開始 (frames `0x086de2b8`) and over 尋問開始
 (`0x086de3b0`), and the halves sliding in: 証言, 開始, 尋問, 開始 (`0x086de4d8`, `0x086de4f8`,
 `0x086de518`, `0x086de538`). The 0x0800 bit in the cross-examination frames selects the red
-palette. The two banners share the right half 開始. The English build writes a new sub-archive
-with 26 cells (the cross-examination banner gets its own right half in cells 19–25), points the
-six entries at it and renumbers the cells in the two cross-examination frame blocks. The pieces
-use OBJ tiles `0x240`–`0x2bf`, so a banner can be at most 128×32.
+palette. The two banners share the right half 開始. The halves (OBJ tiles `0x260` left, `0x240`
+right) slide in from x 0 and 240 to 120 (the testimony's code at `0x0800e788`, y 60), then
+the whole banner (OBJ tile `0x280`) takes over with the sheen, and at the end the halves slide
+apart again (testimony: across each other; cross-examination and Unlock Successful: up and
+down).
+
+The high byte of a frame's time says how a sprite's attribute picks its palette (`0x08017eb0`):
+0, bit 11 (two palettes); 8, bits 10–11 (four); 1, bits 9–11 (eight). The palettes go to the
+OBJ palettes from the one in the flags on.
+
+The DS keeps its English banners in `data.bin` in the same formats: Witness Testimony and Cross
+Examination in the sub-archive at `0x71b000` (eight palettes: blue, three lighter blues, red,
+three lighter reds; 44 cells, the lettering in pieces of up to 64×32), Unlock Successful at
+`0x73f01c` (four blues, 45 cells); after each, the frame data of the whole banners (`0x71f6f0`,
+`0x71f924`, `0x742df8`: the sheen as sprites over the lettering in four frames of 7, then a flash
+through the lighter palettes, held 60 frames) and of the halves, which on the DS are the two
+lines. The lettering is two lines of bold italic, 192×84 and 218×79 pixels. `0x716b58` and
+`0x73bfb0` are the Japanese ones.
+
+The English build (`patches/banners.py`) composes every picture of the DS animation, shrinks it
+to 128 wide (area average) and cuts it into two 64×64 halves: Witness Testimony and Cross
+Examination are 128×56, Unlock Successful 128×46. The banner takes OBJ tiles `0x240`–`0x2bf` as
+before: the right half at `0x240`, the left half at `0x280`, and the whole banner at `0x240` too,
+right half first, so that its first frame writes the same tiles the halves have when it takes
+over from them (and the halves the same as its last frame when they take over again). The
+testimony banners keep two palettes, so their flash is drawn into the pictures (four palettes
+from OBJ palette 11 would reach the witness's 14); Unlock Successful flashes through the DS's
+four palettes, as the original's did. The frames keep the DS's timing.
 
 **Speech bubbles** (異議あり！, 待った！, くらえ！): sub-archives `0x28e4`, `0x3c44`, `0x4e24`,
 one palette each (1 white, 2 red, 3–4 darker reds, 5 bubble outline, 6 grey, 7 light red),
@@ -306,15 +358,18 @@ A copy of the banner kanji as 16×16 blocks also sits raw at `0x08186b20`; the g
 use it for the banners.
 
 **Testimony label** (証言中, top left during a testimony): raw 64×32 sprite at `0x08189f20`
-(1D tile order), OBJ palette 5, white (2) with a green outline (1).
+(1D tile order), OBJ palette 5, white (2) with a green outline (1). `data.bin` has it at
+`0x1c900` and the English Testimony 2 KB after it (`0x1d100`, with a few pixels of index 3), which
+the English build copies.
 
 **Psyche-Lock banner** (解除成功, "unlock successful"): sub-archive `0xa4b4`, four palettes (the
 last three for the flash at the end), 13 cells with the banner's roles: 解除 (0) and 成功 (1) as
 64×32, quarter 2 (2), quarter 1 with the sheen coming in (3, 4), quarter 1 (5), quarter 2 with
 the sheen (6), quarter 3 with it (7, 9), quarter 3 (10), quarter 4 (8) and with the sheen (11,
-12). Effects 104 (the whole sequence, frames `0x086df030`) and 105–107 (the halves, `0x086df168`,
-`0x086df188`). The English build writes a new sub-archive and sets the three frame blocks'
-sub-archive offset to 0.
+12). Effects 104 (the whole sequence, frames `0x086df030`, OBJ tile `0x280`) and 105–107 (the
+halves, `0x086df168`, `0x086df188`; the code at `0x0801a360` slides them; 107, the right half
+alone, belongs to script command `0x72`, which neither script uses). See above for the English
+build's.
 
 **Data screen** (episode 4, the escaped convict): effects 69 and 70 are its title bars
 (脱獄囚に関するデータ, 脱獄から再逮捕までの推移) and 71–73 the PICTURE, DATA1 and DATA2 tabs,

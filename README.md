@@ -14,10 +14,9 @@ The English script, font, name tags, Court Record, talk topics, episode titles, 
 other English material are read out of the DS image while the ROM is built. This repository
 holds the code changes (the new text engine, the script converter and the hooks) and a little
 English typed in by hand: the choice-menu options, which the DS only has as pictures
-(`tools/labels_en.py`), the short words on the buttons and banners the build draws itself
-(Press, Present, OK, Back, the investigation tabs, the testimony banners, Unlock Successful, the
-verdict), the note on the save screen, and the few DS lines the converter rewords for the GBA's
-buttons. Nothing else from either game is stored in it.
+(`tools/labels_en.py`), the short words on the buttons the build draws itself (Press, Present,
+OK, Back and the investigation tabs), the note on the save screen, and the few DS lines the
+converter rewords for the GBA's buttons. Nothing else from either game is stored in it.
 
 ## Use
 
@@ -42,9 +41,9 @@ the next page of text.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
   description (the DS text, set in a small font so it fits the GBA panel; "Touch the Check
   Button" becomes "Press L"), and the R Profiles / R Evidence switch.
-* Witness Testimony / Cross Examination banners (bold italic lettering after the DS ones), the
-  Testimony label, the cross-examination buttons (L Press / Present R) and the OK / Back
-  prompts when presenting.
+* The DS version's Witness Testimony / Cross Examination banners (shrunk to the GBA's banner
+  width) and Testimony label; the cross-examination buttons (L Press / Present R) and the OK /
+  Back prompts when presenting.
 * The DS version's Objection!, Hold it! and Take that! speech bubbles.
 * Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
   destinations (the DS version's pictures, copied into the GBA boxes).
@@ -54,7 +53,8 @@ the next page of text.
   buttons From save point. / From chapter start.
 * College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
   writing is gone, as in the DS version's sprites.
-* Unlock Successful when the last Psyche-Lock breaks, and the NOT GUILTY / GUILTY verdict.
+* The DS version's Unlock Successful banner when the last Psyche-Lock breaks, and its Not Guilty
+  / Guilty verdict letters.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
   exhibition poster and the signs in the backgrounds.
@@ -94,6 +94,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.13 — the Witness Testimony / Cross Examination and Unlock Successful banners, the Testimony
+  label and the Not Guilty / Guilty verdict come from the DS version too: the banners shrunk to
+  the width of the GBA's, with the DS's shine and flash; the verdict in the DS's serif letters,
+  each zooming in as on the DS.
 * 0.12 — graphics from the DS version in place of the ones the build drew itself: the
   Objection! / Hold it! / Take that! bubbles (shrunk to the GBA screen), the SAVE and LOAD
   headers, the Yes / No and continue-screen buttons (now From save point. / From chapter start.,
