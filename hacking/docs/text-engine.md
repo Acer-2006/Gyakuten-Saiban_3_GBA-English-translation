@@ -52,7 +52,7 @@ Other engine data:
 | `0x03002fa0` | BG0 map shadow |
 | `0x03002ba0` | OAM shadow (128 × 8 bytes) |
 | `0x03003e50` | 64 sprite records of 12 bytes (3 OAM attributes + bookkeeping); bit 15 of the first halfword = slot in use. Records 32–63 are the pool the text engine takes from in the bit-2 mode |
-| `0x05000200` | OBJ palette (the English build puts its text colours into entries 13–15 of palette 2 for sprite text) |
+| `0x05000200` | OBJ palette (the English build's sprite text uses palette 0, the engine's own sprite-text palette, the same in every scene: white 3, orange 6, blue 9, green 12) |
 | `0x0803b844` | 32×32 byte template of the text box: tile indices per map cell. Row 14 is the top edge (first byte `0x02`), rows 15–18 the interior (`0x06`), row 19 the bottom (`0x04`) |
 
 ## How a character is drawn (`0x0801f4c4`)
@@ -208,6 +208,9 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
   mode), the question stays in the top rows and the labels are drawn as text in the lower part.
+  The engine puts its cursor at y 18 · (row + selection), the row being the question's lines plus
+  a blank one (`TXT+0x29` + 1 when the first option is drawn); the English build's option
+  sprites go on those rows, 18 px apart.
 
 ## Where the English build hooks in
 

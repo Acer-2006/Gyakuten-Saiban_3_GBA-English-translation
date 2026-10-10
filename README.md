@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.10 — the Court Record's item names turned green while a choice's options or the page
+  were shown as sprites (the sprite text used the panel's palette; it now uses the engine's own
+  sprite-text palette); a choice's options are set on the rows the cursor is placed on, so the
+  hand sits on the option it selects after a three-line question too.
 * 0.15.9 — the text box keeps its page in view while the Court Record is open, as in the
   original (it went blank, since the Court Record draws its panel over the tiles the page is
   drawn in; the page is now shown as sprite text in its place until the Record closes).
