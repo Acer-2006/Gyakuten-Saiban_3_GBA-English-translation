@@ -104,8 +104,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
-* 0.15.3 — New Game on the title menu: a pixel between the G and the a, which ran into each other
-  (the letters themselves are unchanged).
+* 0.15.3 — New Game on the title menu: a pixel between the N and the e and between the G and
+  the a, which ran into each other (the letters themselves are unchanged).
 * 0.15.2 — the title screen's DS logo is scaled properly: to 3/4 with a filter that keeps every
   stroke (the letters were uneven and broken in places, from dropping rows and columns), and a
   little larger than before.

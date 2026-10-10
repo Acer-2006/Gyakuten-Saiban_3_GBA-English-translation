@@ -7,8 +7,9 @@ import lz, chunkimg, textgfx, resample
 
 TITLE_MENU = {0x0818e300: 'New Game', 0x0818e500: 'Continue'}   # 64x16 sprites (two 32x16 cells), OBJ palette 2
 # New Game only fits with its letters 2 pixels closer than the DS sets them, so that they touch;
-# the G's straight right side then runs into the a's bowl, and the pair gets its pixel back
-TITLE_KERN = {'Ga': 1}
+# where a straight side then runs into the next letter (the N's right stem into the e, the G's
+# right side into the a's bowl) the pair gets a pixel back
+TITLE_KERN = {'Ne': 1, 'Ga': 1}
 
 DS_TITLE = 0x3684          # LZ: 512-byte palette + 256x192 8bpp tiles (English title logo)
 DS_TITLE_BG = 32           # its background colour
@@ -58,7 +59,8 @@ def title_menu(rom, ctx):
     font = textgfx.Font.from_ctx(ctx)
     for addr, text in TITLE_MENU.items():
         sq = 0
-        while font.measure(text) - sq * (len(text) - 1) > 62: sq += 1
+        kern = sum(TITLE_KERN.get(text[i:i + 2], 0) for i in range(len(text) - 1))
+        while font.measure(text) - sq * (len(text) - 1) + kern > 62: sq += 1
         grid = textgfx.render(font, text, 64, 16, fill=3, outline=1, squeeze=sq, kern=TITLE_KERN)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'title menu ' + text)
     print(f"  title menu: {len(TITLE_MENU)} items rendered")
