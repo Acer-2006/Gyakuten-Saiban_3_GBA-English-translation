@@ -22,13 +22,15 @@ class Font:
     def measure(self, text):
         return sum(self.glyph(c)[1] for c in text)
 
-def render(font, text, w, h=16, fill=1, outline=None, align='center', y0=0, squeeze=0):
-    """-> list of h rows, each a list of w palette indices (0 = transparent)."""
+def render(font, text, w, h=16, fill=1, outline=None, align='center', y0=0, squeeze=0, kern=None):
+    """-> list of h rows, each a list of w palette indices (0 = transparent).  squeeze takes that
+    many pixels out of every gap; kern {two characters: pixels} adds to the gap between a pair."""
     grid = [[0] * w for _ in range(h)]
-    tw = font.measure(text) - squeeze * max(0, len(text) - 1)
+    extra = [(kern or {}).get(text[i:i + 2], 0) for i in range(len(text))]
+    tw = font.measure(text) - squeeze * max(0, len(text) - 1) + sum(extra[:-1])
     x = {'center': (w - tw) // 2, 'left': 0, 'right': w - tw}[align]
     if x < 0: x = 0
-    for ch in text:
+    for ch, more in zip(text, extra):
         rows, adv = font.glyph(ch)
         for r in range(16):
             yy = y0 + r
@@ -38,7 +40,7 @@ def render(font, text, w, h=16, fill=1, outline=None, align='center', y0=0, sque
                 if bits & (1 << (15 - k)):
                     xx = x + k
                     if 0 <= xx < w: grid[yy][xx] = fill
-        x += adv - squeeze
+        x += adv - squeeze + more
     if outline is not None:
         src = [row[:] for row in grid]
         for y in range(h):
