@@ -1,11 +1,18 @@
-"""Buttons drawn as raw sprites (the sheet around 0x0818a720), redrawn in English with the DS font.
+"""Buttons drawn as raw sprites (the sheet around 0x0818a720), redrawn in English with the DS font,
+and the save and continue screens' header and buttons, taken from the DS's pictures.
 
-Each graphic is 64x16 or 32x16 pixels stored as 32x16 one-dimensional sprite cells (4x2 tiles,
-row-major, 256 bytes); see hacking/docs/graphics.md.
+Each button graphic is 64x16 or 32x16 pixels stored as 32x16 one-dimensional sprite cells (4x2
+tiles, row-major, 256 bytes); see hacking/docs/graphics.md.
 """
 import os, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
-import textgfx, smallfont
+import struct
+import textgfx, smallfont, dsimgtext, dspic
+from rom import compile_c
+from .text import call_hook
+from . import topics
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # cross-examination buttons, OBJ palette 5: a white box (index 1) with dark lettering (3, grey 2
 # for the anti-aliasing) and the L / R button icon at one end.  (address, cells, box interior
@@ -31,23 +38,42 @@ TABS = [
     (0x08189720, 'Present'),                # つきつける
 ]
 
-# save screen header 記録: two 32x32 glyphs in the UI BG tile sheet (0x08180820, DMA'd to char
-# block 0), tiles 0x60-0x6f and 0x70-0x7f, placed by the screen's BG2 map (0x0803bf44, 32 wide)
-# at columns 10-13 and 18-21 of rows 3-6.  BG palette 0: grey (3) lettering with a white (8)
-# outline on dark red (9).  English: one 64x32 picture in the same 32 tiles, columns 12-19.
-SAVE_TILES, SAVE_MAP = 0x08181420, 0x0803bf44
-SAVE_ROWS, SAVE_COL0 = (3, 4, 5, 6), 10
-SAVE_TEXT = 'SAVE'
-SAVE_BG, SAVE_FILL, SAVE_OUTLINE, SAVE_PLAIN = 9, 3, 8, 0x40
+# save screen header: the GBA's 記録 is two 32x32 glyphs in the UI BG tile sheet (0x08180820),
+# tiles 0x60-0x7f, placed by the box's BG2 map (0x0803bf44, 32 wide; the box is columns 4-27 of
+# rows 2-11) at columns 10-13 and 18-21 of rows 3-6 with BG palette 0.  The DS has SAVE, and LOAD
+# on the continue screen: 103x30 lettering in its save box textures (data.bin 0x7cbebc and
+# 0x7cfef0), olive green with a white outline.  The build cuts the lettering out as 14x4 tiles,
+# which src/menu.c puts in BG tiles 0x1c4.. when the screen opens, and maps them at columns 9-22
+# with BG palette 1.  Palette 1 on these screens is entries 16-31 of the palette of the courtroom
+# picture behind them (0x08254afc, also the episode select's), whose pixels use none of those
+# entries: the DS colours palette 1 lacks are added to its empty ones.
+HDR_DS = {'save': 0x7cbebc, 'load': 0x7cfef0}
+SAVE_MAP = 0x0803bf44
+HDR_ROWS, HDR_COL0, HDR_COLS = (3, 4, 5, 6), 9, 14
+HDR_TILE, HDR_PAL = 0x1c4, 1
+BOX_INSIDE, BOX_FILL = range(5, 27), 0x40
+HDR_AREA = (36, 9, 220, 60)          # inside the DS box texture, clear of its frame: x0, y0, x1, y1
+MENU_BG = 0x08254afc
+MENU_BSS = 0x02029000                # after src/script.c's state
+HDR_HOOKS = [(0x0800b636, 'hdr_game', 'str r1, [r0, #4]\n str r3, [r0, #8]'),      # saving (START, end of a part)
+             (0x0800ae80, 'hdr_erase', 'str r1, [r0, #8]\n ldr r1, [r0, #8]'),     # erasing all data
+             (0x0800d750, 'hdr_continue', 'str r0, [r1, #4]\n str r2, [r1, #8]')]  # Continue on the title
+HDR_CLOSE = 0x0800bcc4               # the save screen closes, the game state is back (patches/text.py)
 
-# save screen はい / いいえ: 0x0819a070, two 64x32 sprites (1D) in the Talk-topic box style (OBJ
-# palette 9 for the highlighted one, 10 for the other; 12 fill, dark lettering)
-YESNO, YESNO_TEXT = 0x0819a070, ('Yes', 'No')
-YESNO_FILL, YESNO_INK = 12, 4
-# the continue screen (after Continue on the title) in the same style, two 128x32 boxes of two
-# 64x32 sprites each, at (56, 98) and (56, 130): 中断したところから (from where the game was
-# suspended) and この章のはじめから (from the start of this part)
-CONTINUE, CONTINUE_TEXT = 0x08199070, ('Resume Play', 'Restart Part')
+# save screen はい / いいえ (0x0819a070, two 64x32 sprites) and the continue screen's two buttons
+# (0x08199070, two 128x32 boxes of two 64x32 sprites each, at (56, 98) and (56, 130):
+# 中断したところから, from where the game was suspended, and この章のはじめから, from the start of
+# this part), all 1D sprites in the Talk topics' box style (OBJ palette 9 for the highlighted
+# one, 10 for the other).  The DS has its English buttons in the same style as textures in
+# data.bin: Yes and No (128x32) and From save point. / From chapter start. (256x32); their
+# lettering goes into the GBA boxes the way patches/topics.py copies the topics' (narrowed to the
+# box where it is wider).
+YESNO, CONTINUE = 0x0819a070, 0x08199070
+DS_BUTTONS = [(YESNO, 64, 0x804e48, 'Yes'), (YESNO + 1024, 64, 0x8056dc, 'No'),
+              (CONTINUE, 128, 0x802d20, 'From save point.'),
+              (CONTINUE + 2048, 128, 0x803db4, 'From chapter start.')]
+BUTTON_FILL = 12
+DS_FRAME = 9                         # the DS box's outline
 # the note under them (※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。): 0x0818e720,
 # 80 tiles shown as a 160x32 line at (40, 128): two 64x32 sprites, then a 32x32 column of four
 # 32x8 strips whose tiles are stored in the order of rows 0, 2, 1, 3; OBJ palette 13, white (1)
@@ -57,32 +83,26 @@ HELP_LINES = ('You can save at any time during', 'the game by pressing START.')
 HELP_HIGHLIGHT = 'START'
 HELP_FILL, HELP_HL, HELP_OUTLINE = 1, 6, 5
 
-def box_button(rom, font, addr, width, text):
-    """A box button of `width` // 64 sprites of 64x32 (1D): rows 6-25 and columns 2 to width - 4
-    are the inside of the box; the text goes there, centred and bold."""
-    n = width // 64
-    grid = [sum((unpack_cells(rom.read(addr + 1024 * i, 1024), 64, 32, 64, 32)[y] for i in range(n)), [])
-            for y in range(32)]
-    if grid[6][2] != YESNO_FILL or grid[24][width - 4] != YESNO_FILL:
-        raise SystemExit(f'ui: unexpected box button at {addr:#x}')
-    for y in range(7, 25):
-        for x in range(3, width - 4):
-            grid[y][x] = YESNO_FILL
-    w = font.measure(text) + 1
-    if w > width - 7: raise SystemExit(f'ui: {text!r} does not fit its button')
-    g = textgfx.render(font, text, w + 1, 16, fill=1, align='left')
-    x0 = 2 + (width - 4 - w) // 2
-    for y in range(16):
-        for x in range(w):
-            if g[y][x] or (x and g[y][x - 1]): grid[8 + y][x0 + x] = YESNO_INK   # bold
-    rom.write(addr, b''.join(textgfx.sprite_cells([r[64 * i:64 * i + 64] for r in grid], 64, 32)
-                             for i in range(n)), 'button ' + text)
-
-def yes_no(rom, font):
-    for k, text in enumerate(YESNO_TEXT):
-        box_button(rom, font, YESNO + 1024 * k, 64, text)
-    for k, text in enumerate(CONTINUE_TEXT):
-        box_button(rom, font, CONTINUE + 2048 * k, 128, text)
+def ds_buttons(rom, data):
+    levels = topics.ramp_gba(rom)
+    for addr, width, off, name in DS_BUTTONS:
+        n = width // 64
+        grid = [sum((unpack_cells(rom.read(addr + 1024 * i, 1024), 64, 32, 64, 32)[y] for i in range(n)), [])
+                for y in range(32)]
+        if grid[6][2] != BUTTON_FILL or grid[24][width - 4] != BUTTON_FILL:
+            raise SystemExit(f'ui: unexpected box button at {addr:#x}')
+        px, w, h, pal = dsimgtext.texture(data, off)
+        if h != 32 or w not in (128, 256):
+            raise SystemExit(f'ui: unexpected DS button at data.bin {off:#x} ({name})')
+        # only the inside of the DS box: its frame has colours of the lettering's ramp
+        frame = [(x, y) for y in range(h) for x in range(w) if px[y][x] == DS_FRAME]
+        x0, x1 = min(x for x, y in frame) + 2, max(x for x, y in frame) - 2
+        y0, y1 = min(y for x, y in frame) + 2, max(y for x, y in frame) - 2
+        px = [[v if x0 <= x <= x1 and y0 <= y <= y1 else topics.DS_FILL for x, v in enumerate(r)]
+              for y, r in enumerate(px)]
+        g = topics.picture(grid, px, topics.ink_ds(pal), levels, width)
+        rom.write(addr, b''.join(textgfx.sprite_cells([r[64 * i:64 * i + 64] for r in g], 64, 32)
+                                 for i in range(n)), 'button ' + name)
 
 def help_note(rom):
     cv = [[0] * 160 for _ in range(32)]
@@ -105,32 +125,84 @@ def help_note(rom):
     if len(out) != 2560: raise SystemExit('ui: help note size')
     rom.write(HELP, out, 'save note')
 
-def save_header(rom):
-    from .shouts import lettering
-    old = [[rom.u16(SAVE_MAP + 2 * (r * 32 + c)) for c in range(SAVE_COL0, SAVE_COL0 + 12)] for r in SAVE_ROWS]
-    want = [[0x60 + 4 * k + j for j in range(4)] + [SAVE_PLAIN] * 4 + [0x70 + 4 * k + j for j in range(4)]
-            for k in range(4)]
+def menu_palette(rom):
+    """Address and values of the courtroom picture's palette entries 16-31 (BG palette 1)."""
+    p = MENU_BG + rom.u32(MENU_BG) + 32
+    return p, [rom.u16(p + 2 * i) for i in range(16)]
+
+def header_pictures(data, pal1):
+    """The DS lettering as 112x32 pictures of palette 1 indices -> ({name: rows}, {index: colour})."""
+    add, pics = {}, {}
+    for name, off in HDR_DS.items():
+        px, w, h, palb = dsimgtext.texture(data, off)
+        dspal = struct.unpack_from('<16H', palb)
+        x0, y0, x1, y1 = HDR_AREA
+        fill = px[y1][(x0 + x1) // 2]
+        pts = [(x, y) for y in range(y0, y1) for x in range(x0, x1) if px[y][x] != fill]
+        if not pts: raise SystemExit(f'ui: no lettering in the DS {name} box')
+        bx0, bx1 = min(x for x, y in pts), max(x for x, y in pts) + 1
+        by0, by1 = min(y for x, y in pts), max(y for x, y in pts) + 1
+        W, H = 8 * HDR_COLS, 8 * len(HDR_ROWS)
+        if bx1 - bx0 > W or by1 - by0 > H: raise SystemExit(f'ui: the DS {name} lettering is too big')
+        cx, cy = bx0 - (W - (bx1 - bx0)) // 2, by0      # centred, at the top (the text goes below)
+        if cx < x0 or cy < y0 or cx + W > x1 or cy + H > y1 + 8:
+            raise SystemExit(f'ui: the DS {name} lettering is not where expected')
+        pic = []
+        for y in range(cy, cy + H):
+            row = []
+            for x in range(cx, cx + W):
+                c = dspal[px[y][x]]
+                if c and c in pal1[1:]: i = pal1.index(c, 1)
+                elif c in add.values(): i = next(k for k, v in add.items() if v == c)
+                else:
+                    free = [k for k in range(1, 16) if pal1[k] == 0 and k not in add]
+                    if not free: raise SystemExit('ui: no room in palette 1 for the header')
+                    i = free[0]; add[i] = c
+                row.append(i)
+            pic.append(row)
+        pics[name] = pic
+    return pics, add
+
+def save_header(rom, ctx):
+    old = [[rom.u16(SAVE_MAP + 2 * (r * 32 + c)) for c in BOX_INSIDE] for r in HDR_ROWS]
+    want = [[0x60 + 4 * k + c - 10 if 10 <= c < 14 else 0x70 + 4 * k + c - 18 if 18 <= c < 22 else BOX_FILL
+             for c in BOX_INSIDE] for k in range(4)]
     if old != want: raise SystemExit('ui: unexpected save screen map')
-    m = lettering(SAVE_TEXT)
-    h, w = len(m), len(m[0])
-    if w + 2 > 64 or h + 2 > 32: raise SystemExit('ui: save header too big')
-    cv = [[SAVE_BG] * 64 for _ in range(32)]
-    x0, y0 = (64 - w) // 2, (32 - h) // 2
-    for y in range(h):
-        for x in range(w):
-            if m[y][x]: cv[y0 + y][x0 + x] = SAVE_FILL
-    src = [r[:] for r in cv]
-    for y in range(32):
-        for x in range(64):
-            if src[y][x] != SAVE_FILL and any(0 <= y + dy < 32 and 0 <= x + dx < 64 and src[y + dy][x + dx] == SAVE_FILL
-                                              for dy in (-1, 0, 1) for dx in (-1, 0, 1)):
-                cv[y][x] = SAVE_OUTLINE
-    tiles = b''.join(textgfx.tile4(cv, tx * 8, ty * 8) for ty in range(4) for tx in range(8))
-    rom.write(SAVE_TILES, tiles, 'save header')
-    for k, r in enumerate(SAVE_ROWS):           # the picture's 8x4 tiles in columns 12-19
-        row = [SAVE_PLAIN, SAVE_PLAIN] + [0x60 + 8 * k + j for j in range(8)] + [SAVE_PLAIN, SAVE_PLAIN]
-        for j, t in enumerate(row):
-            rom.w16(SAVE_MAP + 2 * (r * 32 + SAVE_COL0 + j), t)
+    paddr, pal1 = menu_palette(rom)
+    pics, add = header_pictures(ctx.data, pal1)
+    # the courtroom picture must not use the entries the header takes
+    import chunkimg
+    _, pixels, _ = chunkimg.load(rom.d, MENU_BG - 0x08000000, 512)
+    if set(pixels) & {16 + i for i in add}: raise SystemExit('ui: the menu background uses palette 1')
+    for i, c in add.items(): rom.w16(paddr + 2 * i, c)
+    tiles = {name: b''.join(dspic.rows_to_tiles(pic, 8 * c, 8 * r, 8, 8)
+                            for r in range(len(HDR_ROWS)) for c in range(HDR_COLS))
+             for name, pic in pics.items()}
+    addr = {name: rom.store(t, 'ext', 4, f'{name} header') for name, t in tiles.items()}
+    for k, r in enumerate(HDR_ROWS):
+        for c in BOX_INSIDE:
+            j = c - HDR_COL0
+            rom.w16(SAVE_MAP + 2 * (r * 32 + c), (HDR_TILE + k * HDR_COLS + j) | HDR_PAL << 12
+                    if 0 <= j < HDR_COLS else BOX_FILL)
+    # the code that puts the tiles in VRAM (src/menu.c)
+    text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)
+    binary, syms, bss = compile_c([os.path.join(ROOT, 'src/menu.c')], text_addr, MENU_BSS,
+                                  os.path.join(ROOT, 'build/menu'),
+                                  ld_defsyms={'hdr_save': addr['save'], 'hdr_load': addr['load']})
+    assert rom.store(binary, 'font', 4, 'menu code') == text_addr
+    for site, fn, displaced in HDR_HOOKS:
+        if rom.read(site, 4) != rom.asm_thumb(site, displaced): raise SystemExit(f'ui: unexpected code at {site:#x}')
+        call_hook(rom, site, syms[fn], displaced, fn)
+    old_tramp = rom.restore_tramp
+    if rom.read(HDR_CLOSE, 4) != rom.asm_thumb(HDR_CLOSE, f'bl #{old_tramp & ~1:#x}'):
+        raise SystemExit('ui: unexpected save screen exit')
+    tramp = rom.thumb_code(f'''
+        push {{lr}}
+        bl #{syms["hdr_close"] & ~1:#x}
+        bl #{old_tramp & ~1:#x}
+        pop {{pc}}
+    ''', note='save screen close trampoline')
+    rom.thumb(HDR_CLOSE, f'bl #{tramp & ~1:#x}', 'save screen close hook')
 
 def unpack_cells(data, w, h=16, cw=32, ch=16):
     """Inverse of textgfx.sprite_cells: cells left to right, top to bottom -> rows of indices."""
@@ -180,8 +252,8 @@ def apply(rom, ctx):
             for x in range(56):
                 if txt[y][x]: grid[16 + y][2 + x] = txt[y][x]
         rom.write(addr, textgfx.sprite_cells(grid, 64, 32), 'tab ' + text)
-    save_header(rom)
-    yes_no(rom, font)
+    save_header(rom, ctx)
+    ds_buttons(rom, ctx.data)
     help_note(rom)
-    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn; save screen header, Yes / No and note; "
-          f"continue screen {' / '.join(CONTINUE_TEXT)}")
+    print(f"  buttons: {len(BUTTONS) + len(PROMPTS) + len(TABS)} redrawn and the save note; from the DS: "
+          f"{' / '.join(n.upper() for n in HDR_DS)} headers, {' / '.join(n for a, w, o, n in DS_BUTTONS)}")

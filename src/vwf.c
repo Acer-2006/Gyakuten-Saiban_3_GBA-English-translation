@@ -38,6 +38,7 @@
 #define Q_MAPROW   1          /* question canvas rows in choice mode */
 #define CAP_Y0     62         /* caption screen: first row y, 18 px pitch */
 #define CAP_PITCH  18
+#define SYS_Y0     56         /* system messages in the save / continue screen box: first row y */
 
 struct vwf_state {
     s16 pen_x;
@@ -362,8 +363,9 @@ static void labels_oam(void) {
                 if (vs.lbl_sys) y -= 64;
             } else if (vs.lbl_sys) {
                 /* the engine does not centre these (the Japanese pads them with spaces); the
-                   English lines are centred, as on the DS */
-                y = 52 + L * CAP_PITCH;
+                   English lines are centred, as on the DS, and a little lower and closer
+                   together, clear of the DS header above them (patches/ui.py) */
+                y = SYS_Y0 + L * LINE_H;
                 x = (240 - fw) / 2;
             } else if (vs.lbl_align) {
                 x = (240 - fw) / 2;
@@ -399,6 +401,38 @@ static void choice_frame(void) {
     }
     if (dirty) SYS_BGDIRTY |= 2;
     labels_oam();
+}
+
+/* Before a choice the box grows (and after it shrinks) a few rows a frame, the engine copying map
+   rows upward (or downward): rows with the canvas in them would show copies of the text in every
+   row.  A copied canvas row keeps each tile in its column. */
+static int canvas_row_at(int row) {
+    u32 a = BG1MAP[row * 32 + 1] & 0x3ff, b = BG1MAP[row * 32 + CV_COLS - 2] & 0x3ff;
+    if (!canvas_tile(a) || !canvas_tile(b)) return -1;
+    a -= CV_TILE0; b -= CV_TILE0;
+    if (a % CV_COLS != 1 || b % CV_COLS != CV_COLS - 2 || a / CV_COLS != b / CV_COLS) return -1;
+    return a / CV_COLS;
+}
+
+/* While the box moves: the engine's own tiles wherever canvas rows are, as the original hides
+   the text then (the canvas keeps the page; it is shown again at the top for a choice, or where
+   it was if the box comes back).  1 if the box is moving. */
+static int box_moving(void) {
+    int moving = 0;
+    for (int row = 0; row < CV_MAPROW; row++)
+        if (canvas_row_at(row) >= 0) { moving = 1; break; }
+    if (!moving) return 0;
+    for (int row = 0; row < 20; row++) {
+        int ty = canvas_row_at(row);
+        if (ty < 0) continue;
+        for (int tx = 0; tx < CV_COLS; tx++) {
+            u32 e = BG1MAP[row * 32 + tx] & 0x3ff;
+            if (canvas_tile(e) && (e - CV_TILE0) % CV_COLS == (u32)tx)
+                BG1MAP[row * 32 + tx] = BOX_TEMPLATE[(CV_MAPROW + (e - CV_TILE0) / CV_COLS) * 32 + tx];
+        }
+    }
+    SYS_BGDIRTY |= 2;
+    return 1;
 }
 
 /* ---------------------------------------------------------------- hooks */
@@ -595,6 +629,7 @@ void vwf_frame(void) {
     }
     labels_hide();
     vs.lbl_row0 = -1;
+    if (vs.mapped && box_moving()) return;
     if (vs.lost) {
         /* the box is still there (its top edge) and nothing shows the canvas tiles any more */
         if ((BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {

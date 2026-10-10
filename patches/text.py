@@ -14,6 +14,13 @@ BSS_ADDR        = 0x02028000
 FRAME_TEMPLATE  = 0x0803b844   # 32x32 byte map template of the normal text box
 TAG_ROW14_LIT   = 0x08006678   # literal 0x3002400 (row 14) in the name-tag drawer
 TAG_ROW12_LIT   = 0x0800667c   # literal 0x3002380 (row 12)
+TAG_ERASE_FROM  = 0x0800658c   # movs r4, #0xc0 (<< 1: template entry 0x180, row 12) when there is no tag
+# loops that clear map rows 12-19 (0x100 entries from 0x180): (start, the instruction after the
+# loop, what the replaced instructions set up that is used after it)
+BOX_CLEARS = [(0x08022166, 0x08022186, 'adds r4, r7, #0\n adds r4, #0x23'),   # command 0x1c
+              (0x08021c8e, 0x08021caa, 'ldr r5, [pc, #0x4c]')]                # after a choice:
+                                                                  # r5 = 0x03002080 (0x08021cdc)
+TAG_ERASE_DST   = 0x08006596   # movs r5, #0xc0 (<< 2: map byte offset 0x300, row 12)
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
 RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
 RESTORE_CALLS   = (0x0800bcc4, 0x08014464)   # 0x0800dcd4, continuing a save: patches/script.py
@@ -106,6 +113,7 @@ def apply(rom, ctx):
     for site in RESTORE_CALLS:
         assert rom.asm_thumb(site, f'bl #{RESTORE_TEXT:#x}') == rom.read(site, 4), hex(site)
         rom.thumb(site, f'bl #{tramp_rs & ~1:#x}', 'restore hook')
+    rom.restore_tramp = tramp_rs             # patches/ui.py adds the save screen header to the first
 
     # 5. taller text box: frame rows 13..19 (top edge, 5 interior rows, bottom)
     t = bytearray(rom.read(FRAME_TEMPLATE, 1024))
@@ -119,8 +127,17 @@ def apply(rom, ctx):
     # name tag one row up (rows 11-12, joint at row 13)
     assert rom.u32(TAG_ROW14_LIT) == 0x03002400 and rom.u32(TAG_ROW12_LIT) == 0x03002380
     rom.w32(TAG_ROW14_LIT, 0x030023c0); rom.w32(TAG_ROW12_LIT, 0x03002340)
-    # box clear loop (rows 12-19 -> rows 11-19): replace loop with a call
-    rom.thumb(0x08022166, f'bl #{syms["vwf_boxclear"] & ~1:#x}\n b #0x08022186', 'box clear')
+    # ... and a line with no name tag puts the box template back from row 11 instead of 12 (the
+    # loop at 0x0800659c copies template entries 0x180-0x1df to the map from row 12)
+    assert rom.u16(TAG_ERASE_FROM) == 0x24c0 and rom.u16(TAG_ERASE_DST) == 0x25c0
+    rom.w16(TAG_ERASE_FROM, 0x24b0); rom.w16(TAG_ERASE_DST, 0x25b0)
+    # box clear loops (rows 12-19 -> rows 11-19): replace each loop with a call.  Command 0x1c
+    # (hide the box): the code after the loop sets TXT+0x23 = 1 through r4 = r7 + 0x23, which the
+    # loop's first instructions set up
+    assert rom.u32(0x08021cdc) == 0x03002080
+    for site, after, setup in BOX_CLEARS:
+        assert rom.u16(after) == 0x2001, hex(after)          # movs r0, #1
+        rom.thumb(site, f'{setup}\n bl #{syms["vwf_boxclear"] & ~1:#x}\n b #{after:#x}', 'box clear')
 
     # 6. UI palette: add text colours to every embedded copy of bank 0
     pal = b''.join(struct.pack('<H', v) for v in UI_PAL)

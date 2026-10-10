@@ -95,19 +95,21 @@ def fit(rows, width):
         out.append(o)
     return out
 
-def picture(orig, px, ink, levels):
+def picture(orig, px, ink, levels, width=W):
+    """The GBA box `orig` (rows of indices, `width` wide) with the DS picture's lettering."""
+    x1 = width - 4 if width != W else X1
     g = [r[:] for r in orig]
     for y in range(Y0, Y1 + 1):                          # clear the Japanese lettering
-        for x in range(X0 - 1, X1 + 2):
-            if (y, x) != (Y1, X1 + 1): g[y][x] = FILL
+        for x in range(X0 - 1, x1 + 2):
+            if (y, x) != (Y1, x1 + 1): g[y][x] = FILL
     rows, top = lettering(px, ink)
-    rows = fit(rows, X1 - X0 + 1)
+    rows = fit(rows, x1 - X0 + 1)
     used = [i for i, r in enumerate(rows) if any(v > 0 for v in r)]
     if not used: raise ValueError('empty picture')
     w = len(rows[used[0]])
     y_first, y_last = top + used[0], top + used[-1]
     dy = min(0, Y1 - y_last) + max(0, Y0 - y_first)   # keep descenders inside the frame
-    x0 = X0 + (X1 - X0 + 1 - w) // 2
+    x0 = X0 + (x1 - X0 + 1 - w) // 2
     for i in used:
         for x, v in enumerate(rows[i]):
             if v <= 0.02: continue

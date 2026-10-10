@@ -14,9 +14,10 @@ The English script, font, name tags, Court Record, talk topics, episode titles, 
 other English material are read out of the DS image while the ROM is built. This repository
 holds the code changes (the new text engine, the script converter and the hooks) and a little
 English typed in by hand: the choice-menu options, which the DS only has as pictures
-(`tools/labels_en.py`), the short words on the buttons and banners the build redraws, and the
-few DS lines the converter rewords for the GBA's buttons. Nothing else from either game is
-stored in it.
+(`tools/labels_en.py`), the short words on the buttons and banners the build draws itself
+(Press, Present, OK, Back, the investigation tabs, the testimony banners, Unlock Successful, the
+verdict), the note on the save screen, and the few DS lines the converter rewords for the GBA's
+buttons. Nothing else from either game is stored in it.
 
 ## Use
 
@@ -44,12 +45,15 @@ the next page of text.
 * Witness Testimony / Cross Examination banners (bold italic lettering after the DS ones), the
   Testimony label, the cross-examination buttons (L Press / Present R) and the OK / Back
   prompts when presenting.
-* OBJECTION!, HOLD IT! and TAKE THAT! speech bubbles.
+* The DS version's Objection!, Hold it! and Take that! speech bubbles.
 * Investigation menu tabs (Examine, Move, Talk, Present), and the Talk topics and Move
   destinations (the DS version's pictures, copied into the GBA boxes).
-* Episode select: the episode titles (from the DS script) and EPISODE 1–5 labels.
-* Save screen: SAVE header, Yes / No and the note under them; the continue screen names the
-  part you saved in and offers Resume Play / Restart Part.
+* Episode select: the DS version's episode boxes and Episode 1–5 labels.
+* Save screen: the DS version's SAVE header and Yes / No buttons, and the note under them; the
+  continue screen has the DS LOAD header, names the part you saved in and offers the DS
+  buttons From save point. / From chapter start.
+* College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
+  writing is gone, as in the DS version's sprites.
 * Unlock Successful when the last Psyche-Lock breaks, and the NOT GUILTY / GUILTY verdict.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
@@ -90,6 +94,15 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.12 — graphics from the DS version in place of the ones the build drew itself: the
+  Objection! / Hold it! / Take that! bubbles (shrunk to the GBA screen), the SAVE and LOAD
+  headers, the Yes / No and continue-screen buttons (now From save point. / From chapter start.,
+  as on the DS), and the episode-select boxes and labels. College Phoenix's sweater says P, and
+  the policeman loses his armband, as on the DS. Fixes: while the text box grows into a choice
+  (and shrinks back after it), the page's text no longer smears over the rows the box passes; a
+  strip of the name tag no longer stays above the box when the next line has no name, after a
+  choice or when the box closes; hiding the text box no longer writes its state to a stray
+  address.
 * 0.11.8 — cross-examination statements keep clear of the arrows to the previous and next
   statement (the left arrow covered the first letter of the second line); a save made during
   a cross-examination shows its statement again when continued.

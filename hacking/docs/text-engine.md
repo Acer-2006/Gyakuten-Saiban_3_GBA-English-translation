@@ -75,7 +75,15 @@ the name tag (tiles from the sheet at `0x08181820`, see [graphics.md](graphics.m
 function at `0x08006684` DMAs the shadow to VRAM once per frame (its literal pool holds
 `0x030037b0` and `0x03003a90`). A partial redraw of the box frame starts at template row 14 —
 `movs r1, #0xe0` at `0x0800577a` and `movs r5, #0xe0` at `0x08005784` (byte offset `0x1c0` after
-the shift). The interior is cleared by the loop at `0x08022166`–`0x08022186`.
+the shift). A line with no name tag puts the template back over the tag's rows (the loop at
+`0x0800659c`, from template entry `0x180`, row 12: `movs r4, #0xc0` at `0x0800658c` and
+`movs r5, #0xc0` at `0x08006596`, both shifted). Rows 12–19 are cleared by two loops:
+`0x08022166`–`0x08022186` (command `0x1c`, which hides the box; the code after it sets
+`TXT+0x23`, the box state, to 1 through `r4`, which the loop's first instructions set up) and
+`0x08021c8e`–`0x08021caa` (after a choice).
+
+Before a choice the box grows to the full screen a few rows a frame, and shrinks back after it:
+the engine copies the map rows up (or down) one row at a time.
 
 Page ends reset the text state in four places: `0x08021ab0` (wait for button), `0x08022622`
 (command `0x2e`), `0x0801fc00` (section initialisation) and `0x0801fa6c` (text reset).
@@ -162,8 +170,8 @@ the English build uses that one, with the greys 4, 3, 3 and 2 of the UI palette.
   The English build draws text in this mode as sprites (16×16 cells in OBJ tiles 0–191, OAM
   entries 3–50) and places the lines by the rules above, taking the section, alignment and
   number of lines at the first character; the system messages are centred (the English lines
-  have no padding), and a page with a third English line uses the three-line box's rows
-  (y 112 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
+  have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
+  a page with a third English line uses the three-line box's rows (y 112 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
   shows its Yes / No in entries 40 and 41.
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
@@ -179,13 +187,14 @@ the old font area.
 | `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw; the VWF keeps a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 14–19 and blits 1-bit glyph rows at a pixel pen |
 | dispatch entry 1 (`0x08163b00`) | trampoline: `vwf_newline`, then the original handler `0x0802172d` |
 | `0x08021ab0`, `0x08022622`, `0x0801fc00`, `0x0801fa6c` | call `vwf_clear` before the original instructions |
-| `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: remaps the canvas, handles caption / choice sprites, and clears the arrow cells (row 19, columns 14–15) that the engine writes after the box has closed |
+| `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: remaps the canvas, handles caption / choice sprites, and clears the arrow cells (row 19, columns 14–15) that the engine writes after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
 | `0x0803b844` | template rewritten to a three-line box: rows 13–19 = top edge, 5 interior rows, bottom |
 | `0x0800577a`, `0x08005784` | `0xe0 → 0xd0`: partial redraw starts one row higher |
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
-| `0x08022166` | box clear loop replaced by `bl vwf_boxclear; b 0x08022186` |
+| `0x0800658c`, `0x08006596` | `0xc0 → 0xb0`: a line with no name tag puts the template back from row 11 |
+| `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 11–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
 | BG tiles `0xe0`–`0x193` | the canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, shows the engine's empty box (template rows) until no background uses those tiles any more, then draws the page again from a log of the glyphs blitted since the last clear |
-| `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024` |
+| `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
 | `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |
 | every copy of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) | entries 13–15 become the text colours (`167f`, `7eed`, `2be7`) |

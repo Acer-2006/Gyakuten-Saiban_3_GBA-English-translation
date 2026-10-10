@@ -10,6 +10,7 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x080000c0`–`0x0803c000` approx. | code (Thumb, a little ARM): game code to about `0x08030000`, the text engine around `0x0801e000`–`0x08023000`, the sound driver and BIOS wrappers `0x08036000`–`0x0803b000` (`m4aSongNumStart` `0x08038bd0`, LZ77-to-WRAM wrapper `0x0803a048`) |
 | `0x08045d1c` | Talk topic and Move destination pictures: 150 pointers to LZ 128×32 pictures (see graphics.md) |
 | `0x08045f74` | Court Record item table (211 × {LZ picture, icon \| detail << 16}, see graphics.md) |
+| `0x08046920` | person table: 44 × {sub-archive, frame data, count} (see graphics.md, characters) |
 | `0x08046b30` | animation table, indexed by effect number: 241 × 20-byte entries {archive, VRAM destination, frame data, s16 x, s16 y, flags} (see graphics.md, effects archive) |
 | `0x08049834`, `0x0804991c` | per-command property tables (u16 × 121) |
 | `0x08049b38` | chapter table: 25 pointers to script banks |
@@ -28,7 +29,8 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 | `0x0819a070` | save screen はい / いいえ (two 64×32 sprites) |
 | `0x081f31cc`–`0x082231cc` | font, 0x600 glyphs × 128 bytes. The English build does not need it and reuses the whole area for its code and font tables |
 | `0x0823e7a8`–`0x0848xxxx` | chunked image objects (backgrounds) and other compressed graphics |
-| `0x08254afc` | episode-select background (chunked image object, 8bpp; its boxes and labels are effects, see graphics.md) |
+| `0x08254afc` | episode-select background (chunked image object, 8bpp; its boxes and labels are effects, see graphics.md), also behind the save and continue screens; its pixels do not use palette entries 16–31, which those screens show as BG palette 1 |
+| `0x08490cb0`– | characters: the person table's sub-archives and frame data, person by person |
 | `0x0826deb0` | title screen image object |
 | `0x0869c8f0` | effects archive: sub-archives of RLE-packed sprite cells for banners, shout bubbles and other effects |
 | `0x086de2b8`– | animation frame data |
@@ -50,7 +52,7 @@ puts all of its code there), while data can go anywhere.
 | --- | --- |
 | `0x02011fc0` | decompressed chapter bank (appears to be `0x1b000` bytes) |
 | `0x0202cfc0` | episode-select sprite sheet after decompression (`0x9600` bytes) |
-| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script) |
+| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, `0x02028800` script, `0x02029000` the save screen header's: the BG tiles it borrows during the game, `src/menu.c`) |
 
 ## Saved games
 
@@ -96,7 +98,7 @@ before the pointer and the one at it (`src/script.c`, `script_save`, called inst
 
 | Address | Contents |
 | --- | --- |
-| `0x06000000` | BG char block 0 (the English build's text canvas uses tiles `0xe0`..) |
+| `0x06000000` | BG char block 0 (the English build's text canvas uses tiles `0xe0`..; on the save and continue screens its SAVE / LOAD header is in tiles `0x1c4`–`0x1fb`) |
 | `0x0600e800` | BG1 map |
 | `0x06010000` | OBJ tiles 0–127: dialogue text cells (original engine) |
 | `0x06011000` | OBJ tiles 128–255: pool for "free slot" sprite text |

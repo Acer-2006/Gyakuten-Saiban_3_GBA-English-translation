@@ -160,18 +160,26 @@ and the 第n話 label are effects of the effects archive (below):
   the five titled boxes on palette 0 (the highlighted one, VRAM `0x06012300`) and 16–20 the same
   boxes on palette 1 (VRAM `0x06013300` + `0x1000` · n). A box is 128×64 and 23–24 sprites: the
   frame and the empty inside are shared cells (0–12), the title row (y −8..8) has cells of its
-  own. Each box takes 128 OBJ tiles;
+  own. Each box takes 128 OBJ tiles. The frame data has two frames: the box for one frame, then
+  one 32×16 piece of the inside, held. The box of episode 5, shown next to episode 4, runs 24
+  tiles past the end of OBJ VRAM, which wraps to tiles 0–23;
 * effects 21–25, sub-archive `0x9ca0`: 第n話, three 16×16 sprites at y −60 (第, the digit, 話),
   VRAM `0x06011000` (tile 128); the arrows (effects 26, 27) follow at tiles 140 and 146, so the
   label has 12 tiles (48×16).
 
 The prompt under the boxes (エピソードを選んでください) is common-bank section 2, drawn as sprite
-text (see text-engine.md).
+text in OBJ tiles 64–127 (see text-engine.md); tiles 24–63 are free on this screen.
 
-The English build reads the five titles from the DS common bank (the sections the save menu
-uses: two centred lines, the episode title and the part) and builds the boxes on the empty box's layout:
-nine 32×16 cells inside, the title in two lines of the DS font. The label is EPISODE n in
-condensed capitals (Spleen 5x8 at double height).
+The DS has each episode's box as a 256×64 texture in `data.bin` (from `0x7de7b8`, `0x2094` bytes
+apart; texture format under Court Record): a 176×58 box with the title on one line and four
+palettes (normal, touched, faded, greyed). The label is one 128×64 texture (`0x7e8a9c`): the
+digits 1–5, the arrows and the word Episode. The English build (`patches/episodes.py`) draws
+128×64 boxes in the DS style (its outline, highlight, shadow and fill colours, the corners cut)
+with the DS title lettering cut into two lines at a word space, on DS palettes 0 and 3 for the
+highlighted box and the others: two 64×64 sprites in the same 128 tiles. The label is the DS word
+Episode and the digit, 96×24 in six sprites (three 32×16 over three 32×8) at OBJ tile 24. The five
+titles read from the DS common bank (the sections the save screen uses: two centred lines, the
+episode title and the part) check that each box is the episode it should be.
 
 ## Save screen
 
@@ -183,9 +191,21 @@ state back, then calls `0x08020024`, which redraws text sprites from the records
   char block 0 by eight loaders), tiles `0x60`–`0x6f` and `0x70`–`0x7f` (`0x08181420`), placed by
   the BG2 map at `0x0803bf44` (32 wide, rows 2–11 are the box) at columns 10–13 and 18–21 of
   rows 3–6. BG palette 0: grey (3) lettering, white (8) outline, dark red (9) background. The
-  English build draws SAVE as one 64×32 picture in the same 32 tiles and places it at columns
-  12–19. The sheet stays in VRAM between screens: a savestate made with an older ROM shows the
-  old tiles until a screen reloads the sheet (the episode select does).
+  sheet stays in VRAM between screens: the save screen opened during the game loads no BG tiles
+  of its own.
+* The DS has SAVE, and LOAD on the continue screen: 103×30 olive-green lettering with a white
+  outline in its save box textures (`data.bin` `0x7cbebc` and `0x7cfef0`). The English build
+  (`patches/ui.py`) cuts the lettering out as 14×4 tiles and maps them at columns 9–22 of rows
+  3–6 with BG palette 1 (the rest of the box inside is tile `0x40`). Palette 1 on these screens
+  is entries 16–31 of the palette of the courtroom picture behind them (`0x08254afc`, the episode
+  select's too), whose pixels use none of those entries; the DS colours that palette 1 lacks go
+  into its empty entries. The 56 tiles do not fit in the UI sheet, so `src/menu.c` copies them to
+  BG tiles `0x1c4`–`0x1fb` when a screen with the header opens: hooks at `0x0800b636` (the save
+  screen, opened with START or at the end of a part), `0x0800ae80` (erase all data, from the
+  title) and `0x0800d750` (the continue screen). During the game a scene's graphics may be in
+  those tiles, so the save screen keeps them (in `0x02029000`..) and puts them back when it
+  closes, at `0x0800bcc4` after the game state is restored. The question under the header starts
+  at y 56 with a 16-pixel pitch, clear of the lettering.
 * はい / いいえ: `0x0819a070`, two 64×32 sprites (1D) in the Talk-topic box style, DMA'd to OBJ
   tile `0x1e0`; OAM entries 40 and 41 at (48, 96) and (128, 96), palette 9 for the highlighted
   one and 10 for the other.
@@ -194,8 +214,12 @@ state back, then calls `0x08020024`, which redraws text sprites from the records
   128×32 buttons in the same style sit at (56, 98) and (56, 130), each two 64×32 sprites:
   中断したところから (where the game was suspended) at `0x08199070` and この章のはじめから (the
   start of this part) at `0x08199870`, OBJ tiles `0x1a0`–`0x21f`, OAM entries 38–41. The box
-  inside is index 12 from row 6 to 25 and column 2 to 125. The English build writes Resume Play
-  and Restart Part.
+  inside is index 12 from row 6 to 25 and column 2 to 125.
+* The DS has the English buttons in the same box style as textures: Yes (`0x804e48`) and No
+  (`0x8056dc`), 128×32, and From save point. (`0x802d20`) and From chapter start. (`0x803db4`),
+  256×32, its box outlined in index 9. The English build copies their lettering (inside the DS
+  outline) into the GBA boxes the way the Talk topics are copied, narrowed where it is wider than
+  the box.
 * The note ※ゲーム中にSTARTボタンを押せば、いつでも記録することができます。: `0x0818e720`, 80 tiles
   at OBJ tile `0x220`, a 160×32 line at (40, 128): two 64×32 sprites, then a 32×32 column of four
   32×8 sprites whose tiles are stored in the order of rows 0, 2, 1, 3. OBJ palette 13
@@ -262,10 +286,21 @@ one palette each (1 white, 2 red, 3–4 darker reds, 5 bubble outline, 6 grey, 7
 one frame of 7 cells (32×64, two 64×64, 32×64, three 32×16; 216 tiles at OBJ tile `0x1e8`,
 palette 11), frames `0x086de558`, `0x086de590` and `0x086de5c8`. Effects 1–9 show them: 異議あり
 at x 45, 190 and 120 (effects 2, 3, 6, 8, 9), 待った at 45 and 120 (1, 5, 7), くらえ at 45 (4),
-y 80. The words are written vertically in a 96×144 bubble. The English build draws OBJECTION!
-and HOLD IT! in a 144×96 bubble (two 64×64, two 64×32 and three 16×32 sprites, the same 216
-tiles), moves their anchors at x 45 / 190 to 72 / 168 so they stay on screen, and keeps the
-tall shape for TAKE THAT!, which shares the screen with the evidence being presented.
+y 80. The words are written vertically in a 96×144 bubble. (When Take that! is shouted at a
+Psyche-Lock, the bubble goes to OBJ tile `0x100`.)
+
+The DS keeps its English bubbles in `data.bin` in the same formats: frame data at `0x7228f8`
+(Objection!), `0x72b1f8` (Hold it!) and `0x733738` (Take that!), one list of twelve 64×64 sprites
+covering 256×192, followed by the sub-archive (one palette). The English build
+(`patches/shouts.py`) shrinks each picture to 144×108 (area average, `tools/dspic.py`), maps the
+colours back to the DS palette, covers the 8×8 tiles that have something in them with as few
+sprites as it finds within the 216 tiles (16–24 sprites, so it raises the sprite count in the
+entries' flags), and writes a new sub-archive and frame data for each bubble with the original
+timing. The anchors at x 45 / 190 move to 72 / 168 so the bubble stays on screen. Presenting
+evidence from the Court Record starts effect 4 (Take that!, `0x08013488`) or 2 (Objection!,
+`0x080134ca`), and the item's icon shows at the top middle of the screen and spins away: the
+tall Japanese bubbles at x 45 left room for it, the wide English ones are under it for about
+half a second.
 
 A copy of the banner kanji as 16×16 blocks also sits raw at `0x08186b20`; the game does not
 use it for the banners.
@@ -296,6 +331,28 @@ running effect's frames (see memory-map.md, "Saved games").
 
 The animation table has 241 entries (0–240); the ones after 141 are characters and objects for
 cut-scenes and the ending, with no writing.
+
+## Characters
+
+**Person table: `0x08046920`**, 44 entries of `{u32 sub-archive, u32 frame data, u32 count}`.
+Each person's pictures are sub-archives in the effects-archive format (above): the first one,
+then more for its other poses, each a palette and its cells. The frame data (in the effects'
+format) gives the sub-archive as an offset from the person's first one. Person 7 is Phoenix at
+college (sub-archives `0x08501c50`, `0x08507708`, `0x0850b2a0`), person 12 a policeman
+(`0x08548548`, `0x0854a904`, `0x0854f42c`, `0x08551a74`); effects 35–37 (sub-archive
+`0x086bb1cc`) are the close-up of Phoenix at college.
+
+The DS keeps the same sub-archives in `data.bin`, the ones its English version changed twice:
+Japanese (the GBA's cells, byte for byte) and English, with the same cells in the same order and
+a few cells the GBA does not have. Its English sprites put P on Phoenix's sweater instead of RYU
+(`0x53ccf0` / `0x6f3f9c`, `0x544150` / `0x6fb274`, `0x548ad0` / `0x6ffaf8`, and the close-up
+`0x758718` / `0x75ac78`) and take away the policeman's armband with Japanese writing on it
+(`0x58b270` / `0x704db8`, `0x590f5c` / `0x70a9dc`, `0x593cc4` / `0x70d710`). Two more pairs
+(`0x70f8dc` / `0x70fab8`, `0x712ac8` / `0x713258`, effects 204 and 211) change a few pixels of
+pictures with no writing in them. `patches/sprites.py` finds the GBA cell that is the same as each
+Japanese cell the English version changed, stores the English one in the expansion area and
+points the sub-archive's cell table at it (offsets are 32-bit and count from the table; the game
+unpacks a cell until the sprite is full, so the cells need not follow one another): 37 cells.
 
 ## Buttons
 
