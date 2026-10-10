@@ -26,9 +26,13 @@ them carry `0x11` or `0x21` in the low flag byte) and one is 900.
 
 **Image table: `0x0803b3a4`**, 145 entries of `{u32 object, u32 flags}` (`0x0803b3a4`–
 `0x0803b82c`). Several entries share one object. Known entries: 6 (`0x0803b3d4` → `0x0826deb0`)
-is the title screen, 240×160 8bpp; its palette entries 0–31 are the shared UI colours and the
-copyright rows at the bottom use them. The English build rebuilds that object with
-`tools/chunkimg.py` (`load` / `build`) and only changes the pointer in the table entry.
+is the title screen, 240×160 8bpp; its palette entries 0–31 are the shared UI colours, and the
+copyright rows at the bottom (148–159) use entries 32 (black) and 195 (grey). The English build
+rebuilds that object with `tools/chunkimg.py` (`load` / `build`) and only changes the pointer in
+the table entry. Its logo comes from the DS title picture (`data.bin` `0x3684`, LZ: a 512-byte
+palette and 256×192 8bpp tiles, the logo's ink in x 4–251, y 11–156), scaled to 3/4 (186×111, at
+the top of the screen so it clears the menu at y 112) with a Lanczos filter, each pixel then taking
+the nearest of the logo's own colours (`tools/resample.py`); the copyright rows stay the GBA's.
 
 `gs3_image.py list ROM` prints the table with the flavour and size of each object;
 `gs3_image.py extract` / `build` convert to and from PNG.

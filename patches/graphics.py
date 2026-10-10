@@ -3,11 +3,14 @@ import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-import lz, chunkimg, textgfx
+import lz, chunkimg, textgfx, resample
 
 TITLE_MENU = {0x0818e300: 'New Game', 0x0818e500: 'Continue'}   # 64x16 sprites (two 32x16 cells), OBJ palette 2
 
 DS_TITLE = 0x3684          # LZ: 512-byte palette + 256x192 8bpp tiles (English title logo)
+DS_TITLE_BG = 32           # its background colour
+DS_LOGO = (4, 10, 252, 158)    # the logo in it (x0, y0, x1, y1; its ink is x 4..251, y 11..156)
+LOGO_SCALE = (3, 4)        # 248x148 -> 186x111: as large as it fits above the menu (y 112)
 GBA_TITLE_OBJ = 0x0826deb0 # chunked image object: 240x160 8bpp title screen
 GBA_TITLE_REF = 0x0803b3d4 # table entry pointing at it
 
@@ -58,23 +61,25 @@ def title_menu(rom, ctx):
     print(f"  title menu: {len(TITLE_MENU)} items rendered")
 
 def title(rom, ctx):
-    """English title logo: the DS 256x192 image scaled to 240x160 (nearest neighbour keeps the
-    palette), logo rows on top, the DS copyright line at the bottom."""
+    """English title logo: the DS picture's logo scaled to 3/4 with a filter, each pixel then taking
+    the nearest of the logo's own colours (tools/resample.py), centred at the top of the screen so
+    it clears the menu at y=112; the GBA picture's copyright line at the bottom."""
     dec, _ = lz.decompress(ctx.data, DS_TITLE)
     pal, img = dec[:512], dec[512:]
     lin = bytearray(256 * 192)
     for t in range(32 * 24):
         tx, ty = (t % 32) * 8, (t // 32) * 8
         for i in range(64): lin[(ty + i // 8) * 256 + tx + i % 8] = img[t * 64 + i]
-    # logo (DS rows 8..160) scaled by 0.7 and centred, so it clears the menu sprite at y=112
-    SCALE = 0.7
-    lw, lh = int(256 * SCALE), int(152 * SCALE)
-    x0 = (240 - lw) // 2
-    out = bytearray(240 * 160)
-    for y in range(lh):
-        sy = 8 + int(y / SCALE)
-        for x in range(lw):
-            out[y * 240 + x0 + x] = lin[sy * 256 + int(x / SCALE)]
+    if lin[0] != DS_TITLE_BG: raise SystemExit('title: unexpected DS title picture')
+    x0, y0, x1, y1 = DS_LOGO
+    w, h = x1 - x0, y1 - y0
+    nw, nh = w * LOGO_SCALE[0] // LOGO_SCALE[1], h * LOGO_SCALE[0] // LOGO_SCALE[1]
+    crop = bytes(lin[y * 256 + x] for y in range(y0, y1) for x in range(x0, x1))
+    logo = resample.scale_indexed(crop, w, h, struct.unpack('<256H', pal), nw, nh)
+    out = bytearray([DS_TITLE_BG]) * (240 * 160)
+    lx = (240 - nw) // 2
+    for y in range(nh):
+        out[y * 240 + lx:y * 240 + lx + nw] = logo[y * nw:(y + 1) * nw]
     # keep the original copyright rows (148..159) from the GBA image
     gpal, gtiles, _ = chunkimg.load(rom.d, GBA_TITLE_OBJ - 0x08000000)
     gl = bytearray(240 * 160)
@@ -83,19 +88,31 @@ def title(rom, ctx):
             for yy in range(8):
                 gl[(ty * 8 + yy) * 240 + tx * 8: (ty * 8 + yy) * 240 + tx * 8 + 8] = gtiles[(ty * 30 + tx) * 64 + yy * 8: (ty * 30 + tx) * 64 + yy * 8 + 8]
     out[148 * 240:] = gl[148 * 240:]
+    # palette: GBA entries 0..31 (shared UI bank), DS colours 32..255.  The copyright rows use GBA
+    # indices: where the logo uses the same index for a colour within a step of the GBA's (black
+    # 32, grey 195), the GBA colour goes in; otherwise the copyright pixels move to an index the
+    # logo leaves free.
+    newpal = bytearray(gpal[:64] + pal[64:])
+    used = set(logo)
+    free = [i for i in range(255, 31, -1) if i not in used]
+    def close(a, b): return all(abs((a >> k & 31) - (b >> k & 31)) <= 1 for k in (0, 5, 10))
+    remap = {}
+    for idx in sorted(set(gl[148 * 240:])):
+        if idx < 32: continue
+        g = struct.unpack_from('<H', gpal, idx * 2)[0] & 0x7fff
+        if idx in used and not close(g, struct.unpack_from('<H', pal, idx * 2)[0]):
+            if not free: raise SystemExit('title: no palette entry left for the copyright line')
+            remap[idx] = free.pop(0); idx = remap[idx]
+        struct.pack_into('<H', newpal, idx * 2, g)
+    for i in range(148 * 240, 160 * 240):
+        out[i] = remap.get(out[i], out[i])
     tiles = bytearray()
     for ty in range(20):
         for tx in range(30):
             for yy in range(8):
                 tiles += out[(ty * 8 + yy) * 240 + tx * 8: (ty * 8 + yy) * 240 + tx * 8 + 8]
-    # palette: GBA entries 0..31 (shared UI bank), DS colours 32..255; the copyright rows use
-    # GBA indices, so copy those colours over any DS indices they need
-    newpal = bytearray(gpal[:64] + pal[64:])
-    used_copy = set(gl[148 * 240:])
-    for idx in used_copy:
-        if idx >= 32: newpal[idx * 2: idx * 2 + 2] = gpal[idx * 2: idx * 2 + 2]
     obj = chunkimg.build(newpal, bytes(tiles))
     addr = rom.store(obj, 'ext', 4, 'title image')
     assert rom.u32(GBA_TITLE_REF) == GBA_TITLE_OBJ
     rom.w32(GBA_TITLE_REF, addr)
-    print(f"  title screen replaced ({len(obj)} bytes at {addr:#x})")
+    print(f"  title screen replaced ({len(obj)} bytes at {addr:#x}; the DS logo at {nw}x{nh})")
