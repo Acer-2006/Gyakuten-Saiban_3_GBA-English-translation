@@ -17,6 +17,7 @@ notes say so.
 | [docs/sound.md](docs/sound.md) | the MP2K driver tables, song and sample formats, which songs are the shouts |
 | [docs/memory-map.md](docs/memory-map.md) | ROM regions, free space, important RAM and VRAM addresses |
 | [docs/tools.md](docs/tools.md) | how to use the command-line tools and the emulator harness |
+| [docs/port-checklist.md](docs/port-checklist.md) | what the English build must not lose from the GBA game (commands between the words, name tags, the GBA's scenes), and what to check for each case |
 
 ## Tools (`tools/`)
 
