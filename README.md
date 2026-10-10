@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.14 — the Court Record icons that carry writing (the Coldkiller X bottle, the Ami jar, the
+  newspapers, magazines and letters: 18 of them) are the DS English pictures; the name tag was
+  half solid, half see-through while an item was shown in court (the window that keeps the
+  item's box solid ended at the Japanese tag's top line; it now ends at ours).
 * 0.15.13 — the metal detector lesson (Bridge to the Turnabout): the DS version moves the
   detector with the stylus and left out the Japanese line that explains the sound (it changes
   with the distance to the metal), which on the GBA is the only cue while searching; that line

@@ -131,6 +131,21 @@ apart when it fits (as the Japanese), otherwise four 12 rows apart, broken so th
 of two lines touch as little as possible (they are 13 rows tall). Where the DS says "Touch the Check Button",
 the GBA text says "Press L".
 
+### Icons
+
+The picture in the Court Record's left box, the item shown in court (top left, kept solid by
+WIN0 while the text box blends: WIN0V's bottom line is the name tag's top, 88 in the English
+build, 100 in the Japanese) and the presenting animation all come from a **table of 123
+pointers at `0x0804660c`**, one LZ picture each: 32 bytes of palette (16 BGR555 colours, index 0
+transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles in rows (2048
+bytes), decompressed to `0x0200afc0` by `0x0803a048` and DMA'd to OBJ tile `0x280`. The DS has
+the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
+per-language bases, the same set for both languages), then one more and twenty pairs: the
+Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the
+newspapers and magazines, the letters, the hotel's notepad...). `patches/icons.py` finds each
+pair's Japanese picture among the GBA's and stores the English one in its place, in the GBA's
+tile order with the DS palette; two pairs are the same in both languages and are left alone.
+
 ### Where the DS version keeps them
 
 Item ids are the same in both versions. The arm9 has a table of 211 records of 24 bytes at

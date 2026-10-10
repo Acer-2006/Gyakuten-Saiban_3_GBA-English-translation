@@ -149,6 +149,12 @@ def apply(rom, ctx):
     # name tag one row up (rows 11-12, joint at row 13)
     assert rom.u32(TAG_ROW14_LIT) == 0x03002400 and rom.u32(TAG_ROW12_LIT) == 0x03002380
     rom.w32(TAG_ROW14_LIT, 0x030023c0); rom.w32(TAG_ROW12_LIT, 0x03002340)
+    # ... and the window that keeps the evidence shown in court (its box on BG1, top left) out of
+    # the box's blending ends at the tag's new top: WIN0V bottom 100 -> 88 (0x08000eda, in the
+    # display routine at 0x08000ea0; with the tag at rows 11-12 its top 12 lines were solid and
+    # the rest blended)
+    assert rom.u16(0x08000eda) == 0x2064
+    rom.w16(0x08000eda, 0x2058)
     # ... and a line with no name tag puts the box template back from row 11 instead of 12 (the
     # loop at 0x0800659c copies template entries 0x180-0x1df to the map from row 12)
     assert rom.u16(TAG_ERASE_FROM) == 0x24c0 and rom.u16(TAG_ERASE_DST) == 0x25c0
