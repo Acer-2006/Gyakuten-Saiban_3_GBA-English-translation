@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.15.13 — the metal detector lesson (Bridge to the Turnabout): the DS version moves the
+  detector with the stylus and left out the Japanese line that explains the sound (it changes
+  with the distance to the metal), which on the GBA is the only cue while searching; that line
+  is translated from the Japanese again, with the DS line's sound and animation commands.
 * 0.15.12 — the defence bench showed through the text box (brighter, over the box's bottom
   edge) once the Court Record had been scrolled or swapped, and stayed so after it closed: the
   page's third line of sprite text sat after the bench's sprites in OAM, and the hardware lifts

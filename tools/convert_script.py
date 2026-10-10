@@ -214,8 +214,13 @@ GBA_WORDING = [
     ('Touch to see before and after{01}view under the Check screen.',
      'Press L to see the before and{01}after view.'),
     # the metal detector (case 5): the GBA's display turns red where there is metal, and the
-    # A Button looks there
-    ('{03 1} touch{03 0} the detector', '{03 1} move{03 0} the detector'),
+    # A Button looks there.  The DS moves the detector with the stylus and dropped the Japanese
+    # line about the sound (the GBA's only cue while searching: it changes with the distance to
+    # the metal), so that line is the Japanese one again, with the DS line's commands.
+    ('Next,{4e a}{6b 1f 0 0}{69 49e 104}{1e 6 23b4 2210}{03 1} touch{03 0} the detector and{01}'
+     'take a real good look around{01}this courtyard with it,{0c a} pal.',
+     'The sound changes with how{01}close you are to the metal.{4e a}{01}'
+     '{6b 1f 0 0}{69 49e 104}{1e 6 23b4 2210}Keep your ears open,{0c a} pal.'),
     ('the{03 1} CHECK{03 0} gauge{01}will flash.', 'the{03 1} display{03 0}{01}will turn red.'),
     ('touch{01}the gauge to really give the', 'press{01}the{03 1} A Button{03 0} to give the'),
     ('the{03 1} CHECK{03 0} gauge and wait{01}for it to flash,', 'the{03 1} display{03 0} and wait{01}for it to turn red,'),
