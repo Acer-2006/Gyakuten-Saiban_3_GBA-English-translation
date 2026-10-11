@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.2 — the third line of the box broke up into coloured blocks in scenes with sprite effects
+  over the dialogue (Dahlia's butterflies): the effects' tiles sat where that line's cells were.
+  The page now uses the sprite tiles the original keeps for its own text plus the item shown in
+  court's, and that item (the picture at the top left when evidence is shown) moves to the Court
+  Record's tiles, which are free whenever it can be on screen.
 * 0.16.1 — the engine's own continue arrow showed in the middle of the box next to ours (it
   bobs through four tiles, and only one of them was being taken out); ours now bobs with it at
   the right, as the original's does. The Back prompt in a photo's detail view ran off the

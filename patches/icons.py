@@ -64,8 +64,22 @@ def encode(rows, pal):
                 out.append(r[x0] | r[x0 + 1] << 4)
     return bytes(out)
 
+# The item shown in court (OAM 65, a 64x64 sprite at the top left) is DMA'd to OBJ tiles
+# 0x80-0xbf, which the English page's third line of sprite text needs (the original's two lines
+# take 0x00-0x7f; the effects that play over dialogue, such as the butterflies, are at 0xe0 on).
+# It moves to 0x1e0-0x21f, the Court Record's text sprites, whose only other user is the Record
+# itself: the game DMAs the item again when the Record closes.
+ITEM_DMA_LIT = 0x080158a4            # 0x06011000 in the routine at 0x08015870
+ITEM_ATTR2 = (0x080155be, 0x08015710)   # movs r0, #0x84 (<< 5 = attr2 0x1080: palette 1, tile 0x80)
+ITEM_TILE = 0x1e0
+
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
+    assert rom.u32(ITEM_DMA_LIT) == 0x06011000
+    rom.w32(ITEM_DMA_LIT, 0x06010000 + ITEM_TILE * 32)
+    for a in ITEM_ATTR2:
+        assert rom.u16(a) == 0x2084
+        rom.w16(a, 0x2000 | ((0x1000 | ITEM_TILE) >> 5))
     base = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[1]
     ds = ds_pictures(d, base)
     gba = {k: colours(*gba_picture(rom, k)) for k in range(GBA_COUNT)}

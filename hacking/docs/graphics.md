@@ -138,7 +138,11 @@ WIN0 while the text box blends: WIN0V's bottom line is the name tag's top, 88 in
 build, 100 in the Japanese) and the presenting animation all come from a **table of 123
 pointers at `0x0804660c`**, one LZ picture each: 32 bytes of palette (16 BGR555 colours, index 0
 transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles in rows (2048
-bytes), decompressed to `0x0200afc0` by `0x0803a048` and DMA'd to OBJ tile `0x280`. The DS has
+bytes), decompressed to `0x0200afc0` by `0x0803a048` and DMA'd to OBJ tile `0x280`. The item
+shown in court (OAM 65) is the same picture DMA'd to OBJ tile `0x80` (`0x08015870`), which the
+English page's third line of sprite text needs: `patches/icons.py` moves it to `0x1e0`, the
+Court Record's text sprites, whose only other user is the Record itself — the game DMAs the
+item again when the Record closes (so it must not share tiles with anything that stays). The DS has
 the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
 per-language bases, the same set for both languages), then one more and twenty pairs: the
 Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the

@@ -33,18 +33,15 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 
-/* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in the OBJ tiles the game leaves
-   free in every scene: 0x00-0x7f, 0xc0-0xf7 and 0x198-0x19f (0x80-0xbf carry the item shown in
-   court, OAM 65; 0xf8-0xf9 the continue arrow; 0xfc-0xff the choice cursor, OAM 57; 0x1a0 on
-   the Court Record's) */
+/* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00-0xbf.  The
+   original's two lines take 0x00-0x7f and the item shown in court 0x80-0xbf: patches/icons.py
+   moves that item to 0x1e0.  Effects that play over dialogue (the butterflies, 0xe0 on), the
+   continue arrow (0xf8) and the choice cursor (0xfc, OAM 57) are above. */
 #define LBL_X0     24
 #define LBL_CELLS  8
 #define LBL_CELLW  32
 #define LBL_LINES  3
-static u32 lbl_tile(int L, int cell) {
-    if (L == 2) return cell == 7 ? 0x198 : 0xc0 + cell * 8;
-    return L * 0x40 + cell * 8;
-}
+static u32 lbl_tile(int L, int cell) { return L * 0x40 + cell * 8; }
 /* OAM entries of each line's cells: 3-26, within the entries 2-33 the engine's own sprite text
    takes.  They must come before the scene's sprites (the defence bench is in 48-51, at
    priority 3): the hardware draws an earlier, lower-priority sprite that overlaps a later,
@@ -64,7 +61,6 @@ struct vwf_state {
     u8 squeeze;
     u8 mapped;      /* canvas map entries currently written */
     u8 arrow_on;
-    u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
     s16 lbl_pen;
     s16 lbl_row0;
     u8 lbl_line;
@@ -94,6 +90,7 @@ struct vwf_state {
     u8 mode;            /* the page being typed: 0 none yet, 1 on the canvas (it ends in a choice),
                            2 sprite text in the box (box_glyph) */
     u8 lbl_base;        /* a choice: the engine's row of the first option (see label_draw_char) */
+    u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
 };
 static struct vwf_state vs;
 
