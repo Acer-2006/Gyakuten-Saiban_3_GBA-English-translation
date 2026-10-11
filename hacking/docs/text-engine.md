@@ -146,6 +146,9 @@ stopped on again from the records. Two things change in the English build:
   box (or the full-screen choice box) lays it out again: the page as sprite text (its tiles
   cleared first), or for a choice the question on the canvas and the options after `0x07` as
   labels. A caption (`0x42 0`) is left to the engine, which draws it again every frame.
+  A save carries the box's map rows; one made with the 56-pixel box of builds before 0.16.8
+  puts the box back a row lower than this build's, which `box_open` never saw: `box_rows_fix`
+  moves it up (the tag rows too) before the page is looked for.
   The same is done when the START save screen closes without saving ("No"): the game puts
   the text state back after its redraw from the records, so the hook is its last call
   (`0x0800bd54`); the original restored the box's tiles, which held its text, and the English

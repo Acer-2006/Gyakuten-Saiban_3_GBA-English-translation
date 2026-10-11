@@ -825,10 +825,23 @@ static void resume_replay(int choice) {
     else vs.mode = 2;
 }
 
+/* A save carries the box's map rows, and one made by a build with the 56-pixel box (before
+   0.16.8) puts the box back a row lower than this build's (top edge at row 13, name tag at
+   11-12): box_open never saw it, and the page was never drawn again.  Move it up. */
+static void box_rows_fix(void) {
+    if ((BG1MAP[13 * 32 + 8] & 0x3ff) != 0x08 || (BG1MAP[12 * 32 + 8] & 0x3ff) == 0x08) return;
+    for (int r = 10; r < 12; r++)
+        for (int tx = 0; tx < 32; tx++) BG1MAP[r * 32 + tx] = BG1MAP[(r + 1) * 32 + tx];
+    for (int r = 12; r < 20; r++)
+        for (int tx = 0; tx < 32; tx++) BG1MAP[r * 32 + tx] = BOX_TEMPLATE[r * 32 + tx];
+    SYS_BGDIRTY |= 2;
+}
+
 static void resume_frame(void) {
     u32 p = TXT_PTR;
     if ((p != vs.resume_cur && p != vs.resume_cur + 2) || (SYS_CAPTION & 4)) { vs.resume = 0; return; }
     int choice = fullscreen_box();
+    if (!choice) box_rows_fix();
     if (!choice && !box_open()) return;
     vs.resume = 0;
     resume_replay(choice);

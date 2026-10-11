@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.10 — a game saved with a build before 0.16.8 (the shorter box) and continued on this one
+  came back with an empty box: the save carries the box's map rows, so the box was put back a
+  row lower than this build draws it and the page was never drawn again. The box is moved up
+  when such a save is continued, and the page follows. Saves made on this build were fine.
 * 0.16.9 — two animated effects drew their pictures into the third line's sprite tiles when
   they played over a page (the news report's "Fugitive Data" header, and a figure in the dark
   in a later episode): they are moved to the Court Record's tiles. A check of every effect in
