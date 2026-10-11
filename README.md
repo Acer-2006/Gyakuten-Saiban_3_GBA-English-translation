@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.15 — the top edge of an item's box stayed on screen (a row of pale frame tiles along the
+  top of the scene) after the item was taken down with a scene change: a second, inline clear
+  of the box's rows still started at the old row. It starts at row 0 now, with the box.
 * 0.16.14 — the name tag still lost its top row whenever an item shown in court was taken down
   or replaced: the box's erase cleared ten rows from the old row, the last of them the tag's.
   The erase and the right-hand item box move up with the box.

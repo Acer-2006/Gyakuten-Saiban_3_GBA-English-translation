@@ -90,6 +90,11 @@ ITEM_FRAME_LIT = 0x08015998          # 0x030020c2: map shadow row 1, column 1 (0
 ITEM_FRAME_LIT_R = 0x08015a7c        # 0x030020f8: row 1, column 28 (0x0801599c's frame, right, drawn leftward)
 ITEM_ERASE_LIT = 0x08015ab4          # 0x030020c0: the erase (0x08015a80) clears 10 rows from row 1
 ITEM_SPRITE_Y = (0x08015650, 0x080156f2)   # movs r0, #0x10: OAM 65's y while the item is shown (every frame, and once set)
+# A second, inline clear of the box's rows: when the item is taken down with the scene (the
+# routine at 0x08036130, which also hides OAM 65), `ldr r0, =0x03002080; adds r0, #0x40` and a
+# loop of 0x140 halfwords zero rows 1-10.  With the box a row up it has to start at row 0, or
+# the frame's top edge stays on screen.
+ITEM_CLEAR_ADD = 0x0803616e          # adds r0, #0x40 -> nop
 
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
@@ -104,6 +109,8 @@ def apply(rom, ctx):
     for a in ITEM_SPRITE_Y:
         assert rom.u16(a) == 0x2010, hex(a)
         rom.w16(a, 0x2008)
+    assert rom.u16(ITEM_CLEAR_ADD) == 0x3040
+    rom.w16(ITEM_CLEAR_ADD, 0x46c0)          # nop: clear from row 0
     for n, tile in MOVED_EFFECTS.items():
         e = ANIM_TABLE + 20 * n
         assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)
