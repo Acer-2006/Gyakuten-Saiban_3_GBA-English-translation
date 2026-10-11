@@ -246,7 +246,16 @@ def save_header(rom, ctx):
     assert rom.store(binary, 'font', 4, 'menu code') == text_addr
     for site, fn, displaced in HDR_HOOKS:
         if rom.read(site, 4) != rom.asm_thumb(site, displaced): raise SystemExit(f'ui: unexpected code at {site:#x}')
-        call_hook(rom, site, syms[fn], displaced, fn)
+        target = syms[fn]
+        if fn == 'hdr_game':
+            # ... and the page's sprite text goes while the save screen is up (src/vwf.c)
+            target = rom.thumb_code(f'''
+                push {{lr}}
+                bl #{syms[fn] & ~1:#x}
+                bl #{rom.syms["vwf_overlay"] & ~1:#x}
+                pop {{pc}}
+            ''', note='save screen open trampoline') | 1
+        call_hook(rom, site, target, displaced, fn)
     # the Testimony label 3 pixels in from the corner (src/menu.c label_pos): the hook replaces
     # the x computation and adds the offset to it
     if rom.read(LABEL_POS, 4) != rom.asm_thumb(LABEL_POS, 'movs r0, #0xc0\n lsls r0, r0, #8'):

@@ -100,6 +100,7 @@ struct vwf_state {
     u8 lbl_base;        /* a choice: the engine's row of the first option (see label_draw_char) */
     u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
     u8 arrow_t;         /* frames the DS-style arrow has been up (its slide) */
+    u8 overlay;         /* the save screen is up over the game: nothing of the page is shown */
 };
 static struct vwf_state vs;
 
@@ -725,6 +726,7 @@ void vwf_newline(void) {
 }
 
 void vwf_clear(void) {
+    vs.overlay = 0;
     vs.pen_x = 0;
     vs.line = 0;
     vs.squeeze = 0;
@@ -801,7 +803,7 @@ static void resume_replay(int choice) {
     else labels_reset();    /* the save screen's prompt was sprite text in the same tiles */
     TXT_COLOR = (colour & 0xf0) | vs.resume_colour;
     TXT_ALIGN = vs.resume_align;
-    int labels = 0, caption = 0, col = 0, row = 0;
+    int labels = 0, caption = 0, col = 0, row = 0, qrows = 1;
     while (p < cur) {
         u32 t = *p++;
         if (t >= 0x80) {
@@ -813,7 +815,7 @@ static void resume_replay(int choice) {
             col++;
             continue;
         }
-        if (t == 0x01) { if (caption) {} else if (labels) row++; else vwf_newline(); col = 0; }
+        if (t == 0x01) { if (caption) {} else if (labels) row++; else { vwf_newline(); qrows++; } col = 0; }
         else if (t == 0x03) TXT_COLOR = (TXT_COLOR & 0xf0) | (*p & 0xf);
         else if (t == 0x5d) TXT_ALIGN = align_cmd(TXT_ALIGN, *p);
         else if (t == 0x42) caption = *p == 0;
@@ -821,7 +823,13 @@ static void resume_replay(int choice) {
         p += cmd_args[t];
     }
     TXT_PTR = ptr; TXT_COLOR = colour; TXT_ALIGN = align;
-    if (choice) { vs.mode = 1; vs.mapped = 1; }     /* choice_frame shows the question at the top */
+    if (choice) {
+        vs.mode = 1; vs.mapped = 1;     /* choice_frame shows the question at the top */
+        /* the options sit under the question and a blank row, where the engine's cursor is: its
+           row counter, which label_draw_char read, has moved on to the last option by now */
+        vs.lbl_base = qrows + 1;
+        text_colours(1);                /* the question's colours: set while the page is typed */
+    }
     else vs.mode = 2;
 }
 
@@ -849,6 +857,7 @@ static void resume_frame(void) {
 
 /* Per frame (before the BG map / OAM DMA). */
 void vwf_frame(void) {
+    if (vs.overlay) { labels_hide(); return; }
     if (vs.resume) resume_frame();
     if (vs.lbl_row0 >= 0 && vs.lbl_caption) { labels_oam(); return; }
     if (fullscreen_box()) {
@@ -910,10 +919,19 @@ void vwf_frame(void) {
     if (vs.mapped) canvas_check();
 }
 
+/* The save screen opens over the game (START; patches/ui.py, with hdr_game): the page's sprite
+   text goes until the state is put back (vwf_restore), a page starts (vwf_clear) or the box is
+   cleared.  On a choice its options were drawn over the save screen. */
+void vwf_overlay(void) {
+    vs.overlay = 1;
+    labels_hide();
+}
+
 /* Called before 0x08020024, which redraws the text sprites from the saved sprite records when
    an overlay screen (the save screen, for one) closes and the game state is restored: the
    overlay's own sprite text goes with it. */
 void vwf_restore(void) {
+    vs.overlay = 0;
     labels_hide();
     vs.lbl_row0 = -1;
     vs.lbl_caption = 0;
@@ -926,6 +944,7 @@ void vwf_boxclear(void) {
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
     vs.mode = 0;
+    vs.overlay = 0;
 }
 
 void _start(void) {}

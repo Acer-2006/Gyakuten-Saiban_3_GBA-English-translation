@@ -145,7 +145,9 @@ stopped on again from the records. Two things change in the English build:
   pointer, with the colour and layout commands before it), and the first frame that shows the
   box (or the full-screen choice box) lays it out again: the page as sprite text (its tiles
   cleared first), or for a choice the question on the canvas and the options after `0x07` as
-  labels. A caption (`0x42 0`) is left to the engine, which draws it again every frame.
+  labels, under the question and a blank row (`lbl_base`: the engine's row counter has moved on
+  to the last option by then) and with the question's colours set. A caption (`0x42 0`) is left
+  to the engine, which draws it again every frame.
   A save carries the box's map rows; one made with the 56-pixel box of builds before 0.16.8
   puts the box back a row lower than this build's, which `box_open` never saw: `box_rows_fix`
   moves it up (the tag rows too) before the page is looked for.
@@ -248,6 +250,7 @@ the old font area.
 | `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 10–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
 | BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
+| `0x0800b636` (the save screen opening; `patches/ui.py`, with `hdr_game`) | `vwf_overlay`: the page's sprite text is hidden until `vwf_restore`, a page start or a box clear (a choice's options were drawn over the save screen) |
 | `0x0800bd54` (the save screen closing, the text state back; `patches/text.py`) | `0x080201e4`, then `vwf_resume` (see "Continuing a saved game") |
 | `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |

@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.11 — saving on a choice: the options drew over the save screen, and the game continued
+  from that save with the question in the wrong colours and the options a few rows too low,
+  off the cursor. The page's sprite text now goes while the save screen is up, and a continued
+  choice puts its options under the question where the cursor is, with the question's colours.
 * 0.16.10 — a game saved with a build before 0.16.8 (the shorter box) and continued on this one
   came back with an empty box: the save carries the box's map rows, so the box was put back a
   row lower than this build draws it and the page was never drawn again. The box is moved up
