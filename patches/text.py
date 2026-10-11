@@ -24,6 +24,8 @@ TAG_ERASE_DST   = 0x08006596   # movs r5, #0xc0 (<< 2: map byte offset 0x300, ro
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
 RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
 RESTORE_CALLS   = (0x0800bcc4, 0x08014464)   # 0x0800dcd4, continuing a save: patches/script.py
+SAVE_BACK       = 0x0800bd54   # bl 0x080201e4: the save screen's last call once the game state is back
+SAVE_BACK_CALL  = 0x080201e4
 PACE_RELOAD     = 0x0801f960   # ldrb r2, [r2]; adds r0, r2, r0  (wait = TXT+0x26, the speed)
 BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x0801f858 (no blip)
 TEXT_LOOP       = 0x0801f858
@@ -123,6 +125,18 @@ def apply(rom, ctx):
         assert rom.asm_thumb(site, f'bl #{RESTORE_TEXT:#x}') == rom.read(site, 4), hex(site)
         rom.thumb(site, f'bl #{tramp_rs & ~1:#x}', 'restore hook')
     rom.restore_tramp = tramp_rs             # patches/ui.py adds the save screen header to the first
+    # The records hold the original's cells, not the English page, and the save screen (START,
+    # "No") put the text state back only after that redraw: once it has (0x0800bd54, the last
+    # call of its restore), the page is found in the script and drawn again, as a continued
+    # save's is (vwf_resume).  Without this the box came back empty.
+    assert rom.asm_thumb(SAVE_BACK, f'bl #{SAVE_BACK_CALL:#x}') == rom.read(SAVE_BACK, 4), hex(SAVE_BACK)
+    tramp_sb = rom.thumb_code(f'''
+        push {{lr}}
+        bl #{SAVE_BACK_CALL:#x}
+        bl #{syms["vwf_resume"] & ~1:#x}
+        pop {{pc}}
+    ''', note='save screen back trampoline')
+    rom.thumb(SAVE_BACK, f'bl #{tramp_sb & ~1:#x}', 'save screen back hook')
 
     # 5. taller text box: frame rows 13..19 (top edge, 5 interior rows, bottom)
     t = bytearray(rom.read(FRAME_TEMPLATE, 1024))

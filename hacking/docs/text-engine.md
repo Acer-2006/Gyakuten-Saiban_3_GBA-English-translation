@@ -139,13 +139,17 @@ stopped on again from the records. Two things change in the English build:
   on a token boundary, and as a last resort the start of the section.
 * **The page.** The English text is in OBJ tiles (the page as sprite text, or a question on the
   canvas with the options as sprite text), which the save does not keep, and the records are
-  empty. When the game stopped on a page end (`0x02`, `0x2d`), a choice (`0x08`–`0x0a`), a
-  statement (`0x15`) or the Court Record opened to present (`0x21`), `vwf_resume` finds the
-  page (from the last page end before the pointer, with the colour and layout commands before
-  it), and the first frame that shows the box (or the full-screen choice box) lays it out
-  again: the page as sprite text, or for a choice the question on the canvas and the options
-  after `0x07` as labels. A caption (`0x42 0`) is left to the engine, which draws it again
-  every frame.
+  empty. When the game stopped on a command (a page end `0x02`/`0x2d`, a choice `0x08`–`0x0a`,
+  a statement `0x15`, the Court Record opened to present `0x21`, the wait before a choice's
+  question `{0c 1}`, ...), `vwf_resume` finds the page (from the last page end before the
+  pointer, with the colour and layout commands before it), and the first frame that shows the
+  box (or the full-screen choice box) lays it out again: the page as sprite text (its tiles
+  cleared first), or for a choice the question on the canvas and the options after `0x07` as
+  labels. A caption (`0x42 0`) is left to the engine, which draws it again every frame.
+  The same is done when the START save screen closes without saving ("No"): the game puts
+  the text state back after its redraw from the records, so the hook is its last call
+  (`0x0800bd54`); the original restored the box's tiles, which held its text, and the English
+  page came back empty without this.
 
 ## Cross-examination statements
 
@@ -238,6 +242,7 @@ the old font area.
 | `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 11–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
 | BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
+| `0x0800bd54` (the save screen closing, the text state back; `patches/text.py`) | `0x080201e4`, then `vwf_resume` (see "Continuing a saved game") |
 | `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |
 | BG palette 0, entries 13–15 (`0x0500001a`) | the text colours (`1dde`, `7b0d`, `03c0`: the orange, light blue and green of the Japanese sprite text's OBJ palette 0, entries 6, 9 and 12, which the DS uses too), written by `vwf.c` each frame while a page is mapped and put back to the UI palette's own values (`3def 028c 03ff`) when it is not: the ROM's copies of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) stay as they are, since they also load into OBJ palette 2, whose entry 15 is the Court Record's item-name yellow, and the Record's panel uses BG entry 15 for the same while it slides |

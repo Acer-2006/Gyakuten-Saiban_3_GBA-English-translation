@@ -522,8 +522,9 @@ static void box_glyph(u32 code, u32 col);
 
 /* The common bank's system messages (the save and continue screens' prompts, the chapter
    names): the engine places their sprite text 64 pixels up, for the box of those screens.
-   Dispatched with no such screen up (the chapter name is run through the text engine when the
-   game saves at the start of a testimony), they must not land on the page in the box. */
+   Dispatched with no such screen up (the load screen's chapter name, when a suspended game is
+   continued from its save point, was drawn over the first statement of Dahlia's testimony),
+   they must not land on the page in the box. */
 static int sys_text(void) {
     u32 sec = TXT_SECTION;
     return sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31);
@@ -746,8 +747,9 @@ void vwf_resume(void) {
     vs.resume = 0;
     const u16* cur = (const u16*)TXT_PTR;
     u32 t = *cur;
-    /* a page end, a choice, a statement (0x15), the Court Record opened to present (0x21) */
-    if (t != 0x02 && t != 0x2d && t != 0x08 && t != 0x09 && t != 0x0a && t != 0x15 && t != 0x21) return;
+    /* the engine stopped on a command: a page end, a choice, a statement (0x15), the Court
+       Record opened to present (0x21), the wait before a choice's question ({0c 1}), ... */
+    if (t >= 0x80) return;
     const u16* p = (const u16*)TXT_START;
     const u16* page = p;
     u32 c = 0, a = 0, pc = 0, pa = 0, caption = 0;
@@ -780,6 +782,7 @@ static void resume_replay(int choice) {
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     vs.glog_n = 0; vs.lost = 0;
     if (choice) canvas_tiles();
+    else labels_reset();    /* the save screen's prompt was sprite text in the same tiles */
     TXT_COLOR = (colour & 0xf0) | vs.resume_colour;
     TXT_ALIGN = vs.resume_align;
     int labels = 0, caption = 0, col = 0, row = 0;

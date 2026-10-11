@@ -105,11 +105,20 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.5 — the box came back empty after the START save screen was closed with "No" (the
+  original restores the box's tiles, which held its text; the English page is sprite text):
+  the page is drawn again, as it is when a saved game is continued. A sweep of the trial and
+  investigation flows against the Japanese GBA and the DS (testimony statements, cross-
+  examination with Press and Present, the part boundary with its save prompt, Continue from
+  the chapter start and from a save point, examine and move in the investigation) found
+  nothing else; the chapter name over Dahlia's statement (0.16.4) is the load screen's
+  caption when a suspended game is continued from its save point, and 0.16.4 fixes it on
+  that path.
 * 0.16.4 — text drawn over a page in the box during a testimony (the chapter's name, "Turnabout
   Memories / Part 1-2", on top of Dahlia's statement): the game runs the common bank's system
-  messages (the chapter names, the save prompts) through the text engine when it saves at the
-  start of a testimony, and the English build drew them on the page; they are left out unless
-  a save or continue screen is up. A page the engine starts over without clearing (its own
+  messages (the chapter names, the save prompts) through the text engine (the load screen's
+  caption, when a suspended game is continued from its save point), and the English build
+  drew them on the page; they are left out unless a save or continue screen is up. A page the engine starts over without clearing (its own
   cell counters back at 0, 0) now starts ours over too, so two pages can no longer overlap.
 * 0.16.3 — the Testimony label in the top left corner sits three pixels in from the edge (the
   DS lettering fills its sprite edge to edge, where the Japanese 証言中 had a margin, so it
