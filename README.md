@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.6 — the text sits in the box as on the DS: lines start 8 pixels inside it (they
+  started at 2, against the frame), measured against the DS running in an emulator; the
+  glyphs, widths and line breaks were already the DS's. The GBA box is 16 pixels narrower, so
+  the lines wider than 230 pixels (under 1%, up to 246) keep the letter spacing a pixel
+  tighter rather than breaking elsewhere than the DS.
 * 0.16.5 — the box came back empty after the START save screen was closed with "No" (the
   original restores the box's tiles, which held its text; the English page is sprite text):
   the page is drawn again, as it is when a saved game is continued. A sweep of the trial and

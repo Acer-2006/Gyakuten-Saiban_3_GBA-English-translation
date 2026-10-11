@@ -19,8 +19,12 @@
 #define CV_MAPROW  14
 #define LINE_H     16
 #define MAX_LINES  3
-#define TEXT_X0    2          /* left padding inside the box */
-#define TEXT_MAXW  236        /* usable width in pixels */
+/* The DS starts its lines 8 pixels inside the box (its box is 256 wide; the GBA's 240): the same
+   margin here, with 230 pixels for the line.  Lines wider than that (under 1%, up to 246) get
+   their letter spacing one pixel tighter; the DS's line breaks are kept. */
+#define BOX_W      240
+#define TEXT_X0    8          /* left padding inside the box */
+#define TEXT_MAXW  230        /* usable width in pixels */
 /* cross-examination statements: the engine's arrows to the previous and next statement are
    sprites over the box's edge columns at the second line (x 0-8 and 232-239), so the text keeps
    clear of them */
@@ -599,7 +603,7 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
         if (w - 24 > maxw) vs.squeeze = 2;
         /* command 0x5d 1 (the date and place cards, the testimony titles): the line centred, as
            the DS centres it (0x02023840) */
-        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (maxw - w) / 2 : 0;
+        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (BOX_W - w) / 2 - (vs.inset ? STMT_X0 : TEXT_X0) : 0;
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;
@@ -640,7 +644,7 @@ static void box_glyph(u32 code, u32 col) {
         vs.squeeze = 0;
         if (w > maxw) vs.squeeze = 1;
         if (w - 24 > maxw) vs.squeeze = 2;
-        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (maxw - w) / 2 : 0;
+        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (BOX_W - w) / 2 - (vs.inset ? STMT_X0 : TEXT_X0) : 0;
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;

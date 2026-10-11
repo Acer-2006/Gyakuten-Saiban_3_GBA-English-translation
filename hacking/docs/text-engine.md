@@ -160,7 +160,8 @@ and 1 at (0, 128) and (224, 128), OBJ tiles `0x1a0` and `0x1a4`, over the box's 
 the height of the second line. The original's two lines start at x 9 and stay clear of them;
 the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide
 (narrowing the letter spacing for longer lines, as for every line that does not fit), instead
-of from x 2 and up to 236 pixels.
+of from x 8 and up to 230 pixels (the DS's margin: its lines start 8 pixels inside its 256-wide
+box; measured on the DS, "No one's asking how you feel!" is 221 pixels on both).
 
 ## Fading lines
 
@@ -195,7 +196,7 @@ The DS centres the date and place cards ("April 11, 9:40 AM / District Court / .
 testimony titles ("-- The Victim and I --") with command `0x5d 1` before them and `0x5d 0`
 after: it measures the line at its first character and starts it at (256 − width) / 2
 (`0x02023840`). The GBA's script has none of these (332 pairs); the English converter keeps the
-DS's, and the canvas starts a line under alignment 1 at (236 − width) / 2 into the box. The
+DS's, and a line under alignment 1 starts at (240 − width) / 2 on the screen. The
 engine itself only uses the alignment for its sprite cells (`0x0801f014`: the offsets at
 `TXT+0x18`), which the English build does not draw.
 
