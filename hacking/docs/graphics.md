@@ -354,6 +354,13 @@ cell:         a 4bpp sprite (1D tile order) packed with a 16-bit RLE: token u16 
 ```
 
 The pictures are decompressed into OBJ VRAM at the destination each time a frame is shown.
+The English page's third line lives in tiles `0x80`–`0xbf` (the original's text took `0x00`–`0x7f`),
+so the two effects that play over a page with their pictures from `0x80` up — `0x45`, the news
+report's header (112 tiles from `0x90`), and `0xdd`, a figure in the dark (219 tiles from `0x80`,
+started by the script in bank 21) — are moved to `0x1a0`, the Court Record's tiles
+(`patches/icons.py`, `MOVED_EFFECTS`). The other effects placed in the text tiles (the episode
+select's labels at `0x80`, the episode title cards at `0x98`, the bursts at `0x00`/`0x78`) play
+with no page up.
 
 **Testimony / cross-examination banners** (証言開始 blue, 尋問開始 red): sub-archive offset 0,
 two palettes, 19 cells: the halves 開始 (0), 証言 (1), 尋問 (13) as 64×32, and 32×32 quarters

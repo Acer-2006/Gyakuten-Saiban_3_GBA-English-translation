@@ -73,6 +73,16 @@ ITEM_DMA_LIT = 0x080158a4            # 0x06011000 in the routine at 0x08015870
 ITEM_ATTR2 = (0x080155be, 0x08015710)   # movs r0, #0x84 (<< 5 = attr2 0x1080: palette 1, tile 0x80)
 ITEM_TILE = 0x1e0
 
+# Two animated effects also put their pictures at 0x80 and up while a page is in the box: 0x45
+# (the "Fugitive Data" header of the news report, 112 tiles from 0x90) and 0xdd (a figure in the
+# dark, 219 tiles from 0x80, started by the script over a page in bank 21).  Their entries in the
+# animation table (0x08046b30 + 20 * n, u32 VRAM destination at +4) move them to 0x1a0, the Court
+# Record's tiles, which the Record only uses while it is open.  The other effects placed in the
+# text tiles play with no page up (the episode select, the episode title cards, the bursts the
+# original put over its own two lines at 0x00-0x7f).
+ANIM_TABLE = 0x08046b30
+MOVED_EFFECTS = {0x45: 0x1a0, 0xdd: 0x1a0}
+
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
     assert rom.u32(ITEM_DMA_LIT) == 0x06011000
@@ -80,6 +90,10 @@ def apply(rom, ctx):
     for a in ITEM_ATTR2:
         assert rom.u16(a) == 0x2084
         rom.w16(a, 0x2000 | ((0x1000 | ITEM_TILE) >> 5))
+    for n, tile in MOVED_EFFECTS.items():
+        e = ANIM_TABLE + 20 * n
+        assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)
+        rom.w32(e + 4, 0x06010000 + tile * 32)
     base = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[1]
     ds = ds_pictures(d, base)
     gba = {k: colours(*gba_picture(rom, k)) for k in range(GBA_COUNT)}

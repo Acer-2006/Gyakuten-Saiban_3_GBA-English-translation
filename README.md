@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.9 — two animated effects drew their pictures into the third line's sprite tiles when
+  they played over a page (the news report's "Fugitive Data" header, and a figure in the dark
+  in a later episode): they are moved to the Court Record's tiles. A check of every effect in
+  the game's animation table found no other that plays over a page from the text tiles.
 * 0.16.8 — the text box is the DS box's height: 64 pixels (one tile row taller), with the
   DS's 60 pixels between its border lines, so the three lines sit 4 pixels below the top
   border as on the DS and the page arrow 10 pixels above the bottom one, where the box used to
