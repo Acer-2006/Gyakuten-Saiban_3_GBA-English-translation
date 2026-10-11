@@ -83,6 +83,12 @@ ITEM_TILE = 0x1e0
 ANIM_TABLE = 0x08046b30
 MOVED_EFFECTS = {0x45: 0x1a0, 0xdd: 0x1a0}
 
+# The item's box on BG1 (its frame is drawn from map row 1, column 1, around the 64x64 picture
+# at y 16) ended on row 10 with the 64-pixel text box, the name tag's top row, and cut the tag
+# in half.  Box and picture move up a row: the frame from row 0, the sprite at y 8.
+ITEM_FRAME_LIT = 0x08015998          # 0x030020c2: map shadow row 1, column 1 (0x08015870's frame loop)
+ITEM_SPRITE_Y = 0x080156f2           # movs r0, #0x10: OAM 65's y while the item is shown
+
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
     assert rom.u32(ITEM_DMA_LIT) == 0x06011000
@@ -90,6 +96,8 @@ def apply(rom, ctx):
     for a in ITEM_ATTR2:
         assert rom.u16(a) == 0x2084
         rom.w16(a, 0x2000 | ((0x1000 | ITEM_TILE) >> 5))
+    assert rom.u32(ITEM_FRAME_LIT) == 0x030020c2 and rom.u16(ITEM_SPRITE_Y) == 0x2010
+    rom.w32(ITEM_FRAME_LIT, 0x03002082); rom.w16(ITEM_SPRITE_Y, 0x2008)
     for n, tile in MOVED_EFFECTS.items():
         e = ANIM_TABLE + 20 * n
         assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)

@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.12 — the item shown in court cut the name tag in half: its box on the background ended
+  on the row the tag now starts on, above the taller text box. The item's box and picture sit
+  one tile row higher.
 * 0.16.11 — saving on a choice: the options drew over the save screen, and the game continued
   from that save with the question in the wrong colours and the options a few rows too low,
   off the cursor. The page's sprite text now goes while the save screen is up, and a continued
