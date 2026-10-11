@@ -16,7 +16,9 @@
 #define CV_TILE0   0xe0
 #define CV_COLS    30
 #define CV_ROWS    6
-#define CV_MAPROW  14
+#define CV_MAPROW  13         /* the box's first interior row: the box is BG1 rows 12-19 */
+#define BOX_BOTTOM 19         /* its bottom edge row */
+#define TEXT_Y0    102        /* the page's first line: 4 px below the box's top border, as the DS's */
 #define LINE_H     16
 #define MAX_LINES  3
 /* The DS starts its lines 8 pixels inside the box (its box is 256 wide; the GBA's 240): the same
@@ -37,7 +39,7 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 #define ARROW_X     229       /* at rest: the tip 2 pixels inside the box's right edge, as the DS's */
-#define ARROW_Y     149       /* the third line's rows, as the DS's sits on its third line */
+#define ARROW_Y     139       /* 10 px above the box's bottom border, as the DS's */
 
 /* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00-0xbf.  The
    original's two lines take 0x00-0x7f and the item shown in court 0x80-0xbf: patches/icons.py
@@ -201,8 +203,7 @@ static void canvas_tiles(void) {
     for (int ty = 0; ty < CV_ROWS; ty++) {
         for (int tx = 0; tx < CV_COLS; tx++) {
             int src;
-            if (ty == CV_ROWS - 1) src = (tx == 0) ? 1 : (tx == CV_COLS - 1) ? 2 : 6;
-            else src = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;
+            src = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;   /* the bottom edge is the template's row 19 */
             fill_tile(CV_TILE0 + ty * CV_COLS + tx, frame_tiles[src]);
         }
     }
@@ -436,7 +437,7 @@ static void labels_oam(void) {
         int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
         if (vs.mode == 2) {
             /* the page in the box: the cells cover its text rows from the left edge */
-            x = 0; y = CV_MAPROW * 8 + L * LINE_H;
+            x = 0; y = TEXT_Y0 + L * LINE_H;
         } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
@@ -444,7 +445,7 @@ static void labels_oam(void) {
                y 62 + 18 * row (y 71 when TXT+0x1a is 0). */
             int fw = vs.lbl_full[L] > w ? vs.lbl_full[L] : w;
             x = 9;
-            y = (vs.lbl_rows > 2) ? 112 + L * 16 : 116 + L * 18;
+            y = (vs.lbl_rows > 2) ? TEXT_Y0 + L * 16 : 116 + L * 18;
             if (vs.lbl_free) {
                 /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
                    36 + 18 * row + y offset, and the writer adds 9 to x */
@@ -862,7 +863,7 @@ void vwf_frame(void) {
            0x09 = plain bottom edge) even after the box has been cleared; with the box gone
            they would stay on screen as a 16x8 scrap of frame.  Remove them when they are the
            only thing left on that row. */
-        volatile u16* r = &BG1MAP[(CV_MAPROW + 5) * 32];
+        volatile u16* r = &BG1MAP[BOX_BOTTOM * 32];
         u32 e = r[14] & 0x3ff;
         if ((e == 0x09 || e == 0x24) && (r[8] & 0x3ff) == 0 && (r[12] & 0x3ff) == 0 &&
             (r[13] & 0x3ff) == 0 && (r[16] & 0x3ff) == 0) {
@@ -875,19 +876,13 @@ void vwf_frame(void) {
     /* the engine's arrow is BG tiles in row 19, columns 14-15, bobbing through the tile pairs
        0x20/0x21 .. 0x26/0x27 (each a row lower; 0x09 is the plain bottom edge): ours is a sprite
        at the right that bobs with it, and those cells show the box's bottom edge */
-    u32 e = BG1MAP[(CV_MAPROW + 5) * 32 + 14] & 0x3ff;
+    u32 e = BG1MAP[BOX_BOTTOM * 32 + 14] & 0x3ff;
     if (e >= 0x20 && e <= 0x27) { vs.arrow_on = 1; vs.arrow_y = (e - 0x20) >> 1; }
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;
-    if (vs.mapped) {
-        if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
-        else if (e != (u32)(CV_TILE0 + 5 * CV_COLS + 14)) {
-            BG1MAP[(CV_MAPROW + 5) * 32 + 14] = CV_TILE0 + 5 * CV_COLS + 14;
-            BG1MAP[(CV_MAPROW + 5) * 32 + 15] = CV_TILE0 + 5 * CV_COLS + 15;
-            SYS_BGDIRTY |= 2;
-        }
-    } else if (e >= 0x20 && e <= 0x27) {
-        BG1MAP[(CV_MAPROW + 5) * 32 + 14] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 14];
-        BG1MAP[(CV_MAPROW + 5) * 32 + 15] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 15];
+    if (vs.mapped && (BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+    if (e >= 0x20 && e <= 0x27) {
+        BG1MAP[BOX_BOTTOM * 32 + 14] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 14];
+        BG1MAP[BOX_BOTTOM * 32 + 15] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 15];
         SYS_BGDIRTY |= 2;
         arrow_load();
     }
@@ -911,9 +906,10 @@ void vwf_restore(void) {
     vs.lbl_caption = 0;
 }
 
-/* Replaces the engine's "clear box rows" loop: rows 11..19 of the BG1 map. */
+/* Replaces the engine's "clear box rows" loop: rows 10..19 of the BG1 map (the name tag's two
+   rows and the box's eight). */
 void vwf_boxclear(void) {
-    for (int i = 11 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
+    for (int i = 10 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
     vs.mode = 0;

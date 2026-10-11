@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.8 — the text box is the DS box's height: 64 pixels (one tile row taller), with the
+  DS's 60 pixels between its border lines, so the three lines sit 4 pixels below the top
+  border as on the DS and the page arrow 10 pixels above the bottom one, where the box used to
+  run out right under the third line. The name tag rides up with it; the arrows to the previous
+  and next statement sit on the second line.
 * 0.16.7 — the page arrow is the DS's: a white triangle pointing right at the end of the
   third line, sliding sideways as it does there (measured frame by frame on the DS), in place
   of the GBA's down-pointing triangle bobbing in the box's bottom edge.

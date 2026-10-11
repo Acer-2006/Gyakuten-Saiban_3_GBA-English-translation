@@ -134,7 +134,7 @@ the GBA text says "Press L".
 ### Icons
 
 The picture in the Court Record's left box, the item shown in court (top left, kept solid by
-WIN0 while the text box blends: WIN0V's bottom line is the name tag's top, 88 in the English
+WIN0 while the text box blends: WIN0V's bottom line is the name tag's top, 80 in the English
 build, 100 in the Japanese) and the presenting animation all come from a **table of 123
 pointers at `0x0804660c`**, one LZ picture each: 32 bytes of palette (16 BGR555 colours, index 0
 transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles in rows (2048

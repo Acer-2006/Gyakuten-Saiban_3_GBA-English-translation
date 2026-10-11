@@ -158,7 +158,7 @@ text stays up while the game waits for Press (L), Present (R) or the next statem
 it waits, two 16×16 sprites show the arrows to the previous and next statement: OAM entries 0
 and 1 at (0, 128) and (224, 128), OBJ tiles `0x1a0` and `0x1a4`, over the box's edge columns at
 the height of the second line. The original's two lines start at x 9 and stay clear of them;
-the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide
+the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide (the arrows on the second line, y 118, with the taller box)
 (narrowing the letter spacing for longer lines, as for every line that does not fit), instead
 of from x 8 and up to 230 pixels (the DS's margin: its lines start 8 pixels inside its 256-wide
 box; measured on the DS, "No one's asking how you feel!" is 221 pixels on both).
@@ -214,7 +214,7 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   Yes / No in 40–41 and the choice cursor is 57) and places the lines by the rules above, taking the section, alignment and
   number of lines at the first character; the system messages are centred (the English lines
   have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
-  a page with a third English line uses the three-line box's rows (y 112 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
+  a page with a third English line uses the three-line box's rows (y 102 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
   shows its Yes / No in entries 40 and 41.
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
@@ -230,17 +230,19 @@ the old font area.
 
 | Site | Patch |
 | --- | --- |
-| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw: 1-bit glyph rows blitted at a pixel pen. The page is sprite text like the original's — three lines of eight 32×16 cells, OAM 3–26, OBJ tiles `0x00`–`0xbf` (the original's two lines take `0x00`–`0x7f`; the item shown in court, which had `0x80`–`0xbf`, is moved to `0x1e0` by `patches/icons.py`; the effects that play over dialogue, such as the butterflies, start at `0xe0`, the continue arrow is at `0xf8` and the choice cursor at `0xfc`), the engine's sprite-text palette (OBJ palette 0: white 3, orange 6, blue 9, green 12, greys 2 / 14 / 1 for a line trailing off), shown while the box is open, under the Court Record's panel too. The box behind it is the engine's own (BG1, blended with the scene: text on it would take the scene's colour, and the original's never does, being sprites). A page that ends in a choice (`0x07`) is the exception: its question goes on a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 14–19, so that it can move to the top rows when the box grows while the options take the sprite cells |
+| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw: 1-bit glyph rows blitted at a pixel pen. The page is sprite text like the original's — three lines of eight 32×16 cells, OAM 3–26, OBJ tiles `0x00`–`0xbf` (the original's two lines take `0x00`–`0x7f`; the item shown in court, which had `0x80`–`0xbf`, is moved to `0x1e0` by `patches/icons.py`; the effects that play over dialogue, such as the butterflies, start at `0xe0`, the continue arrow is at `0xf8` and the choice cursor at `0xfc`), the engine's sprite-text palette (OBJ palette 0: white 3, orange 6, blue 9, green 12, greys 2 / 14 / 1 for a line trailing off), shown while the box is open, under the Court Record's panel too. The box behind it is the engine's own (BG1, blended with the scene: text on it would take the scene's colour, and the original's never does, being sprites). A page that ends in a choice (`0x07`) is the exception: its question goes on a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 13–18 (the box's interior; its bottom edge, row 19, is the template's), so that it can move to the top rows when the box grows while the options take the sprite cells |
 | dispatch entry 1 (`0x08163b00`) | trampoline: `vwf_newline`, then the original handler `0x0802172d` |
 | `0x08021ab0`, `0x08022622`, `0x0801fc00`, `0x0801fa6c` | call `vwf_clear` before the original instructions |
 | `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: places the page's sprite cells (or remaps the question canvas), handles caption / choice sprites, puts the box's bottom edge back where the engine writes its own arrow cells (row 19, columns 14–15, bobbing through the tile pairs `0x20`/`0x21` to `0x26`/`0x27`, each a row lower: the English arrow is the DS's, a solid white 9×9 triangle pointing right at the third line's rows, a 16×16 sprite at OBJ tiles `0xf8`–`0xfb`, x 229 at rest with its tip 2 pixels inside the box's right edge, sliding a pixel at a time three frames a step from one pixel right of its rest to two pixels left and back, an 18-frame cycle as measured on the DS) and clears them after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
 | `0x0801f960` | `bl` to a trampoline: the wait before the next character from `text_pace` (the DS English pace) |
 | `0x0801f9b0` | `bl` to a trampoline that calls `text_blip` (the DS English blips, on every row), then back to the loop |
-| `0x0803b844` | template rewritten to a three-line box: rows 13–19 = top edge, 5 interior rows, bottom |
-| `0x0800577a`, `0x08005784` | `0xe0 → 0xd0`: partial redraw starts one row higher |
-| `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
-| `0x0800658c`, `0x08006596` | `0xc0 → 0xb0`: a line with no name tag puts the template back from row 11 |
-| `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 11–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
+| `0x0803b844` | template rewritten to a three-line box: rows 12–19 = top edge, 6 interior rows, bottom: 64 pixels, the DS box's height, with the DS's 60 pixels between the border lines; the page's sprite lines start at y 102, 4 pixels below the top border as on the DS, and the page arrow sits 10 pixels above the bottom one |
+| `0x0800577a`, `0x08005784` | `0xe0 → 0xc0`: partial redraw starts two rows higher |
+| `0x08006678`, `0x0800667c` | name tag two rows up (`0x03002380`, `0x03002300`: rows 10–11) |
+| `0x08000eda` | WIN0V bottom 100 → 80: the item shown in court stays solid down to the tag's top |
+| `0x0800ebc8`, `0x0800ebfe` | the statement arrows' y 128 → 118, the second line |
+| `0x0800658c`, `0x08006596` | `0xc0 → 0xa0`: a line with no name tag puts the template back from row 10 |
+| `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 10–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
 | BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
 | `0x0800bd54` (the save screen closing, the text state back; `patches/text.py`) | `0x080201e4`, then `vwf_resume` (see "Continuing a saved game") |
