@@ -105,6 +105,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.1 — the engine's own continue arrow showed in the middle of the box next to ours (it
+  bobs through four tiles, and only one of them was being taken out); ours now bobs with it at
+  the right, as the original's does. The Back prompt in a photo's detail view ran off the
+  screen: the B and L icons and the prompt sit three pixels further left and the prompt is
+  drawn 27 pixels wide at most. The sprite cells are cleared at the start of every page,
+  whether or not it begins with a line break.
 * 0.16.0 — the page in the text box is sprite text, as the original's is: the box is a
   background layer blended with the scene, so text drawn on it took on the scene's colour (the
   orange, blue and green came out different in every room, and the white a little different

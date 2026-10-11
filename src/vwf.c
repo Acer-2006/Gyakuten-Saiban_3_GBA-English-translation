@@ -64,6 +64,7 @@ struct vwf_state {
     u8 squeeze;
     u8 mapped;      /* canvas map entries currently written */
     u8 arrow_on;
+    u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
     s16 lbl_pen;
     s16 lbl_row0;
     u8 lbl_line;
@@ -528,7 +529,10 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
     if ((vs.lbl_row0 >= 0 && vs.lbl_caption) || (SYS_CAPTION & 4) || fullscreen_box()) {
         label_draw_char(code, col, row); return;
     }
-    if (!vs.mode) vs.mode = page_has_choice((const u16*)TXT_PTR) ? 1 : 2;
+    if (!vs.mode) {
+        vs.mode = page_has_choice((const u16*)TXT_PTR) ? 1 : 2;
+        if (vs.mode == 2) labels_reset();
+    }
     if (vs.mode == 2) { box_glyph(code, col); return; }
     if (!vs.mapped) {
         if (vs.lost) { canvas_redraw(); vs.lost = 0; }
@@ -616,10 +620,7 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
 static void box_glyph(u32 code, u32 col) {
     int gi = glyph_index(code);
     if (vs.pen_x == 0) {
-        if (vs.line == 0) {
-            labels_reset();
-            vs.inset = page_is_statement((const u16*)TXT_PTR);
-        }
+        if (vs.line == 0) vs.inset = page_is_statement((const u16*)TXT_PTR);
         int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
         int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
         vs.squeeze = 0;
@@ -839,10 +840,11 @@ void vwf_frame(void) {
         return;
     }
     if (!vs.mapped && vs.mode != 2) return;
-    /* the engine's arrow is BG tiles 0x24/0x25 in row 19, columns 14-15 (0x09: the plain bottom
-       edge): ours is a sprite at the right, and those cells show the box's bottom edge */
+    /* the engine's arrow is BG tiles in row 19, columns 14-15, bobbing through the tile pairs
+       0x20/0x21 .. 0x26/0x27 (each a row lower; 0x09 is the plain bottom edge): ours is a sprite
+       at the right that bobs with it, and those cells show the box's bottom edge */
     u32 e = BG1MAP[(CV_MAPROW + 5) * 32 + 14] & 0x3ff;
-    if (e == 0x24) vs.arrow_on = 1;
+    if (e >= 0x20 && e <= 0x27) { vs.arrow_on = 1; vs.arrow_y = (e - 0x20) >> 1; }
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;
     if (vs.mapped) {
         if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
@@ -851,14 +853,14 @@ void vwf_frame(void) {
             BG1MAP[(CV_MAPROW + 5) * 32 + 15] = CV_TILE0 + 5 * CV_COLS + 15;
             SYS_BGDIRTY |= 2;
         }
-    } else if (e == 0x24 || e == 0x25) {
+    } else if (e >= 0x20 && e <= 0x27) {
         BG1MAP[(CV_MAPROW + 5) * 32 + 14] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 14];
         BG1MAP[(CV_MAPROW + 5) * 32 + 15] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 15];
         SYS_BGDIRTY |= 2;
         arrow_load();
     }
     if (vs.arrow_on) {
-        OAMBUF[ARROW_OBJ * 4 + 0] = 150 | (1 << 14);          /* y, wide shape, 4bpp */
+        OAMBUF[ARROW_OBJ * 4 + 0] = (148 + vs.arrow_y) | (1 << 14);   /* y, wide shape, 4bpp */
         OAMBUF[ARROW_OBJ * 4 + 1] = 222 | (0 << 14);          /* x, size 0 -> 16x8 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
     }

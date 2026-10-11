@@ -290,9 +290,16 @@ def apply(rom, ctx):
             for x in range(x1 - x0):
                 if txt[y][x]: grid[y][x0 + x] = txt[y][x]
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'button ' + text)
+    # The detail view (L on a photo) shows the B and L icons and the Back prompt at x 184, 200
+    # and 216: 24 pixels of the prompt's 32 are on screen.  The three move left to 181, 197 and
+    # 213 (the icon's attr1 literal, the L icon's `subs r1, #0xfc` from that literal, the
+    # prompt's attr1 literal, all in the routine at 0x08015170), and the prompts are at most 27
+    # pixels wide.
+    assert rom.u16(0x080151a8) == 0x40b8 and rom.u16(0x08015182) == 0x39fc and rom.u16(0x080151b8) == 0x80d8
+    rom.w16(0x080151a8, 0x40b5); rom.w16(0x08015182, 0x39ff); rom.w16(0x080151b8, 0x80d5)
     for addr, text in PROMPTS:
         sq = 0
-        while font.measure(text) - sq * (len(text) - 1) > 29: sq += 1
+        while font.measure(text) - sq * (len(text) - 1) > 27: sq += 1
         grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
     for addr, text in TABS:
