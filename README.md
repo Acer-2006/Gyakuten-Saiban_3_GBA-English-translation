@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.3 — the Testimony label in the top left corner sits three pixels in from the edge (the
+  DS lettering fills its sprite edge to edge, where the Japanese 証言中 had a margin, so it
+  looked cut off against the corner).
 * 0.16.2 — the third line of the box broke up into coloured blocks in scenes with sprite effects
   over the dialogue (Dahlia's butterflies): the effects' tiles sat where that line's cells were.
   The page now uses the sprite tiles the original keeps for its own text plus the item shown in

@@ -58,6 +58,7 @@ MENU_BSS = 0x02029000                # after src/script.c's state
 HDR_HOOKS = [(0x0800b636, 'hdr_game', 'str r1, [r0, #4]\n str r3, [r0, #8]'),      # saving (START, end of a part)
              (0x0800ae80, 'hdr_erase', 'str r1, [r0, #8]\n ldr r1, [r0, #8]'),     # erasing all data
              (0x0800d750, 'hdr_continue', 'str r0, [r1, #4]\n str r2, [r1, #8]')]  # Continue on the title
+LABEL_POS = 0x0800e97c               # the Testimony label's OAM attribute 1 (x) is computed here
 HDR_CLOSE = 0x0800bcc4               # the save screen closes, the game state is back (patches/text.py)
 
 # save screen はい / いいえ (0x0819a070, two 64x32 sprites) and the continue screen's two buttons
@@ -246,6 +247,11 @@ def save_header(rom, ctx):
     for site, fn, displaced in HDR_HOOKS:
         if rom.read(site, 4) != rom.asm_thumb(site, displaced): raise SystemExit(f'ui: unexpected code at {site:#x}')
         call_hook(rom, site, syms[fn], displaced, fn)
+    # the Testimony label 3 pixels in from the corner (src/menu.c label_pos): the hook replaces
+    # the x computation and adds the offset to it
+    if rom.read(LABEL_POS, 4) != rom.asm_thumb(LABEL_POS, 'movs r0, #0xc0\n lsls r0, r0, #8'):
+        raise SystemExit('ui: unexpected code placing the Testimony label')
+    call_hook(rom, LABEL_POS, syms['label_pos'], 'movs r0, #0xc0\n lsls r0, r0, #8\n adds r0, #3', 'label_pos')
     old_tramp = rom.restore_tramp
     if rom.read(HDR_CLOSE, 4) != rom.asm_thumb(HDR_CLOSE, f'bl #{old_tramp & ~1:#x}'):
         raise SystemExit('ui: unexpected save screen exit')

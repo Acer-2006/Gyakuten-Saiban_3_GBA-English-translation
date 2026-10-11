@@ -48,4 +48,13 @@ void hdr_close(void) {
     kept = 0;
 }
 
+/* The Testimony label (OAM 57, a 64x32 sprite at the top left during a testimony): the DS
+   lettering fills its sprite edge to edge, where the Japanese 証言中 had a margin, so the
+   sprite sits 3 pixels in from the corner.  Called where the game places it (0x0800e97c,
+   after it has stored attribute 0; the hook stores attribute 1 with the x). */
+void label_pos(void) {
+    volatile u16* oam = (volatile u16*)0x03002ba0;
+    oam[57 * 4 + 0] = 0x4000 | 2;
+}
+
 void _start(void) {}
