@@ -137,15 +137,15 @@ stopped on again from the records. Two things change in the English build:
   the words are not there any more, it takes the nearest place with the command the game
   stopped on when that is a page end or a choice (`TXT+8`), then the old offset if it is still
   on a token boundary, and as a last resort the start of the section.
-* **The page.** The English text is on the canvas (and the choice options in OBJ tiles), which
-  the save does not keep, and the records are empty. When the game stopped on a page end
-  (`0x02`, `0x2d`), a choice (`0x08`–`0x0a`), a statement (`0x15`) or the Court Record opened to
-  present (`0x21`), `vwf_resume` finds the page (from the last page end before the pointer,
-  with the colour and layout commands before it), and the first frame that shows the box (or
-  the full-screen choice box) lays it out again: the text into the glyph log, drawn as a lost
-  page is once no other background uses the canvas tiles, and for a choice the question on the
-  canvas and the options after `0x07` as labels. A caption (`0x42 0`) is left to the engine,
-  which draws it again every frame.
+* **The page.** The English text is in OBJ tiles (the page as sprite text, or a question on the
+  canvas with the options as sprite text), which the save does not keep, and the records are
+  empty. When the game stopped on a page end (`0x02`, `0x2d`), a choice (`0x08`–`0x0a`), a
+  statement (`0x15`) or the Court Record opened to present (`0x21`), `vwf_resume` finds the
+  page (from the last page end before the pointer, with the colour and layout commands before
+  it), and the first frame that shows the box (or the full-screen choice box) lays it out
+  again: the page as sprite text, or for a choice the question on the canvas and the options
+  after `0x07` as labels. A caption (`0x42 0`) is left to the engine, which draws it again
+  every frame.
 
 ## Cross-examination statements
 
@@ -225,10 +225,10 @@ the old font area.
 
 | Site | Patch |
 | --- | --- |
-| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw; the VWF keeps a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 14–19 and blits 1-bit glyph rows at a pixel pen |
+| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw: 1-bit glyph rows blitted at a pixel pen. The page is sprite text like the original's — three lines of eight 32×16 cells, OAM 3–26, OBJ tiles `0x00`–`0x7f`, `0xc0`–`0xf7` and `0x198`–`0x19f` (around the item shown in court at `0x80`–`0xbf`, the continue arrow at `0xf8` and the choice cursor at `0xfc`), the engine's sprite-text palette (OBJ palette 0: white 3, orange 6, blue 9, green 12, greys 2 / 14 / 1 for a line trailing off), shown while the box is open, under the Court Record's panel too. The box behind it is the engine's own (BG1, blended with the scene: text on it would take the scene's colour, and the original's never does, being sprites). A page that ends in a choice (`0x07`) is the exception: its question goes on a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 14–19, so that it can move to the top rows when the box grows while the options take the sprite cells |
 | dispatch entry 1 (`0x08163b00`) | trampoline: `vwf_newline`, then the original handler `0x0802172d` |
 | `0x08021ab0`, `0x08022622`, `0x0801fc00`, `0x0801fa6c` | call `vwf_clear` before the original instructions |
-| `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: remaps the canvas, handles caption / choice sprites, and clears the arrow cells (row 19, columns 14–15) that the engine writes after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
+| `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: places the page's sprite cells (or remaps the question canvas), handles caption / choice sprites, puts the box's bottom edge back where the engine writes its own arrow cells (row 19, columns 14–15: the English arrow is a sprite at the right) and clears them after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
 | `0x0801f960` | `bl` to a trampoline: the wait before the next character from `text_pace` (the DS English pace) |
 | `0x0801f9b0` | `bl` to a trampoline that calls `text_blip` (the DS English blips, on every row), then back to the loop |
 | `0x0803b844` | template rewritten to a three-line box: rows 13–19 = top edge, 5 interior rows, bottom |
@@ -236,7 +236,7 @@ the old font area.
 | `0x08006678`, `0x0800667c` | name tag one row up (`0x030023c0`, `0x03002340`) |
 | `0x0800658c`, `0x08006596` | `0xc0 → 0xb0`: a line with no name tag puts the template back from row 11 |
 | `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 11–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |
-| BG tiles `0xe0`–`0x193` | the canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the page again from a log of the glyphs blitted since the last clear: while the Court Record is open (`SYS+8` = 7) as sprite text cell for cell over the box's rows, as the original keeps its page in view under the panel, and on the canvas again once no background uses those tiles any more |
+| BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
 | `0x0800dcd4` (continuing a save; `patches/script.py`) | `script_resume`, `vwf_restore`, `0x08020024`, `vwf_resume` (see "Continuing a saved game") |
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |

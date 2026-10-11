@@ -1,10 +1,14 @@
 /* Variable-width font renderer for the text engine.
  *
- * Main window: the original engine drew one 16x16 sprite per character cell.  We keep a
- * 30x6-tile canvas in BG char block 0 (tiles CV_TILE0..) mapped onto BG1 rows
- * CV_MAPROW..+5 (the inside of the text box) and blit 1bpp glyphs at a pixel pen.
- * Choice menus: the box grows to full screen; the question canvas is re-mapped to the top
- * rows and the option labels are rendered into 16x16 sprite cells in OBJ VRAM.
+ * Main window: the original engine draws one 16x16 sprite per character cell.  The English
+ * page is sprite text too, blitted at a pixel pen into 32x16 sprite cells (three lines of eight,
+ * OAM 3-26, the engine's own sprite-text palette): the box behind it is the engine's own, the
+ * text keeps its colours (the box blends with the scene; sprites do not), and it stays in view
+ * under the Court Record as the original's does.
+ * Choice menus: the page that asks the question is drawn on a 30x6-tile canvas in BG char
+ * block 0 (tiles CV_TILE0..) mapped onto BG1 rows CV_MAPROW..+5 instead, so that when the box
+ * grows to full screen the question can move to the top rows while the options take the sprite
+ * cells.
  */
 #include "gba.h"
 #include "font.h"   /* generated: font_rows[], font_w[], expand_lut[], cmd_args[] */
@@ -29,11 +33,18 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 
-/* choice-menu labels: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00..0xbf */
+/* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in the OBJ tiles the game leaves
+   free in every scene: 0x00-0x7f, 0xc0-0xf7 and 0x198-0x19f (0x80-0xbf carry the item shown in
+   court, OAM 65; 0xf8-0xf9 the continue arrow; 0xfc-0xff the choice cursor, OAM 57; 0x1a0 on
+   the Court Record's) */
 #define LBL_X0     24
 #define LBL_CELLS  8
 #define LBL_CELLW  32
 #define LBL_LINES  3
+static u32 lbl_tile(int L, int cell) {
+    if (L == 2) return cell == 7 ? 0x198 : 0xc0 + cell * 8;
+    return L * 0x40 + cell * 8;
+}
 /* OAM entries of each line's cells: 3-26, within the entries 2-33 the engine's own sprite text
    takes.  They must come before the scene's sprites (the defence bench is in 48-51, at
    priority 3): the hardware draws an earlier, lower-priority sprite that overlaps a later,
@@ -79,18 +90,18 @@ struct vwf_state {
     s16 line_x0;        /* where the line starts: centred lines (command 0x5d 1) further in */
     u8 blip_n, blip_mode;     /* text blips (text_blip) */
     u8 q_noedge;        /* the canvas's bottom edge is taken out for the choice box (frame_bottom) */
-    u8 lbl_shadow;      /* the lost page shown as sprite text in the box (the Court Record is open) */
+    u8 mode;            /* the page being typed: 0 none yet, 1 on the canvas (it ends in a choice),
+                           2 sprite text in the box (box_glyph) */
     u8 lbl_base;        /* a choice: the engine's row of the first option (see label_draw_char) */
 };
 static struct vwf_state vs;
 
-/* Every glyph blitted onto the canvas since it was last cleared, so that the page can be drawn
-   again: the Court Record's slide between items copies its panel into BG tiles 0xa0-0x17f,
-   which are the canvas's (BG char block 0 has no room for both). */
+/* Every glyph blitted onto the canvas since it was last cleared, so that the question can be
+   drawn again: the Court Record's slide between items copies its panel into BG tiles
+   0xa0-0x17f, which are the canvas's (BG char block 0 has no room for both). */
 #define GLOG_MAX   192
 static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 */
 #define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
-#define MODE_RECORD 7       /* SYS+8 while the Court Record is open */
 
 /* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too.
    They live in BG palette 0 entries 13-15 only while the page is mapped; the UI palette's own
@@ -149,8 +160,7 @@ static volatile u32* canvas_rowptr(int tx, int ty, int r) {
 
 static volatile u32* label_rowptr(int tx, int ty, int r) {
     if (tx < 0 || tx >= LBL_CELLS * 4 || ty >= LBL_LINES * 2) return 0;
-    int cell = (ty >> 1) * LBL_CELLS + (tx >> 2);
-    int tile = cell * 8 + (ty & 1) * 4 + (tx & 3);       /* 1D mapping: a 32x16 sprite's tiles */
+    int tile = lbl_tile(ty >> 1, tx >> 2) + (ty & 1) * 4 + (tx & 3);   /* 1D mapping: a 32x16 sprite's tiles */
     return (volatile u32*)(0x06010000 + tile * 32 + r * 4);
 }
 
@@ -327,8 +337,11 @@ static int measure_line(const u16* p) {
 
 /* ---------------------------------------------------------------- choice labels */
 static void labels_reset(void) {
-    volatile u32* p = (volatile u32*)0x06010000;
-    for (int i = 0; i < LBL_LINES * LBL_CELLS * 64; i++) p[i] = 0;
+    for (int L = 0; L < LBL_LINES; L++)
+        for (int c = 0; c < LBL_CELLS; c++) {
+            volatile u32* p = (volatile u32*)(0x06010000 + lbl_tile(L, c) * 32);
+            for (int i = 0; i < 64; i++) p[i] = 0;
+        }
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     vs.lbl_pen = 0; vs.lbl_line = 0;
 }
@@ -408,9 +421,9 @@ static void labels_oam(void) {
         /* a choice's options: the rows the engine's cursor is placed on, 18 px apart from
            y 18, after the question's lines and a blank row (lbl_row0 is the first option's) */
         int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
-        if (vs.lbl_shadow) {
-            /* the page as the canvas showed it: cell for cell over the box's text rows */
-            x = 0; y = CV_MAPROW * 8 + L * 16; ncells = LBL_CELLS;
+        if (vs.mode == 2) {
+            /* the page in the box: the cells cover its text rows from the left edge */
+            x = 0; y = CV_MAPROW * 8 + L * LINE_H;
         } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
@@ -444,7 +457,7 @@ static void labels_oam(void) {
             OAMBUF[obj * 4 + 1] = ((x + c * LBL_CELLW) & 0x1ff) | (2 << 14);
             /* priority 1 like the engine's own sprite text: under the Court Record's panel
                (BG2, priority 0), as a choice's options are in the original */
-            OAMBUF[obj * 4 + 2] = (L * LBL_CELLS + c) * 8 | (1 << 10) | (0 << 12);
+            OAMBUF[obj * 4 + 2] = lbl_tile(L, c) | (1 << 10) | (0 << 12);
         }
         vs.lbl_used[L] = ncells;
     }
@@ -506,12 +519,17 @@ static int box_moving(void) {
 
 static void canvas_glyph(u32 code, u32 col, int blit);
 
+static int page_has_choice(const u16* p);
+static void box_glyph(u32 code, u32 col);
+
 /* Replaces the engine's cell draw: r0 = code-0x80, r1 = col, r2 = row. */
 void vwf_draw_char(u32 code80, u32 col, u32 row) {
     u32 code = code80 + 0x80;
     if ((vs.lbl_row0 >= 0 && vs.lbl_caption) || (SYS_CAPTION & 4) || fullscreen_box()) {
         label_draw_char(code, col, row); return;
     }
+    if (!vs.mode) vs.mode = page_has_choice((const u16*)TXT_PTR) ? 1 : 2;
+    if (vs.mode == 2) { box_glyph(code, col); return; }
     if (!vs.mapped) {
         if (vs.lost) { canvas_redraw(); vs.lost = 0; }
         else canvas_reset();
@@ -519,6 +537,20 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
     }
     else if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
     canvas_glyph(code, col, 1);
+}
+
+/* Does the page lead to a choice (command 0x07) before it ends?  Its question is drawn on the
+   canvas, which can move to the top of the full-screen box. */
+static int page_has_choice(const u16* p) {
+    for (int n = 0; n < 1024; n++) {
+        u32 t = *p++;
+        if (t >= 0x80) continue;
+        if (t == 0x07) return 1;
+        if (t == 0x00 || t == 0x02 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
+            t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) return 0;
+        p += cmd_args[t];
+    }
+    return 0;
 }
 
 /* Does the page end in command 0x15 (the text stays up while the game waits: a cross-examination
@@ -578,6 +610,48 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
     vs.pen_x += adv;
 }
 
+/* The same character as sprite text in the box (the page is not a choice's question): the
+   engine's sprite-text palette, white 3 and the colours at 6, 9 and 12, greys 2, 14 and 1 for
+   a line trailing off. */
+static void box_glyph(u32 code, u32 col) {
+    int gi = glyph_index(code);
+    if (vs.pen_x == 0) {
+        if (vs.line == 0) {
+            labels_reset();
+            vs.inset = page_is_statement((const u16*)TXT_PTR);
+        }
+        int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
+        int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
+        vs.squeeze = 0;
+        if (w > maxw) vs.squeeze = 1;
+        if (w - 24 > maxw) vs.squeeze = 2;
+        vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (maxw - w) / 2 : 0;
+    }
+    int L = vs.line;
+    if (L >= MAX_LINES) L = MAX_LINES - 1;
+    int x = (vs.inset ? STMT_X0 : TEXT_X0) + vs.line_x0 + vs.pen_x;
+    if (x > 240 - 4) return;
+    u32 c = lbl_colour(text_colors[TXT_COLOR & 0xf]);
+    int draw = code != 0x17f;
+    if (TXT_ALIGN & 0x20) {
+        static const u8 fade_end[5] = {8, 16, 22, 28, 32};
+        static const u8 fade_col[5] = {0, 2, 14, 14, 1};
+        int k = 0;
+        while (k < 5 && col >= fade_end[k]) k++;
+        if (k == 5) draw = 0;
+        else if (k) c = fade_col[k];
+    }
+    if (draw) {
+        blit_to(gi, x, L * LINE_H, c, label_rowptr);
+        int right = x + font_w[gi];
+        if (right > 255) right = 255;
+        if (right > vs.lbl_width[L]) vs.lbl_width[L] = right;
+    }
+    int adv = font_w[gi] - vs.squeeze;
+    if (adv < 1) adv = 1;
+    vs.pen_x += adv;
+}
+
 /* ---------------------------------------------------------------- pace and text blips */
 /* The DS's English text runs faster than its Japanese: the speed of command 0x0b (frames a
    character) goes through a table first (0x020ac050), and the speaker's blip comes on every
@@ -628,6 +702,7 @@ void vwf_clear(void) {
     vs.lost = 0;
     vs.resume = 0;
     vs.inset = 0;
+    vs.mode = 0;
 }
 
 /* ---------------------------------------------------------------- continuing a saved game */
@@ -686,7 +761,7 @@ static void resume_replay(int choice) {
     u32 ptr = TXT_PTR;
     u8 colour = TXT_COLOR, align = TXT_ALIGN;
     vs.pen_x = 0; vs.line = 0; vs.squeeze = 0; vs.inset = 0;
-    vs.lbl_row0 = -1;
+    vs.lbl_row0 = -1; vs.mode = 0;
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     vs.glog_n = 0; vs.lost = 0;
     if (choice) canvas_tiles();
@@ -699,7 +774,8 @@ static void resume_replay(int choice) {
             if (caption) continue;
             TXT_PTR = (u32)p;
             if (labels) label_draw_char(t, col, row);
-            else canvas_glyph(t, col, choice);
+            else if (choice) canvas_glyph(t, col, 1);
+            else box_glyph(t, col);
             col++;
             continue;
         }
@@ -711,8 +787,8 @@ static void resume_replay(int choice) {
         p += cmd_args[t];
     }
     TXT_PTR = ptr; TXT_COLOR = colour; TXT_ALIGN = align;
-    if (choice) vs.mapped = 1;          /* choice_frame shows the question at the top */
-    else { canvas_unmap(); vs.lost = 1; }
+    if (choice) { vs.mode = 1; vs.mapped = 1; }     /* choice_frame shows the question at the top */
+    else vs.mode = 2;
 }
 
 static void resume_frame(void) {
@@ -732,32 +808,18 @@ void vwf_frame(void) {
         if (vs.mapped) choice_frame();
         return;
     }
-    /* the box text's colours, kept in BG palette 0 against the scene's palette loads */
+    /* the question canvas's colours, kept in BG palette 0 against the scene's palette loads */
     if (vs.mapped) text_colours(1);
-    if (vs.lost && vs.lbl_shadow && SYS[8] == MODE_RECORD && box_open()) {
-        labels_oam();                     /* the page stays up under the Court Record's panel */
-    } else {
-        labels_hide();
-        vs.lbl_shadow = 0;
-    }
+    /* the page in the box is sprite text: shown while the box is (under the Court Record's
+       panel too, as the original keeps it), gone with it */
+    if (vs.mode == 2 && box_open()) labels_oam();
+    else labels_hide();
     vs.lbl_row0 = -1;
     if (vs.mapped && box_moving()) return;
     if (vs.lost) {
         /* the box is still there (its top edge) and nothing shows the canvas tiles any more */
         if ((BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {
-            labels_hide(); vs.lbl_shadow = 0;
             canvas_redraw(); canvas_map(); vs.lost = 0;
-        } else if (!vs.lbl_shadow && SYS[8] == MODE_RECORD && box_open()) {
-            /* The Court Record copies its panel into the canvas's tiles (char block 0 has no
-               room for both) and the original keeps the page in view under the panel: draw the
-               page again as sprite text, cell for cell where the canvas was. */
-            labels_reset();
-            for (int i = 0; i < vs.glog_n; i++) {
-                u32 g = glog[i];
-                blit_to(g & 0x1ff, (g >> 9) & 0xff, (g >> 17) & 0x3f, lbl_colour(g >> 23), label_rowptr);
-            }
-            vs.lbl_shadow = 1;
-            labels_oam();
         }
         return;
     }
@@ -776,22 +838,31 @@ void vwf_frame(void) {
         }
         return;
     }
-    if (!vs.mapped) return;
+    if (!vs.mapped && vs.mode != 2) return;
+    /* the engine's arrow is BG tiles 0x24/0x25 in row 19, columns 14-15 (0x09: the plain bottom
+       edge): ours is a sprite at the right, and those cells show the box's bottom edge */
     u32 e = BG1MAP[(CV_MAPROW + 5) * 32 + 14] & 0x3ff;
     if (e == 0x24) vs.arrow_on = 1;
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;
-    if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
-    else if (e != (u32)(CV_TILE0 + 5 * CV_COLS + 14)) {
-        BG1MAP[(CV_MAPROW + 5) * 32 + 14] = CV_TILE0 + 5 * CV_COLS + 14;
-        BG1MAP[(CV_MAPROW + 5) * 32 + 15] = CV_TILE0 + 5 * CV_COLS + 15;
+    if (vs.mapped) {
+        if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+        else if (e != (u32)(CV_TILE0 + 5 * CV_COLS + 14)) {
+            BG1MAP[(CV_MAPROW + 5) * 32 + 14] = CV_TILE0 + 5 * CV_COLS + 14;
+            BG1MAP[(CV_MAPROW + 5) * 32 + 15] = CV_TILE0 + 5 * CV_COLS + 15;
+            SYS_BGDIRTY |= 2;
+        }
+    } else if (e == 0x24 || e == 0x25) {
+        BG1MAP[(CV_MAPROW + 5) * 32 + 14] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 14];
+        BG1MAP[(CV_MAPROW + 5) * 32 + 15] = BOX_TEMPLATE[(CV_MAPROW + 5) * 32 + 15];
         SYS_BGDIRTY |= 2;
+        arrow_load();
     }
     if (vs.arrow_on) {
         OAMBUF[ARROW_OBJ * 4 + 0] = 150 | (1 << 14);          /* y, wide shape, 4bpp */
         OAMBUF[ARROW_OBJ * 4 + 1] = 222 | (0 << 14);          /* x, size 0 -> 16x8 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
     }
-    canvas_check();
+    if (vs.mapped) canvas_check();
 }
 
 /* Called before 0x08020024, which redraws the text sprites from the saved sprite records when
@@ -808,6 +879,7 @@ void vwf_boxclear(void) {
     for (int i = 11 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
+    vs.mode = 0;
 }
 
 void _start(void) {}

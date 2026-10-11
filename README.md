@@ -105,6 +105,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.0 — the page in the text box is sprite text, as the original's is: the box is a
+  background layer blended with the scene, so text drawn on it took on the scene's colour (the
+  orange, blue and green came out different in every room, and the white a little different
+  from the Japanese game's); as sprites, in the engine's own text palette, the colours are the
+  Japanese and DS values exactly, and the page stays in view under the Court Record by itself
+  (the redraw-after-the-Record machinery and its glitches are gone with it). The question of a
+  choice is the one page still drawn on the background, so that it can move to the top of the
+  full-screen box.
 * 0.15.15 — the direction the DS added is in: its three extra screen shakes, a flash, eleven
   sprite animations, seven moments an item is shown in court while it is talked about, and ten
   short waits (25 in all; the GBA's own direction was already the backbone, and the sounds are
