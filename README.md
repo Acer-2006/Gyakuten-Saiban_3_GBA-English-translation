@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.14 — the name tag still lost its top row whenever an item shown in court was taken down
+  or replaced: the box's erase cleared ten rows from the old row, the last of them the tag's.
+  The erase and the right-hand item box move up with the box.
 * 0.16.13 — 0.16.12 moved the item's box up but not the picture in it on the path that places
   it every frame, so the picture hung out of its box by a row. Both sites now place it.
 * 0.16.12 — the item shown in court cut the name tag in half: its box on the background ended
