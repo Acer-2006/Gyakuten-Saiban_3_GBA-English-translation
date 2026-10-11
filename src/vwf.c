@@ -520,11 +520,27 @@ static void canvas_glyph(u32 code, u32 col, int blit);
 static int page_has_choice(const u16* p);
 static void box_glyph(u32 code, u32 col);
 
+/* The common bank's system messages (the save and continue screens' prompts, the chapter
+   names): the engine places their sprite text 64 pixels up, for the box of those screens.
+   Dispatched with no such screen up (the chapter name is run through the text engine when the
+   game saves at the start of a testimony), they must not land on the page in the box. */
+static int sys_text(void) {
+    u32 sec = TXT_SECTION;
+    return sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31);
+}
+
 /* Replaces the engine's cell draw: r0 = code-0x80, r1 = col, r2 = row. */
 void vwf_draw_char(u32 code80, u32 col, u32 row) {
     u32 code = code80 + 0x80;
     if ((vs.lbl_row0 >= 0 && vs.lbl_caption) || (SYS_CAPTION & 4) || fullscreen_box()) {
         label_draw_char(code, col, row); return;
+    }
+    if (sys_text()) return;
+    /* the engine's own cell counters start a page over at (0, 0): a page started again with no
+       clear in between (its text in the original's records is replaced too) starts ours over */
+    if (col == 0 && row == 0 && (vs.pen_x || vs.line)) {
+        vs.pen_x = 0; vs.line = 0; vs.squeeze = 0; vs.inset = 0; vs.mode = 0;
+        canvas_reset();
     }
     if (!vs.mode) {
         vs.mode = page_has_choice((const u16*)TXT_PTR) ? 1 : 2;
@@ -686,6 +702,7 @@ u32 text_blip(u32 n) {
 }
 
 void vwf_newline(void) {
+    if (sys_text() && !(SYS_CAPTION & 4) && !fullscreen_box()) return;   /* see vwf_draw_char */
     vs.pen_x = 0;
     if (vs.line < 255) vs.line++;
 }

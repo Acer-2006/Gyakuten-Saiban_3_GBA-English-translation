@@ -105,6 +105,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.4 — text drawn over a page in the box during a testimony (the chapter's name, "Turnabout
+  Memories / Part 1-2", on top of Dahlia's statement): the game runs the common bank's system
+  messages (the chapter names, the save prompts) through the text engine when it saves at the
+  start of a testimony, and the English build drew them on the page; they are left out unless
+  a save or continue screen is up. A page the engine starts over without clearing (its own
+  cell counters back at 0, 0) now starts ours over too, so two pages can no longer overlap.
 * 0.16.3 — the Testimony label in the top left corner sits three pixels in from the edge (the
   DS lettering fills its sprite edge to edge, where the Japanese 証言中 had a margin, so it
   looked cut off against the corner).
