@@ -36,6 +36,8 @@
 /* continue arrow sprite */
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
+#define ARROW_X     229       /* at rest: the tip 2 pixels inside the box's right edge, as the DS's */
+#define ARROW_Y     149       /* the third line's rows, as the DS's sits on its third line */
 
 /* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00-0xbf.  The
    original's two lines take 0x00-0x7f and the item shown in court 0x80-0xbf: patches/icons.py
@@ -95,6 +97,7 @@ struct vwf_state {
                            2 sprite text in the box (box_glyph) */
     u8 lbl_base;        /* a choice: the engine's row of the first option (see label_draw_char) */
     u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
+    u8 arrow_t;         /* frames the DS-style arrow has been up (its slide) */
 };
 static struct vwf_state vs;
 
@@ -140,10 +143,6 @@ static const u32 frame_tiles[7][8] = {
     {0x32111111, 0x32111111, 0x32111111, 0x32111111, 0x32111111, 0x32111111, 0x32111111, 0x32111111}, /* 4 right */
     {0x33333333, 0x22222222, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111}, /* 5 top */
     {0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x22222222, 0x33333333}, /* 6 bottom */
-};
-static const u32 arrow_tiles[2][8] = {   /* original tiles 0x24/0x25, white (8) only */
-    {0x00000000, 0x00000000, 0x88888000, 0x88880000, 0x88800000, 0x88000000, 0x80000000, 0x00000000},
-    {0x00000000, 0x00000000, 0x00088888, 0x00008888, 0x00000888, 0x00000088, 0x00000008, 0x00000000},
 };
 
 /* ---------------------------------------------------------------- glyph blitting */
@@ -239,9 +238,21 @@ static void canvas_reset(void) {
     vs.glog_n = 0;
 }
 
+/* The DS's page arrow: a solid white triangle pointing right, 9 pixels wide and high, at the
+   right of the third line; it slides a pixel at a time, three frames a step, from one pixel
+   right of its rest to two pixels left and back (an 18-frame cycle).  The original's is a
+   10x5 triangle pointing down in the box's bottom edge, bobbing.  A 16x16 sprite, tiles
+   0xf8-0xfb, OBJ palette 2 entry 8 (white). */
 static void arrow_load(void) {
     volatile u32* d = (volatile u32*)(0x06010000 + ARROW_TILE * 32);
-    for (int i = 0; i < 8; i++) { d[i] = arrow_tiles[0][i]; d[8 + i] = arrow_tiles[1][i]; }
+    for (int t = 0; t < 4; t++)
+        for (int r = 0; r < 8; r++) {
+            int y = (t >> 1) * 8 + r, x0 = (t & 1) * 8;
+            int w = y < 9 ? (y <= 4 ? 2 * y + 1 : 17 - 2 * y) : 0;   /* 1, 3, 5, 7, 9, 7, 5, 3, 1 */
+            u32 row = 0;
+            for (int x = 0; x < 8; x++) if (x0 + x < w) row |= 8u << (4 * x);
+            d[t * 8 + r] = row;
+        }
 }
 
 /* Choice menus grow the box to the whole screen: its top-left corner tile sits at row 0. */
@@ -881,10 +892,13 @@ void vwf_frame(void) {
         arrow_load();
     }
     if (vs.arrow_on) {
-        OAMBUF[ARROW_OBJ * 4 + 0] = (148 + vs.arrow_y) | (1 << 14);   /* y, wide shape, 4bpp */
-        OAMBUF[ARROW_OBJ * 4 + 1] = 222 | (0 << 14);          /* x, size 0 -> 16x8 */
+        static const s8 slide[6] = {0, 1, 0, -1, -2, -1};
+        int x = ARROW_X + slide[(vs.arrow_t / 3) % 6];
+        vs.arrow_t++;
+        OAMBUF[ARROW_OBJ * 4 + 0] = ARROW_Y | (0 << 14);      /* y, square shape, 4bpp */
+        OAMBUF[ARROW_OBJ * 4 + 1] = (x & 0x1ff) | (1 << 14);  /* x, size 1 -> 16x16 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
-    }
+    } else vs.arrow_t = 0;
     if (vs.mapped) canvas_check();
 }
 

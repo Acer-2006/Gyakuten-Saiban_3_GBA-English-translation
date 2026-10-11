@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.7 — the page arrow is the DS's: a white triangle pointing right at the end of the
+  third line, sliding sideways as it does there (measured frame by frame on the DS), in place
+  of the GBA's down-pointing triangle bobbing in the box's bottom edge.
 * 0.16.6 — the text sits in the box as on the DS: lines start 8 pixels inside it (they
   started at 2, against the frame), measured against the DS running in an emulator; the
   glyphs, widths and line breaks were already the DS's. The GBA box is 16 pixels narrower, so
