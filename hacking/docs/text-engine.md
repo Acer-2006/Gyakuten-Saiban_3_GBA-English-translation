@@ -103,7 +103,11 @@ English build's sprite text uses the same priority. The Record's button row (R P
 B Back) is sprites at y 96 (painted rows 97–109), on the original's name tag, above its text at
 y 116; the English page starts at y 102, so while the Record is open (game mode 7, `SYS+8`)
 `vwf.c` puts the page's lines 8 px lower (line 1 at 110, line 3's descenders at 155, above the
-box's bottom edge). Where the engine puts them:
+box's bottom edge). The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
+on screen whose sprites start below `0x2c0` (the loader's test at `0x08014dca`; Armando's start at
+`0x284`) to `0x80` (`0x08014ddc`, attribute at `0x08014e9a`): the original's spare tiles of the item
+shown in court, the third line's here. While it is there `vwf_frame` hides the third line, and
+when the Record has closed it draws the page again (`vwf_resume`). Where the engine puts them:
 
 * normally y + 116 and x + 9 (the box rows);
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system

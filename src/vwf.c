@@ -108,6 +108,7 @@ struct vwf_state {
     u8 arrow_t;         /* frames the DS-style arrow has been up (its slide) */
     u8 overlay;         /* the save screen is up over the game: nothing of the page is shown */
     volatile u32* ds_cell;   /* the data screen: tiles of the 16x16 sprite being drawn into */
+    u8 l3_lent;         /* the Court Record has put its picture in line 3's tiles (record_borrows) */
 };
 static struct vwf_state vs;
 
@@ -432,6 +433,19 @@ static void labels_hide(void) {
     vs.lbl_shown = 0;
 }
 
+/* The Court Record's picture (OAM 34, 64x64) goes to OBJ tile 0x280, or, with a large character
+   on screen whose sprites start below 0x2c0 (0x08014dca: Armando's from 0x284), to 0x80
+   (0x08014ddc, 0x08014e9a): in the original the spare tiles of the item shown in court, here the
+   third line's.  While it is there the third line is not shown (it would be the picture's tiles in
+   the text's colours), and once the Record has closed the page is drawn again (vwf_resume). */
+static int record_borrows(void) {
+    if (SYS[8] != MODE_RECORD) return 0;
+    /* the loader's own test (the first animation's state), true from the frame the picture is copied */
+    if ((*(volatile u32*)0x03000850 & 0xffffff) == 0x800ff && (*(volatile u32*)0x03000844 & 0x10000000)) return 1;
+    u32 a0 = OAMBUF[34 * 4], t = OAMBUF[34 * 4 + 2] & 0x3ff;
+    return (a0 & 0x300) != 0x200 && t >= 0x80 && t < 0xc0;
+}
+
 static void labels_oam(void) {
     /* the engine's sprite-text writer shows nothing while SYS+0x19 is 0 (the episode select
        clears it as soon as an episode is picked, with its prompt still on the page) */
@@ -473,6 +487,7 @@ static void labels_oam(void) {
             }
             if (x < 0) x = 0;
         }
+        if (L == 2 && vs.l3_lent) ncells = 0;
         for (int c = 0; c < LBL_CELLS; c++) {
             int obj = lbl_obj0[L] + c;
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
@@ -745,6 +760,7 @@ void vwf_clear(void) {
     vs.resume = 0;
     vs.inset = 0;
     vs.mode = 0;
+    vs.l3_lent = 0;
 }
 
 /* ---------------------------------------------------------------- continuing a saved game */
@@ -866,6 +882,8 @@ static void resume_frame(void) {
 /* Per frame (before the BG map / OAM DMA). */
 void vwf_frame(void) {
     if (vs.overlay) { labels_hide(); return; }
+    if (record_borrows()) { if (vs.lbl_width[2]) vs.l3_lent = 1; }
+    else if (vs.l3_lent && SYS[8] != MODE_RECORD) { vs.l3_lent = 0; vwf_resume(); }
     if (vs.resume) resume_frame();
     if (vs.lbl_row0 >= 0 && vs.lbl_caption) { labels_oam(); return; }
     if (fullscreen_box()) {

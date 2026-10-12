@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.20 — opening the Court Record with certain large characters on screen (Armando, for
+  one) turned the page's third line into coloured blocks, which stayed after the Record closed:
+  the Record puts its picture in the original's spare tiles there, which are the third line's
+  in this build. The third line now steps aside while the Record has them and the page is drawn
+  again when it closes.
 * 0.16.19 — episode 4 froze on a black screen at its first data screen (the escaped convict's
   file), whose two pages were also unreadable: the screen draws one sprite per character from
   the Japanese font, and the English pages ran it past the end of the sprite table into the
