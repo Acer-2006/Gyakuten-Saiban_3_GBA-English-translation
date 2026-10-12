@@ -412,11 +412,19 @@ Psyche-Lock, the bubble goes to OBJ tile `0x100`.)
 The DS keeps its English bubbles in `data.bin` in the same formats: frame data at `0x7228f8`
 (Objection!), `0x72b1f8` (Hold it!) and `0x733738` (Take that!), one list of twelve 64×64 sprites
 covering 256×192, followed by the sub-archive (one palette). The English build
-(`patches/shouts.py`) shrinks each picture to 144×108 (area average, `tools/dspic.py`), maps the
-colours back to the DS palette, covers the 8×8 tiles that have something in them with as few
-sprites as it finds within the 216 tiles (16–24 sprites, so it raises the sprite count in the
-entries' flags), and writes a new sub-archive and frame data for each bubble with the original
-timing. The anchors at x 45 / 190 move to 72 / 168 so the bubble stays on screen. Presenting
+(`patches/shouts.py`) shrinks each picture to half size, 128×96 (area average,
+`tools/dspic.py`), maps the colours back to the DS palette, and writes a new sub-archive and
+frame data for each bubble with the original timing: four sprites (two 64×64 over two 64×32),
+192 of the 216 tiles. The anchors at x 45 / 190 move to 64 / 176 so the bubble stays on screen.
+
+The sprite count must not go above the original's seven. The animation renderer (`0x08017cc8`)
+gives every animation on screen OAM entries from 127 downwards, with no lower limit, while the
+life bar writes fixed entries 61–70 (`0x0801d610`: the fill, affine, at OBJ tile `0xc4`, the frame
+at `0xd0`–`0xdf`); the cells of a busy scene (a witness, her effects, a bubble) come to about 53
+in the original, ending at entry 75. An earlier English bubble, 144×108 covered with as few
+sprites as fit the 216 tiles, took 16–24 sprites and ran down to entry 64: while it was up the
+bar lost its frame and its end. The build refuses a bubble with more sprites than the
+original's. Presenting
 evidence from the Court Record starts effect 4 (Take that!, `0x08013488`) or 2 (Objection!,
 `0x080134ca`), and the item's icon shows at the top middle of the screen and spins away: the
 tall Japanese bubbles at x 45 left room for it, the wide English ones are under it for about

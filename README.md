@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.16 — the life bar lost its frame and its end while an Objection! / Hold it! / Take that!
+  bubble was up (presenting the wrong evidence, among others). The English bubbles took 16–24
+  sprites to the original's 7, and the game hands sprites to animations from the top of the
+  list down with no limit, so they ran into the bar's. The bubbles are now half the DS picture,
+  128×96, in four sprites; the bar is whole as in the original.
 * 0.16.15 — the top edge of an item's box stayed on screen (a row of pale frame tiles along the
   top of the scene) after the item was taken down with a scene change: a second, inline clear
   of the box's rows still started at the old row. It starts at row 0 now, with the box.

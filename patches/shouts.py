@@ -7,10 +7,18 @@ seven sprites each, a 96x144 bubble with the words written downwards, in 216 OBJ
 
 The DS keeps its English bubbles in data.bin in the same formats: frame data, then its
 sub-archive, a 256x192 picture as twelve 64x64 cells with one palette.  The build shrinks each
-one to 144x108 (area average), maps the colours back to the DS palette, covers the 8x8 tiles that
-have something in them with as few sprites as it finds within the 216 tiles, and writes a new
-sub-archive and frame data for each bubble with the original timing.  The effects anchored at
-the screen edges (x 45 and 190) move in so the bubble stays on screen.
+one to half size, 128x96 (area average), maps the colours back to the DS palette, and writes a
+new sub-archive and frame data for each bubble with the original timing: four sprites (two
+64x64 over two 64x32), 192 of the 216 tiles.  The effects anchored at the screen edges (x 45 and
+190) move in so the bubble stays on screen.
+
+The sprite count matters more than the tiles.  The animation renderer (0x08017cc8) hands out OAM
+entries from 127 downwards to every animation on screen, with no lower limit, and the life bar
+has fixed entries 61-70: the original's bubbles (seven sprites) leave room for it, and a bubble
+with more sprites than that runs into the bar, which loses its frame and its end while the
+bubble is up.  An earlier 144x108 bubble covered with as few sprites as fit the 216 tiles took
+16-24 sprites and did exactly that; the build now refuses a bubble with more sprites than the
+original's.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -22,9 +30,12 @@ SHOUTS = [(0x086de558, 0x28e4, 0x7228f8, 'Objection!'),
           (0x086de590, 0x3c44, 0x72b1f8, 'Hold it!'),
           (0x086de5c8, 0x4e24, 0x733738, 'Take that!')]
 DS_W, DS_H = 256, 192
-SIZE = (144, 108)                    # 9/16 of the DS picture
+SIZE = (128, 96)                     # half the DS picture
 TILES = 216                          # the OBJ tiles the bubbles have
-EDGE_X = {45: 72, 190: 168}          # anchors at the screen edges, moved in
+# the sprites covering SIZE: whole 64x64 squares, then a row of 64x32 under them
+RECTS = [(x, y, 64, 64) for y in range(0, SIZE[1] - 63, 64) for x in range(0, SIZE[0], 64)] + \
+        [(x, SIZE[1] // 64 * 64, 64, 32) for x in range(0, SIZE[0], 64)]
+EDGE_X = {45: SIZE[0] // 2, 190: 240 - SIZE[0] // 2}   # anchors at the screen edges, moved in
 
 def ds_bubble(data, f, name):
     """-> (the 256x192 picture as rows of indices, its palette)"""
@@ -47,10 +58,15 @@ def apply(rom, ctx):
             raise SystemExit(f'shouts: unexpected frame data at {old_fp:#x}')
         px, pal = ds_bubble(ctx.data, ds_f, name)
         q = dspic.quantize(dspic.shrink(px, pal, *SIZE), pal, dspic.used_indices(px))
-        fit = dspic.cover(q, TILES)
-        if fit is None: raise SystemExit(f'shouts: {name} does not fit in {TILES} tiles')
-        dx, dy, rects = fit
-        g = dspic.grid(q, dx, dy, max(x + w for x, y, w, h in rects), max(y + h for x, y, w, h in rects))
+        dx = dy = 0; rects = RECTS
+        assert sum(w * h for x, y, w, h in rects) // 64 <= TILES
+        covered = sorted((tx, ty) for rx, ry, rw, rh in rects
+                         for tx in range(rx, rx + rw, 8) for ty in range(ry, ry + rh, 8))
+        assert covered == sorted((tx, ty) for tx in range(0, SIZE[0], 8) for ty in range(0, SIZE[1], 8))
+        orig = rom.u16(old_fp + rom.u16(old_fp + 8))       # sprites in the original's list
+        if len(rects) > orig:
+            raise SystemExit(f'shouts: {name} has {len(rects)} sprites, the original {orig} (see the notes above)')
+        g = dspic.grid(q, dx, dy, *SIZE)
         cells = [dspic.rle16(dspic.rows_to_tiles(g, x, y, w, h)) for x, y, w, h in rects]
         off = len(archive)
         archive += dspic.write_sub(1, rom.u16(FX_ARCHIVE + sub + 2), [pal], cells)
