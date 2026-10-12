@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.18 — with the Court Record open over a page, its button row (Profiles / OK / Back) sat on
+  the page's first line, which could not be read (the original's text started lower). While the
+  Record is open the page's lines now sit 8 px lower, clear of the buttons.
 * 0.16.17 — a short pale strip (the top corners of an evidence box) stayed in the top-left or
   top-right corner after almost every item the script takes down: the last step of the box's
   closing animation cleared its smallest frame by hand at the box's old rows. It clears them a

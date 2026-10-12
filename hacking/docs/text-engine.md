@@ -99,7 +99,11 @@ the records into OAM entries 2, 3, ... every frame, unless `SYS+0x19` is 0: then
 entries 2–33 and the records stay as they are (the episode select clears the byte as soon as an
 episode is picked, with its prompt still on the page). The entries are at priority 1, under
 BG2: the Court Record's panel (priority 0) covers a choice's options while it is open, and the
-English build's sprite text uses the same priority. Where it puts them:
+English build's sprite text uses the same priority. The Record's button row (R Profiles, A OK,
+B Back) is sprites at y 96 (painted rows 97–109), on the original's name tag, above its text at
+y 116; the English page starts at y 102, so while the Record is open (game mode 7, `SYS+8`)
+`vwf.c` puts the page's lines 8 px lower (line 1 at 110, line 3's descenders at 155, above the
+box's bottom edge). Where the engine puts them:
 
 * normally y + 116 and x + 9 (the box rows);
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
