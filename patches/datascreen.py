@@ -11,6 +11,12 @@ the pieces into a sub-archive of their own (plus a plain 32x32 piece made of two
 lays the bars out again: the caps stay where they are, the lettering is centred between them.
 The new frame data replaces the old in place: a game saved while the bars are up keeps the
 address of their frames.
+
+The screen's two pages of text (common sections 0x31 and 0x32) are drawn by 0x0801ecd4, one
+16x16 sprite per character from the Japanese font, which the English build has filled with code:
+the English pages came out as garbage, and their length (three times the Japanese) ran the
+reveal past the end of OAM into the game's state.  Both calls go to vwf_data_text (src/vwf.c),
+which draws them in the English font, a few letters to a sprite.
 """
 import struct
 from .banners import rle16, unrle16, FX_ARCHIVE, effect_entries
@@ -23,6 +29,16 @@ TAB_FRAMES = [0x086e282c, 0x086e27d4, 0x086e2800]     # effects 71-73, to check 
 DS_CELLS = {0: (16, 32), 1: (16, 32), 2: (64, 32), 3: (64, 32), 4: (32, 32), 5: (64, 32),
             6: (64, 32), 7: (32, 32)}
 PLAIN = 8                         # the new cell: two plain pieces side by side
+DATA_TEXT = 0x0801ecd4
+DATA_TEXT_CALLS = (0x0802afd0, 0x0802b50e)          # bl 0x0801ecd4: page 1 (0x31), page 2 (0x32)
+
+def bl_target(rom, a):
+    h1, h2 = rom.u16(a), rom.u16(a + 2)
+    if h1 >> 11 != 0x1e or h2 >> 11 != 0x1f: return None
+    off = ((h1 & 0x7ff) << 12) | ((h2 & 0x7ff) << 1)
+    if off & 0x400000: off -= 0x800000
+    return a + 4 + off
+
 # the inside of each bar, between the caps at x -112 and 96: (x, w, cell); y and h as the caps
 BARS = {
     0x086e2768: [(-96, 32, PLAIN), (-64, 64, 2), (0, 64, 3), (64, 32, PLAIN)],   # effect 69
@@ -73,4 +89,7 @@ def apply(rom, ctx):
         rom.write(fp, data, 'data screen bar frames')
         for e in entries:
             rom.w32(e, arch)
-    print("  data screen: title bars from the DS")
+    for a in DATA_TEXT_CALLS:
+        if bl_target(rom, a) != DATA_TEXT: raise SystemExit(f'datascreen: no call to the text routine at {a:#x}')
+        rom.hook_bl(a, rom.syms['vwf_data_text'], 'data screen text')
+    print("  data screen: title bars from the DS, its text in the English font")

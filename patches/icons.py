@@ -74,14 +74,17 @@ ITEM_ATTR2 = (0x080155be, 0x08015710)   # movs r0, #0x84 (<< 5 = attr2 0x1080: p
 ITEM_TILE = 0x1e0
 
 # Two animated effects also put their pictures at 0x80 and up while a page is in the box: 0x45
-# (the "Fugitive Data" header of the news report, 112 tiles from 0x90) and 0xdd (a figure in the
-# dark, 219 tiles from 0x80, started by the script over a page in bank 21).  Their entries in the
-# animation table (0x08046b30 + 20 * n, u32 VRAM destination at +4) move them to 0x1a0, the Court
-# Record's tiles, which the Record only uses while it is open.  The other effects placed in the
-# text tiles play with no page up (the episode select, the episode title cards, the bursts the
-# original put over its own two lines at 0x00-0x7f).
+# (the "Fugitive Data" header of the escaped convict's data screen in episode 4, 112 tiles from
+# 0x90, started by the screen at 0x0802b011 with the last page still counted as up) and 0xdd (a
+# figure in the dark, 219 tiles from 0x80, started by the script over a page in bank 21).  Their
+# entries in the animation table (0x08046b30 + 20 * n, u32 VRAM destination at +4) move them
+# out.  0xdd goes to 0x1a0, the Court Record's tiles, which the Record only uses while it is
+# open.  0x45 goes to 0x310: on the data screen 0x19c-0x2a7 hold its two pages of text
+# (vwf_data_text) and 0x302-0x309 the PICTURE tab, and no character is on screen there.  The
+# other effects placed in the text tiles play with no page up (the episode select, the episode
+# title cards, the bursts the original put over its own two lines at 0x00-0x7f).
 ANIM_TABLE = 0x08046b30
-MOVED_EFFECTS = {0x45: 0x1a0, 0xdd: 0x1a0}
+MOVED_EFFECTS = {0x45: 0x310, 0xdd: 0x1a0}
 
 # The item's box on BG1 (its frame is drawn from map row 1, column 1, around the 64x64 picture
 # at y 16) ended on row 10 with the 64-pixel text box, the name tag's top row, and cut the tag

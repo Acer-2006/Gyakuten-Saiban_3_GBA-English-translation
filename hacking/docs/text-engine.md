@@ -249,6 +249,7 @@ the old font area.
 | `0x0800577a`, `0x08005784` | `0xe0 → 0xc0`: partial redraw starts two rows higher |
 | `0x08006678`, `0x0800667c` | name tag two rows up (`0x03002380`, `0x03002300`: rows 10–11) |
 | `0x08000eda` | WIN0V bottom 100 → 80: the item shown in court stays solid down to the tag's top |
+| `0x0802afd0`, `0x0802b50e` | `bl vwf_data_text` instead of `0x0801ecd4`: the episode 4 data screen's two pages (common sections `0x31`, `0x32`) in the English font, a few letters to a 16×16 sprite (OAM records from 37, tiles from `0x19c`), with the original's timing list; see graphics.md, "The escaped convict's data screen" |
 | `0x0800ebc8`, `0x0800ebfe` | the statement arrows' y 128 → 118, the second line |
 | `0x0800658c`, `0x08006596` | `0xc0 → 0xa0`: a line with no name tag puts the template back from row 10 |
 | `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 10–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice) |

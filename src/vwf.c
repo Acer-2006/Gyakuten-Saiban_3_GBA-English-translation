@@ -107,6 +107,7 @@ struct vwf_state {
     u8 arrow_y;         /* the engine's arrow bobs: its tile pair (0x20, 0x22, 0x24, 0x26) is a row down each */
     u8 arrow_t;         /* frames the DS-style arrow has been up (its slide) */
     u8 overlay;         /* the save screen is up over the game: nothing of the page is shown */
+    volatile u32* ds_cell;   /* the data screen: tiles of the 16x16 sprite being drawn into */
 };
 static struct vwf_state vs;
 
@@ -952,6 +953,191 @@ void vwf_boxclear(void) {
     vs.mapped = 0;
     vs.mode = 0;
     vs.overlay = 0;
+}
+
+/* ---------------------------------------------------------------- the data screen (episode 4) */
+/* The escaped convict's data screen types two pages, common sections 0x31 and 0x32, with
+   0x0801ecd4 (called from 0x0802afd0 and 0x0802b50e as (section, OBJ VRAM, x, y, shadow,
+   OAM records, timing list)): one 16x16 sprite per character, 14 px apart and 18 px a line,
+   its glyph from the Japanese font, which the English build has filled with code.  It fills the
+   sprites' OAM records (from OAM 37, hidden: 0x0802b288 shows them one at a time, the cursor,
+   OAM 36, moving to the next one's place) and the timing list the screen works through: per
+   sprite its frames (the current {0b} speed), 0x8000 | n for a pause ({0c n}), 0x4000 | n to show
+   picture n ({20 n}), 0xffff at the end ({45}, after one more record, blank, where the cursor
+   stops); it returns the list's length, which the screen also takes as the number of OAM entries
+   to hide from 34 on.  The English pages have three times the characters (68 and 135 against 24
+   and 58): one sprite each ran the reveal past OAM 127 into the game's state (the mode at
+   SYS+8 among it) and the screen went black for good, and the glyphs were garbage.
+   This draws them in the variable-width font, packed into 16x16 sprites placed edge to edge (two
+   or three letters each; a pause or a picture change starts a new one), in the original's dark
+   grey with its light shadow (OBJ palette 13, colours 2 and 1).  Each sprite's time is the speed
+   times its letters, so the page types at the original's pace.  The DS's text is used as it is
+   and reflowed (see ds_layout); lines beside the photo end before it, and the line pitch shrinks
+   from 16 (then the letters close up a pixel) until the page fits above the screen's bottom. */
+#define DS_LIST_MAX   0x50       /* the timing list's room (the caller clears 0x50 entries) */
+#define DS_TILE_END   0x300      /* OBJ tiles from the caller's up to here (the PICTURE tab is at 0x302) */
+#define DS_OAM_LAST   126        /* OAM 37 + sprites, and the end record, stay below 127 */
+#define DS_PHOTO_Y0   48         /* the photo: x 160-223, y 48-111 */
+#define DS_PHOTO_Y1   112
+#define DS_NARROW     154        /* lines beside the photo end before it, */
+#define DS_WIDE       230        /* the others before the DATA tabs (x 232) */
+#define DS_BOTTOM     158
+#define DS_SPACE      0x17f
+#define COMMON_TAB    (*(const u32* const*)0x0801ed60)   /* the common bank: its offset table, */
+#define COMMON_BASE   (*(const u8* const*)0x0801ed64)    /* and its base (patches/script.py) */
+
+static volatile u32* ds_rowptr(int tx, int ty, int r) {
+    if (tx < 0 || tx > 1 || ty < 0 || ty > 1) return 0;
+    return vs.ds_cell + (ty * 2 + tx) * 8 + r;
+}
+
+struct ds_out {
+    u32 vram;                    /* OBJ VRAM of sprite 0 */
+    volatile u16* rec;           /* its OAM record */
+    volatile u16* list;
+    int shadow;
+    int cells, n;                /* sprites made, timing list length */
+    int open, cx, cy, chars;     /* the sprite being filled: its place, letters begun in it */
+    int lgi, lgx, lgy;           /* the last glyph drawn (it may run into the next sprite) */
+    int full;
+};
+
+static void ds_glyph(struct ds_out* o, int gi, int x) {
+    vs.ds_cell = (volatile u32*)(o->vram + (o->cells - 1) * 128);
+    if (o->shadow) blit_to(gi, x + 1, 1, 1, ds_rowptr);
+    blit_to(gi, x, 0, 2, ds_rowptr);
+}
+
+static int ds_new_cell(struct ds_out* o, int x, int y) {
+    int tile = ((o->vram - 0x06010000) >> 5) + o->cells * 4;
+    if (o->full || tile + 8 > DS_TILE_END || 37 + o->cells + 1 > DS_OAM_LAST || o->n + 3 > DS_LIST_MAX) {
+        o->full = 1; return 0;
+    }
+    volatile u32* d = (volatile u32*)(o->vram + o->cells * 128);
+    for (int i = 0; i < 32; i++) d[i] = 0;
+    if (o->rec) {
+        volatile u16* r = o->rec + o->cells * 4;
+        r[0] = (y & 0xff) | 0x200;              /* hidden, 16x16 */
+        r[1] = (x & 0x1ff) | 0x4000;
+        r[2] = tile | 0xd400;                   /* palette 13, priority 1 */
+    }
+    o->cells++;
+    o->open = 1; o->cx = x; o->cy = y; o->chars = 0;
+    return 1;
+}
+
+/* Close the sprite being filled: its time goes on the list; a glyph running past its right edge
+   gets one more sprite for its tail unless the next sprite is about to be placed there. */
+static void ds_close(struct ds_out* o, int speed, int adjacent) {
+    if (!o->open) return;
+    o->open = 0;
+    int t = speed * (o->chars ? o->chars : 1);
+    o->list[o->n++] = t > 0x3fff ? 0x3fff : t;
+    if (!adjacent && o->lgi >= 0 && o->lgy == o->cy && o->lgx + font_w[o->lgi] + 1 > o->cx + 16) {
+        if (ds_new_cell(o, o->cx + 16, o->cy)) {
+            ds_glyph(o, o->lgi, o->lgx - o->cx);
+            o->open = 0;
+            o->list[o->n++] = speed;
+        }
+    }
+}
+
+static int ds_word_width(const u16* p, int sq) {
+    int w = 0;
+    for (;; p++) {
+        u32 t = *p;
+        if (t >= 0x80) { if (t == DS_SPACE) break; w += font_w[glyph_index(t)] - sq; continue; }
+        if (t == 0x0b || t == 0x0c || t == 0x20) { p++; continue; }
+        if (t == 0x2d || t == 0x00) continue;
+        break;
+    }
+    return w;
+}
+
+static int ds_limit(int y) {
+    return (y < DS_PHOTO_Y1 && y + 14 > DS_PHOTO_Y0) ? DS_NARROW : DS_WIDE;
+}
+
+static int ds_lower(u32 t) { return t >= 0xa4 && t < 0xa4 + 26; }
+
+/* Lay the section out (o == 0: only measure; returns the last line's y), or draw it.  A single
+   line break ({2e}) is the DS's own wrapping: here a space, and the text wraps again at the
+   width it has; two or more end the line and leave a blank one (`gap` px) each after the first,
+   unless the text goes on in lower case (the DS breaking a sentence round its picture). */
+static int ds_layout(const u16* p, int x0, int y0, int pitch, int gap, int sq, struct ds_out* o) {
+    int x = x0, y = y0, speed = 8, start = 1, nl = 0, wb = 0;
+    int space = font_w[glyph_index(DS_SPACE)] - sq;
+    for (; *p != 0x45; p++) {
+        u32 t = *p;
+        if (t >= 0x80) {
+            if (nl) {
+                if (nl == 1 || ds_lower(t)) { if (!start) { x += space; wb = 1; } }
+                else {
+                    x = x0; y += pitch + (nl - 1) * gap; start = 1; wb = 0;
+                    if (o) ds_close(o, speed, 0);
+                }
+                nl = 0;
+            }
+            if (t == DS_SPACE) { if (!start) { x += space; wb = 1; } continue; }
+            if (wb && x + ds_word_width(p, sq) > ds_limit(y)) {
+                x = x0; y += pitch; start = 1;
+                if (o) ds_close(o, speed, 0);
+            }
+            wb = 0;
+            int gi = glyph_index(t);
+            if (o) {
+                if (!o->open || y != o->cy || x >= o->cx + 16) {
+                    int adj = o->open && y == o->cy && x < o->cx + 32;
+                    int nx = adj ? o->cx + 16 : x;
+                    ds_close(o, speed, adj);
+                    if (ds_new_cell(o, nx, y) && o->lgi >= 0 && o->lgy == y && o->lgx + font_w[o->lgi] + 1 > nx)
+                        ds_glyph(o, o->lgi, o->lgx - nx);
+                }
+                if (o->open) {
+                    ds_glyph(o, gi, x - o->cx);
+                    o->chars++;
+                    o->lgi = gi; o->lgx = x; o->lgy = y;
+                }
+            }
+            x += font_w[gi] - sq; start = 0;
+            continue;
+        }
+        switch (t) {
+        case 0x2e: nl++; break;
+        case 0x0b: speed = *++p; break;
+        case 0x0c:
+        case 0x20:
+            p++;
+            if (o) {
+                ds_close(o, speed, 0);
+                if (o->n + 2 <= DS_LIST_MAX) o->list[o->n++] = (t == 0x0c ? 0x8000 : 0x4000) + *p;
+                o->lgi = -1;
+            }
+            break;
+        default:
+            p += cmd_args[t];
+        }
+    }
+    if (!o) return y;
+    ds_close(o, speed, 0);
+    /* the end: one more record, blank, where the cursor stops */
+    if (ds_new_cell(o, x, y)) o->cells--;     /* its record and blank tiles, not counted */
+    o->open = 0;
+    o->list[o->n++] = 0xffff;
+    return o->n;
+}
+
+u32 vwf_data_text(u32 sec, u32 vram, u32 x0, u32 y0, u32 shadow, volatile u16* rec, volatile u16* list) {
+    const u16* src = (const u16*)(COMMON_BASE + COMMON_TAB[sec]);
+    /* line pitch, blank line, letters squeezed by: the first that fits */
+    static const u8 fits[][3] = {{16, 8, 0}, {15, 7, 0}, {14, 6, 0}, {16, 8, 1}, {15, 7, 1}, {14, 6, 1}, {13, 5, 1}};
+    int k = 0;
+    while (k < 6 && ds_layout(src, x0, y0, fits[k][0], fits[k][1], fits[k][2], 0) + 14 > DS_BOTTOM) k++;
+    struct ds_out o;
+    o.vram = vram; o.rec = rec; o.list = list; o.shadow = shadow;
+    o.cells = o.n = o.open = o.cx = o.cy = o.chars = o.lgx = o.lgy = o.full = 0;
+    o.lgi = -1;
+    return ds_layout(src, x0, y0, fits[k][0], fits[k][1], fits[k][2], &o);
 }
 
 void _start(void) {}

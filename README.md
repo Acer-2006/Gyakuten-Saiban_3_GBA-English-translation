@@ -105,6 +105,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.19 — episode 4 froze on a black screen at its first data screen (the escaped convict's
+  file), whose two pages were also unreadable: the screen draws one sprite per character from
+  the Japanese font, and the English pages ran it past the end of the sprite table into the
+  game's state. The pages are now drawn in the English font, a few letters to a sprite, wrapped
+  round the photo; the "Fugitive Data" header moves out of their tiles.
 * 0.16.18 — with the Court Record open over a page, its button row (Profiles / OK / Back) sat on
   the page's first line, which could not be read (the original's text started lower). While the
   Record is open the page's lines now sit 8 px lower, clear of the buttons.

@@ -360,10 +360,11 @@ cell:         a 4bpp sprite (1D tile order) packed with a 16-bit RLE: token u16 
 
 The pictures are decompressed into OBJ VRAM at the destination each time a frame is shown.
 The English page's third line lives in tiles `0x80`–`0xbf` (the original's text took `0x00`–`0x7f`),
-so the two effects that play over a page with their pictures from `0x80` up — `0x45`, the news
-report's header (112 tiles from `0x90`), and `0xdd`, a figure in the dark (219 tiles from `0x80`,
-started by the script in bank 21) — are moved to `0x1a0`, the Court Record's tiles
-(`patches/icons.py`, `MOVED_EFFECTS`). The other effects placed in the text tiles (the episode
+so the two effects that play over a page with their pictures from `0x80` up are moved
+(`patches/icons.py`, `MOVED_EFFECTS`): `0xdd`, a figure in the dark (219 tiles from `0x80`,
+started by the script in bank 21), to `0x1a0`, the Court Record's tiles; `0x45`, the "Fugitive
+Data" header of episode 4's data screen (112 tiles from `0x90`), to `0x310`, since the data
+screen's own text is in `0x19c`–`0x2a7` (a first move to `0x1a0` put the header into it). The other effects placed in the text tiles (the episode
 select's labels at `0x80`, the episode title cards at `0x98`, the bursts at `0x00`/`0x78`) play
 with no page up.
 
@@ -525,3 +526,28 @@ renders it; `gs3_font.py glyph` prints one glyph as text.
   another ROM address (or greys), which is the quickest way to identify a block.
 * `gs3_dis.py xref ROM ADDR` finds the literal pools and `bl` instructions that refer to an
   address, which leads from a data block to the code that loads it.
+
+## The escaped convict's data screen (episode 4)
+
+Two pages, typed with a cursor beside a photo, under the title bars of effects 69 and 70
+(`patches/datascreen.py`). Each page's text is a common-bank section (`0x31`: name, charge,
+sentence; `0x32`: the escape and recapture), drawn when the page opens by `0x0801ecd4` (calls at
+`0x0802afd0` and `0x0802b50e`) with (section, OBJ VRAM `0x06013380` = tile `0x19c`, x 8, y 40,
+shadow 1, OAM records from OAM 37, timing list `0x02036500`). The original puts each character in
+a 16×16 sprite from the Japanese font, 14 px apart and 18 px a line (`{2e}`), the records hidden;
+the list gets one entry per sprite (its frames, the `{0b}` speed), `0x8000 | n` per `{0c n}` pause,
+`0x4000 | n` per `{20 n}` photo change and `0xffff` at `{45}`, after one more blank record where the
+cursor stops. The screen (`0x0802b288`) shows the sprites one at a time, moving the cursor (OAM 36,
+tile `0x198`) to the next one's place; the routine's return value, the list's length, is stored at
+`0x03002fa8` and also taken as the number of OAM entries to hide from 34 on.
+
+The English build replaces the routine with `vwf_data_text` (`src/vwf.c`). The English pages are
+three times as long (68 and 135 characters against 24 and 58): drawn one character a sprite from
+the old font area (code in the English build) they were garbage, and the reveal ran past OAM 127
+into the game state at `0x030037b0` — the game mode among it — so the screen went black for good
+at the start of episode 4. The English pages are drawn in the variable-width font, a few letters
+to a 16×16 sprite, with the original's dark grey and light shadow (OBJ palette 13, colours 2 and
+1); each sprite's time is the speed times its letters. A single `{2e}` (the DS's own wrapping) is a
+space and the text wraps again at the room it has (x 154 beside the photo, which is at x 160–223,
+y 48–111; x 230 below it); two make a blank line, unless the text goes on in lower case.
+
