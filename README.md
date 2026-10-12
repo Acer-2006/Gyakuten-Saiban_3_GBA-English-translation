@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.17 — a short pale strip (the top corners of an evidence box) stayed in the top-left or
+  top-right corner after almost every item the script takes down: the last step of the box's
+  closing animation cleared its smallest frame by hand at the box's old rows. It clears them a
+  row higher now, with the box.
 * 0.16.16 — the life bar lost its frame and its end while an Objection! / Hold it! / Take that!
   bubble was up (presenting the wrong evidence, among others). The English bubbles took 16–24
   sprites to the original's 7, and the game hands sprites to animations from the top of the

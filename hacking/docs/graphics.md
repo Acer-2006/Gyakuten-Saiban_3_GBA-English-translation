@@ -139,7 +139,8 @@ build, 100 in the Japanese; the English build also puts the item's box a tile ro
 frame from map row 0 and the sprite at y 8 instead of row 1 and y 16, so that its bottom edge
 stays off the tag's rows above the taller text box; the three routines that draw and erase the
 frame take their row from literals, and the inline clear at `0x0803616a` that takes the box down
-with the scene starts a row earlier too, `patches/icons.py`) and the presenting animation all come from a **table of 123
+with the scene and the hand-made clear of the smallest box at the end of the closing animation
+(`0x0801555c`, map base + `0x42`, now + `2`) start a row earlier too, `patches/icons.py`) and the presenting animation all come from a **table of 123
 pointers at `0x0804660c`**, one LZ picture each: 32 bytes of palette (16 BGR555 colours, index 0
 transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles in rows (2048
 bytes), decompressed to `0x0200afc0` by `0x0803a048` and DMA'd to OBJ tile `0x280`. The item

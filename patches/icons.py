@@ -95,6 +95,11 @@ ITEM_SPRITE_Y = (0x08015650, 0x080156f2)   # movs r0, #0x10: OAM 65's y while th
 # loop of 0x140 halfwords zero rows 1-10.  With the box a row up it has to start at row 0, or
 # the frame's top edge stays on screen.
 ITEM_CLEAR_ADD = 0x0803616e          # adds r0, #0x40 -> nop
+# The last step of the box's closing animation (box state 2, size 0): after the erase it clears
+# the corners of the smallest box by hand, `ldr r0, =0x03002080; adds r0, #0x42` (row 1, column 1)
+# and then offsets from there: columns 1-2 and 27-28 of rows 1 and 2.  With the box a row up those
+# are rows 0 and 1, or the top corners (tiles 0x30, 0x32) stay on row 0 as a short strip.
+ITEM_LAST_CLEAR = 0x08015560         # adds r0, #0x42 -> adds r0, #0x02
 
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
@@ -111,6 +116,8 @@ def apply(rom, ctx):
         rom.w16(a, 0x2008)
     assert rom.u16(ITEM_CLEAR_ADD) == 0x3040
     rom.w16(ITEM_CLEAR_ADD, 0x46c0)          # nop: clear from row 0
+    assert rom.u16(ITEM_LAST_CLEAR) == 0x3042
+    rom.w16(ITEM_LAST_CLEAR, 0x3002)         # the corners from row 0
     for n, tile in MOVED_EFFECTS.items():
         e = ANIM_TABLE + 20 * n
         assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)
