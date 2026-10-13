@@ -252,20 +252,73 @@ def notation_items(s):
     return items
 
 _WORDING = None
-def gba_wording(items, stats=None):
-    """Apply GBA_WORDING to a converted section (list of items); returns the new list."""
+def gba_wording(items, stats=None, index=None):
+    """Apply GBA_WORDING to a converted section (list of items); returns the new list.
+    index (optional dict) receives old item index -> new item index (a replaced item -> the
+    start of its replacement)."""
     global _WORDING
     if _WORDING is None:
         _WORDING = [(notation_items(a), notation_items(b)) for a, b in GBA_WORDING]
+    n0 = len(items)
+    ids = list(range(n0))
     for old, new in _WORDING:
         k = 0
         while k <= len(items) - len(old):
             if items[k:k + len(old)] == old:
-                items = items[:k] + new + items[k + len(old):]; k += len(new)
+                items = items[:k] + new + items[k + len(old):]
+                ids = ids[:k] + [ids[k]] * len(new) + ids[k + len(old):]; k += len(new)
                 if stats is not None: stats['gba_wording'] += 1
             else:
                 k += 1
+    if index is not None:
+        q = 0
+        for i in range(n0 + 1):
+            while q < len(ids) and ids[q] < i: q += 1
+            index[i] = q
     return items
+
+def item_words(it):
+    return 1 + len(it[2]) if it[0] == 'c' else 1
+
+def section_jumps(conv, e, emap, wmap, stats=None):
+    """Command 0x35 f o: if flag f >> 8 is set (f & 1) or clear, jump to the section's start plus
+    o bytes (f & 0x80: to label o instead, see the label entries).  The offset is the DS section's
+    (or the Japanese one's, where the converter kept the GBA's arguments): take the DS item the
+    command came from, find the item its offset points at, and point at that item's place in the
+    converted section.  Without this a jump landed a few words off (on the 0x15 that ends a
+    conversation, skipping the box's close before it: a soft lock in episode 2)."""
+    epos, p = {}, 0
+    for k, it in enumerate(e):
+        epos[p] = k; p += item_words(it)
+    epos[p] = len(e)
+    out = list(conv)
+    starts, p = [], 0
+    for it in out:
+        starts.append(p); p += item_words(it)
+    starts.append(p)
+    done = set()
+    for i, it in enumerate(e):
+        if not (it[0] == 'c' and it[1] == 0x35) or it[2][0] & 0x80: continue
+        k = wmap.get(emap[i], emap[i])
+        if not (out[k][0] == 'c' and out[k][1] == 0x35):
+            raise SystemExit('convert: a DS command 0x35 is not in the converted section')
+        off = it[2][1]
+        tk = epos.get(off // 2)
+        if tk is None or off & 1:
+            raise SystemExit(f'convert: command 0x35 offset {off:#x} is not on a DS item')
+        ok = wmap.get(emap[tk], emap[tk])
+        # the target item itself, unless the conversion dropped it (a DS speaker command the GBA
+        # has no use for): then the item after it
+        if tk < len(e) and emap[tk + 1] > emap[tk] and (out[ok][0], out[ok][1]) != (e[tk][0], e[tk][1]):
+            raise SystemExit(f'convert: command 0x35 target {e[tk][:2]} became {out[ok][:2]}')
+        new = starts[ok] * 2
+        if new != out[k][2][1] and stats is not None: stats['jumps_0x35_moved'] += 1
+        out[k] = ('c', 0x35, (out[k][2][0], new))
+        done.add(k)
+        if stats is not None: stats['jumps_0x35'] += 1
+    if any(it[0] == 'c' and it[1] == 0x35 and not it[2][0] & 0x80 and k not in done for k, it in enumerate(out)):
+        raise SystemExit('convert: a command 0x35 with no DS counterpart')
+    return out
 
 # The common bank: the GBA's has 52 sections, the DS's 54. The DS added two system messages as
 # sections 7 and 8; GBA section s is DS section s up to 6 and DS section s + 2 from 7 on. The game's
@@ -323,12 +376,14 @@ def run_mem(ctx):
         label_secs = {sec for sec, off in E['labels'].values()}
         for s in G['present']:
             emap = {}
+            e_items = tok(words(E['sections'][s]), ADS)
             conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
-                                   tok(words(E['sections'][s]), ADS), argmap, labels=labels.get((b, s)), stats=stats, emap=emap)
-            reworded = gba_wording(conv, stats)
+                                   e_items, argmap, labels=labels.get((b, s)), stats=stats, emap=emap)
+            wmap = {}
+            reworded = gba_wording(conv, stats, wmap)
             if reworded != conv and s in label_secs:
                 raise ValueError(f'bank {b} section {s}: GBA wording in a section with label entries')
-            conv = reworded
+            conv = section_jumps(reworded, e_items, emap, wmap, stats)
             secs[s] = pack(items_to_words(conv)); emaps[s] = (conv, emap)
         # label entries (command 0x36 targets): E's byte offset -> E item index -> output item -> byte offset
         new_labels = {}
@@ -350,9 +405,12 @@ def run_mem(ctx):
     secs = {}
     for s in Graw['present']:   # GBA numbering (see COMMON_DS_ONLY)
         d = ds_common_section(s)
+        emap = {}; wmap = {}
+        e_items = tok(words(Eraw['sections'][d]), ADS)
         conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][d]), ADS),
-                               tok(words(Eraw['sections'][d]), ADS), argmap, stats=stats)
-        secs[s] = pack(items_to_words(gba_wording(conv, stats)))
+                               e_items, argmap, stats=stats, emap=emap)
+        conv = section_jumps(gba_wording(conv, stats, wmap), e_items, emap, wmap, stats)
+        secs[s] = pack(items_to_words(conv))
     out['common'] = bk.build_bank(Graw['n'], secs, Graw['labels'], Graw['stale'])
     return out, dict(stats)
 

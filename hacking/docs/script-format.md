@@ -137,6 +137,7 @@ DS version of the script.
 | `0x0a s` | 1 | one-option menu end: section `s` |
 | `0x08 s1 s2` | 2 | two-option menu end |
 | `0x09 s1 s2 s3` | 3 | three-option menu end |
+| `0x35 f o` | 2 | conditional jump (handler `0x08022724`): flag `f >> 8`; with `f & 1` it jumps if the flag is set, without if it is clear; the target is the current section's start (`TXT+4`) plus `o` bytes, or label `o` (as `0x36`) when `f & 0x80`. The offset is a byte position inside the section, so it differs between the GBA and the DS scripts and between languages: the English converter (`section_jumps` in `tools/convert_script.py`) finds the DS item the offset points at and points it at that item's place in the converted section. Before 0.16.25 it kept the DS offset, and 17 of the 308 jumps landed a few words off: in episode 2 one skipped the box's close (`1c 3`) and stopped on the `0x15` after it, which waits for the box to be closed, and the game locked up |
 | `0x36 i` | 1 | jump to label `i`: entry `i` of the bank's offset table is read as `{u16 byte offset, u16 section}`; the engine jumps to section `section + 0x80` at that offset (function `0x0801fc9c`) |
 | `0x6a n` | 1 | load script block `n` (1–27): the block number is stored at `TXT+0x44` and the loader at `0x0801ee08` jumps through its 27-case table to the bank for that block; the script uses it at the end of a bank, followed by `0x0d` |
 

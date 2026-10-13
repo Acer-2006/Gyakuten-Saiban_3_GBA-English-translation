@@ -105,6 +105,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.25 — a soft lock halfway through episode 2: asking about a topic again could leave the
+  text box up with nothing in it and the game waiting for good. The script's conditional jumps
+  point at a byte position inside their section, and the converter kept the DS script's
+  positions, which are a few words off in the converted English script; 17 of the 308 were wrong,
+  that one landing past the command that closes the box. They now point at the same place as on
+  the DS.
 * 0.16.24 — the episode select's prompt box is whole again (since 0.16.22 its top edge sat a row
   too high over an empty row) and grows to hold the two-line prompt for a newly added episode.
   Pieces some rooms draw over their background as it loads (the statue in the basement warehouse,
