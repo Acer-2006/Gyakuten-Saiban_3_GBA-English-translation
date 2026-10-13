@@ -520,6 +520,8 @@ Raw 4bpp sprites, 32×16 one-dimensional cells (256 bytes):
 | `0x0818a920` | 64×16 | つきつける R | cross-examination, top right |
 | `0x0818ab20` | 32×16 | 決定 | Court Record when presenting, next to the A icon; white (12), outline (10), OBJ palette 4 |
 | `0x0818ac20` | 32×16 | もどる | next to the B icon |
+| `0x08190520` | 64×16 | L やめる | while breaking Psyche-Locks, top left (the Present button beside it is `0x0818a920`); the same layout and colours as ゆさぶる; loaded by the routine at `0x0801a900` |
+| `0x08190420` | 32×16 | きりかえ | Court Record step 5 (`0x08013e9a`): at x 204 after the A icon (`0x08189b20`), OBJ palette 4 like 決定 |
 
 The cross-examination pair is DMA'd (1 KB) to OBJ tile `0x180` with palette `0x081988d0` by the
 code at `0x0800ddd0`, `0x0800eb6c`, `0x0801e5a8` and `0x080224f4`.

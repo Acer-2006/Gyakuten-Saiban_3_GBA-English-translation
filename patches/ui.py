@@ -20,12 +20,15 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BUTTONS = [
     (0x0818a720, 2, 12, 62, 'Press'),       # L ゆさぶる, bottom left
     (0x0818a920, 2, 2, 53, 'Present'),      # つきつける R, bottom right
+    (0x08190520, 2, 12, 62, 'Stop'),        # L やめる, top left while breaking Psyche-Locks (DMA'd by 0x0801a900's routine)
 ]
 # Court Record prompts next to the A / B icons, OBJ palette 4: white lettering (12) with a dark
-# outline (10) on a transparent background, like the R label (patches/court_record.py)
+# outline (10) on a transparent background, like the R label (patches/court_record.py).  (address,
+# text, widest it may be: see the detail view below)
 PROMPTS = [
-    (0x0818ab20, 'OK'),                     # 決定
-    (0x0818ac20, 'Back'),                   # もどる
+    (0x0818ab20, 'OK', 27),                 # 決定
+    (0x0818ac20, 'Back', 27),               # もどる
+    (0x08190420, 'Swap', 31),               # きりかえ, at x 204 after the A icon (Court Record step 5, 0x08013e9a)
 ]
 
 # investigation menu tabs (slide down from the top of the screen): 64x32 sprites, the lettering in
@@ -312,9 +315,9 @@ def apply(rom, ctx):
     # pixels wide.
     assert rom.u16(0x080151a8) == 0x40b8 and rom.u16(0x08015182) == 0x39fc and rom.u16(0x080151b8) == 0x80d8
     rom.w16(0x080151a8, 0x40b5); rom.w16(0x08015182, 0x39ff); rom.w16(0x080151b8, 0x80d5)
-    for addr, text in PROMPTS:
+    for addr, text, maxw in PROMPTS:
         sq = 0
-        while font.measure(text) - sq * (len(text) - 1) > 27: sq += 1
+        while font.measure(text) - sq * (len(text) - 1) > maxw: sq += 1
         grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
     for addr, text in TABS:
