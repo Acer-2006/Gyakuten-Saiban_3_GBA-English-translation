@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.22 — the third line stays on screen while the Court Record is open with a large
+  character in the scene: it moves to sprite tiles nothing on screen is using (and gives them
+  back when the Record closes) instead of being hidden. "THE END" after an episode is no longer
+  cut off at the right edge.
 * 0.16.21 — the page stays where it is when the Court Record opens (0.16.18 undone). A pale strip
   in the top corner left by an evidence box under an earlier build (and kept in saves made with
   it) is cleared as soon as the game is continued.

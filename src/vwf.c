@@ -50,7 +50,7 @@
 #define LBL_CELLS  8
 #define LBL_CELLW  32
 #define LBL_LINES  3
-static u32 lbl_tile(int L, int cell) { return L * 0x40 + cell * 8; }
+static u32 lbl_tile(int L, int cell);
 /* OAM entries of each line's cells: 3-26, within the entries 2-33 the engine's own sprite text
    takes.  They must come before the scene's sprites (the defence bench is in 48-51, at
    priority 3): the hardware draws an earlier, lower-priority sprite that overlaps a later,
@@ -112,6 +112,21 @@ static struct vwf_state vs;
    0xa0-0x17f, which are the canvas's (BG char block 0 has no room for both). */
 #define GLOG_MAX   192
 static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 */
+
+/* State added after 0.16.21, at a fixed address past the BSS (patches/text.py keeps the BSS
+   below it): a save state made with an earlier build has zeros there, where fields appended to
+   vs would shift glog and read the log's first entry as l3_tile.  New fields go at the end. */
+struct vwf_ext {
+    u8 lbl_trim[LBL_LINES];   /* leading space of each line dropped so that it fits (page_scan) */
+    u16 l3_tile;        /* while the Court Record borrows 0x80-0xbf: line 3's stand-in tiles (0: none) */
+};
+#define vx (*(struct vwf_ext*)0x02028780)
+
+/* Each line's eight 32x16 cells: OBJ tiles 0x00, 0x40 and 0x80 on, the third line elsewhere
+   while the Court Record has its tiles (record_lend). */
+static u32 lbl_tile(int L, int cell) {
+    return (L == 2 && vs.l3_lent && vx.l3_tile ? vx.l3_tile : (u32)L * 0x40) + cell * 8;
+}
 #define BOX_TEMPLATE ((const u8*)0x0803b844)   /* the engine's box, 32x32 tile numbers */
 
 /* The three text colours (commands 0x03 1-3): the Japanese game's, which the DS uses too.
@@ -365,22 +380,42 @@ static void labels_reset(void) {
 }
 
 /* The rest of the page from the character being drawn (code at `row`, the script pointer just
-   after it): the number of rows, and the width of each line (for centring before it is typed). */
+   after it): the number of rows, and the width of each line (for centring before it is typed).
+   A line the DS lays out with leading spaces (" ... THE END" under an episode's title at its end,
+   right-aligned in the DS's narrower spaces) can come out wider than the screen in this font:
+   as much of that leading space as it takes is dropped (lbl_trim), so it ends LBL_FIT px from
+   its start, before the right edge as far as the text starts from the left. */
+#define LBL_FIT 222
+static void line_done(int L, int w, int lead) {
+    if (L < 0 || L >= LBL_LINES) return;
+    int trim = 0;
+    if (w > LBL_FIT) { trim = w - LBL_FIT; if (trim > lead) trim = lead; }
+    w -= trim;
+    vs.lbl_full[L] = w > 255 ? 255 : w;
+    vx.lbl_trim[L] = trim > 255 ? 255 : trim;
+}
+
 static int page_scan(const u16* p, u32 code, int row) {
     int L = row - vs.lbl_row0;
     int w = font_w[glyph_index(code)];
+    int lead = code == 0x17f ? w : 0, inlead = code == 0x17f;
     for (int n = 0; n < 1024; n++) {
         u32 t = *p++;
-        if (t >= 0x80) { w += font_w[glyph_index(t)]; continue; }
+        if (t >= 0x80) {
+            int gw = font_w[glyph_index(t)];
+            w += gw;
+            if (inlead && t == 0x17f) lead += gw; else inlead = 0;
+            continue;
+        }
         if (t == 0x01) {
-            if (L >= 0 && L < LBL_LINES) vs.lbl_full[L] = w > 255 ? 255 : w;
-            row++; L++; w = 0; continue;
+            line_done(L, w, lead);
+            row++; L++; w = 0; lead = 0; inlead = 1; continue;
         }
         if (t == 0x00 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
             t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36 || t == 0x42) break;
         p += cmd_args[t];
     }
-    if (L >= 0 && L < LBL_LINES) vs.lbl_full[L] = w > 255 ? 255 : w;
+    line_done(L, w, lead);
     return row + 1;
 }
 
@@ -401,7 +436,7 @@ static void label_draw_char(u32 code, int col, int row) {
         vs.lbl_align = TXT_ALIGN & 0xf;
         vs.lbl_free = (TXT_FLAGS & 4) ? 1 : 0;
         vs.lbl_fx = TXT_OFSX; vs.lbl_fy = TXT_OFSY;
-        for (int i = 0; i < LBL_LINES; i++) vs.lbl_full[i] = 0;
+        for (int i = 0; i < LBL_LINES; i++) { vs.lbl_full[i] = 0; vx.lbl_trim[i] = 0; }
         vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
         /* alignment-2 lines sit at y 71 while TXT+0x1a is 0, which it is until the engine
            reaches the first new line: a one-line caption stays there, a longer one moves up
@@ -410,10 +445,10 @@ static void label_draw_char(u32 code, int col, int row) {
     }
     int L = row - vs.lbl_row0;
     if (L < 0 || L >= LBL_LINES) return;
-    if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = 0; }
+    if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = -vx.lbl_trim[L]; }
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
-    if (vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
+    if (vs.lbl_pen >= 0 && vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
     vs.lbl_pen += font_w[gi];
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
@@ -431,14 +466,70 @@ static void labels_hide(void) {
 /* The Court Record's picture (OAM 34, 64x64) goes to OBJ tile 0x280, or, with a large character
    on screen whose sprites start below 0x2c0 (0x08014dca: Armando's from 0x284), to 0x80
    (0x08014ddc, 0x08014e9a): in the original the spare tiles of the item shown in court, here the
-   third line's.  While it is there the third line is not shown (it would be the picture's tiles in
-   the text's colours), and once the Record has closed the page is drawn again (vwf_resume). */
+   third line's.  While it is there the third line moves to 64 tiles in 0x100-0x17f that no sprite
+   on screen uses (the defence bench's and the investigation tabs' tiles, whose pictures are kept
+   at L3_BACKUP and put back when the Record closes), the page is drawn again into them, and when
+   the Record has closed it is drawn again in its own tiles (vwf_resume).  With no such tiles the
+   third line is not shown meanwhile. */
+#define L3_BACKUP ((volatile u32*)0x0202a000)   /* 2 KB: free (the English build's chapter banks stay in ROM) */
+#define L3_FROM   0x100
+#define L3_TO     0x180
 static int record_borrows(void) {
     if (SYS[8] != MODE_RECORD) return 0;
     /* the loader's own test (the first animation's state), true from the frame the picture is copied */
     if ((*(volatile u32*)0x03000850 & 0xffffff) == 0x800ff && (*(volatile u32*)0x03000844 & 0x10000000)) return 1;
     u32 a0 = OAMBUF[34 * 4], t = OAMBUF[34 * 4 + 2] & 0x3ff;
     return (a0 & 0x300) != 0x200 && t >= 0x80 && t < 0xc0;
+}
+
+static int obj_tiles(u32 a0, u32 a1) {
+    static const u8 n[3][4] = {{1, 4, 16, 64}, {2, 4, 8, 32}, {2, 4, 8, 32}};
+    u32 shape = a0 >> 14;
+    if (shape > 2) return 0;
+    return n[shape][a1 >> 14] << ((a0 >> 13) & 1);
+}
+
+/* 64 tiles from L3_FROM up that no sprite shown (other than the page's own) uses, or 0. */
+static u32 l3_block(void) {
+    for (u32 base = L3_FROM; base + 64 <= L3_TO; base += 8) {
+        int ok = 1;
+        for (int k = 0; k < 128 && ok; k++) {
+            if (k == ARROW_OBJ || (k >= 3 && k < 27)) continue;
+            u32 a0 = OAMBUF[k * 4], a1 = OAMBUF[k * 4 + 1], t = OAMBUF[k * 4 + 2] & 0x3ff;
+            if ((a0 & 0x300) == 0x200) continue;
+            u32 n = obj_tiles(a0, a1);
+            if (t < base + 64 && t + n > base) ok = 0;
+        }
+        if (ok) return base;
+    }
+    return 0;
+}
+
+void vwf_resume(void);
+
+static void l3_give_back(void) {
+    if (vx.l3_tile < L3_FROM || vx.l3_tile + 64 > L3_TO) { vx.l3_tile = 0; return; }
+    volatile u32* v = (volatile u32*)(0x06010000 + vx.l3_tile * 32);
+    for (int i = 0; i < 64 * 8; i++) v[i] = L3_BACKUP[i];
+    vx.l3_tile = 0;
+}
+
+static void record_lend(void) {
+    if (record_borrows()) {
+        if (vs.l3_lent || !vs.lbl_width[2]) return;
+        vs.l3_lent = 1;
+        u32 base = l3_block();
+        if (!base) return;                           /* the third line waits, hidden */
+        volatile u32* v = (volatile u32*)(0x06010000 + base * 32);
+        for (int i = 0; i < 64 * 8; i++) L3_BACKUP[i] = v[i];
+        vx.l3_tile = base;
+        vwf_resume();                                /* the page again, its third line there */
+        return;
+    }
+    if (!vs.l3_lent || SYS[8] == MODE_RECORD) return;
+    vs.l3_lent = 0;
+    l3_give_back();
+    vwf_resume();
 }
 
 static void labels_oam(void) {
@@ -481,7 +572,7 @@ static void labels_oam(void) {
             }
             if (x < 0) x = 0;
         }
-        if (L == 2 && vs.l3_lent) ncells = 0;
+        if (L == 2 && vs.l3_lent && !vx.l3_tile) ncells = 0;
         for (int c = 0; c < LBL_CELLS; c++) {
             int obj = lbl_obj0[L] + c;
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }
@@ -754,6 +845,7 @@ void vwf_clear(void) {
     vs.resume = 0;
     vs.inset = 0;
     vs.mode = 0;
+    l3_give_back();
     vs.l3_lent = 0;
 }
 
@@ -893,8 +985,7 @@ static void box_leftovers(void) {
 void vwf_frame(void) {
     box_leftovers();
     if (vs.overlay) { labels_hide(); return; }
-    if (record_borrows()) { if (vs.lbl_width[2]) vs.l3_lent = 1; }
-    else if (vs.l3_lent && SYS[8] != MODE_RECORD) { vs.l3_lent = 0; vwf_resume(); }
+    record_lend();
     if (vs.resume) resume_frame();
     if (vs.lbl_row0 >= 0 && vs.lbl_caption) { labels_oam(); return; }
     if (fullscreen_box()) {

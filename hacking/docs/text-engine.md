@@ -105,8 +105,12 @@ is under it while the Record is open: 0.16.18 moved the page 8 px lower meanwhil
 put it back.) The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
 on screen whose sprites start below `0x2c0` (the loader's test at `0x08014dca`; Armando's start at
 `0x284`) to `0x80` (`0x08014ddc`, attribute at `0x08014e9a`): the original's spare tiles of the item
-shown in court, the third line's here. While it is there `vwf_frame` hides the third line, and
-when the Record has closed it draws the page again (`vwf_resume`). Where the engine puts them:
+shown in court, the third line's here. While it is there `vwf_frame` moves the third line to
+64 tiles from `0x100`–`0x17f` that no shown sprite uses (in court the defence bench's and witness
+stand's fronts take `0x100`–`0x12f`, so it is usually `0x130`), keeping what was there in EWRAM
+`0x0202a000` and putting it back when the Record closes; the page is drawn again from its start
+(`vwf_resume`) each time it moves. If no such block is free the third line is hidden until
+the Record closes. Where the engine puts them:
 
 * normally y + 116 and x + 9 (the box rows);
 * if the current section (`TXT+0xc`) is 0, 1, 3, 4 or 6–31 of the common bank (the system
@@ -228,6 +232,10 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
   a page with a third English line uses the three-line box's rows (y 102 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
   shows its Yes / No in entries 40 and 41.
+  A line wider than 222 pixels with leading spaces drops as many of their pixels as it takes
+  to fit (`LBL_FIT`, `lbl_trim`): the episode endings' "THE END" is pushed right by spaces in
+  the DS's script, which the DS's 256-pixel screen had room for, and on the GBA's it ran off
+  the right edge.
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
   mode), the question stays in the top rows and the labels are drawn as text in the lower part.
@@ -264,7 +272,10 @@ the old font area.
 | `0x0800ac22` (writing a save; `patches/script.py`) | `script_save` instead of `WriteSramEx`: the game's save, then the record at SRAM `0x0e007f00` |
 | BG palette 0, entries 13–15 (`0x0500001a`) | the text colours (`1dde`, `7b0d`, `03c0`: the orange, light blue and green of the Japanese sprite text's OBJ palette 0, entries 6, 9 and 12, which the DS uses too), written by `vwf.c` each frame while a page is mapped and put back to the UI palette's own values (`3def 028c 03ff`) when it is not: the ROM's copies of the 16-colour UI palette (`0000 0400 1ce7 4210 739c 3800 3cc5 5a0c 7fff 0c6c 3191 4656 631b 3def 028c 03ff`) stay as they are, since they also load into OBJ palette 2, whose entry 15 is the Court Record's item-name yellow, and the Record's panel uses BG entry 15 for the same while it slides |
 
-Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`) and `0x02028800` (BSS of
-`script.c`). The script loader is replaced at its seven call sites so that banks placed above
+Free RAM used by the new code: EWRAM `0x02028000` (BSS of `vwf.c`; its fields added since
+0.16.22 are at `0x02028780`, past the BSS, so that a save state from an earlier build does not
+read other data in them), `0x02028800` (BSS of
+`script.c`) and `0x0202a000`–`0x0202a7ff` (the OBJ tiles the third line borrows under the Court
+Record). The script loader is replaced at its seven call sites so that banks placed above
 `0x08800000` are used uncompressed in place (`src/script.c`: `script_load`, `jump_section`,
 `jump_label`), which also removes the EWRAM size limit for edited banks.
