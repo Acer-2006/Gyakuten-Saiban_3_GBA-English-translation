@@ -20,12 +20,7 @@
 #define BOX_BOTTOM 19         /* its bottom edge row */
 #define TEXT_Y0    102        /* the page's first line: 4 px below the box's top border, as the DS's */
 #define LINE_H     16
-/* The Court Record (game mode 7, SYS+8) puts its button row (R Profiles, A OK, B Back: sprites
-   at y 96, painted on rows 97-109) where the original's text box had its name tag, above the
-   text (y 116); the English page starts at y 102, so while the Record is open its lines go
-   8 px lower, line 1 clear of the buttons and line 3 still above the box's bottom edge. */
-#define MODE_RECORD 7
-#define REC_DY     8
+#define MODE_RECORD 7         /* game mode (SYS+8): the Court Record */
 #define MAX_LINES  3
 /* The DS starts its lines 8 pixels inside the box (its box is 256 wide; the GBA's 240): the same
    margin here, with 230 pixels for the line.  Lines wider than that (under 1%, up to 246) get
@@ -451,7 +446,6 @@ static void labels_oam(void) {
        clears it as soon as an episode is picked, with its prompt still on the page) */
     if (!SYS[0x19] && !fullscreen_box()) { labels_hide(); return; }
     vs.lbl_shown = 1;
-    int dy = SYS[8] == MODE_RECORD ? REC_DY : 0;
     for (int L = 0; L < LBL_LINES; L++) {
         int w = vs.lbl_width[L];
         int ncells = (w + LBL_CELLW - 1) / LBL_CELLW;
@@ -460,7 +454,7 @@ static void labels_oam(void) {
         int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
         if (vs.mode == 2) {
             /* the page in the box: the cells cover its text rows from the left edge */
-            x = 0; y = TEXT_Y0 + L * LINE_H + dy;
+            x = 0; y = TEXT_Y0 + L * LINE_H;
         } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
@@ -468,7 +462,7 @@ static void labels_oam(void) {
                y 62 + 18 * row (y 71 when TXT+0x1a is 0). */
             int fw = vs.lbl_full[L] > w ? vs.lbl_full[L] : w;
             x = 9;
-            y = (vs.lbl_rows > 2) ? TEXT_Y0 + L * 16 + dy : 116 + L * 18;
+            y = (vs.lbl_rows > 2) ? TEXT_Y0 + L * 16 : 116 + L * 18;
             if (vs.lbl_free) {
                 /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
                    36 + 18 * row + y offset, and the writer adds 9 to x */
@@ -880,7 +874,24 @@ static void resume_frame(void) {
 }
 
 /* Per frame (before the BG map / OAM DMA). */
+/* The item box's frame (BG1 tiles 0x30-0x38) left on rows 0-9 with no item box open: before
+   0.16.17 the end of the box's closing animation left its top corners on row 0, and a save made
+   then carries them (the save keeps the map's rows).  Only the item box puts those tiles there,
+   in the game's modes with a box (dialogue 3, investigation 4, cross-examination 6, the Court
+   Record 7).  Clear them. */
+static void box_leftovers(void) {
+    u32 m = SYS[8];
+    if (SYS[0x99] != 0 || (m != 3 && m != 4 && m != 6 && m != MODE_RECORD)) return;
+    int dirty = 0;
+    for (int i = 0; i < 10 * 32; i++) {
+        u32 t = BG1MAP[i] & 0x3ff;
+        if (t >= 0x30 && t <= 0x38) { BG1MAP[i] = 0; dirty = 1; }
+    }
+    if (dirty) SYS_BGDIRTY |= 2;
+}
+
 void vwf_frame(void) {
+    box_leftovers();
     if (vs.overlay) { labels_hide(); return; }
     if (record_borrows()) { if (vs.lbl_width[2]) vs.l3_lent = 1; }
     else if (vs.l3_lent && SYS[8] != MODE_RECORD) { vs.l3_lent = 0; vwf_resume(); }

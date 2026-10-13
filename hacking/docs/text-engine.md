@@ -99,11 +99,10 @@ the records into OAM entries 2, 3, ... every frame, unless `SYS+0x19` is 0: then
 entries 2–33 and the records stay as they are (the episode select clears the byte as soon as an
 episode is picked, with its prompt still on the page). The entries are at priority 1, under
 BG2: the Court Record's panel (priority 0) covers a choice's options while it is open, and the
-English build's sprite text uses the same priority. The Record's button row (R Profiles, A OK,
-B Back) is sprites at y 96 (painted rows 97–109), on the original's name tag, above its text at
-y 116; the English page starts at y 102, so while the Record is open (game mode 7, `SYS+8`)
-`vwf.c` puts the page's lines 8 px lower (line 1 at 110, line 3's descenders at 155, above the
-box's bottom edge). The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
+English build's sprite text uses the same priority. (The Record's button row, R Profiles, A OK,
+B Back, is sprites at y 96 on the original's name tag; the English page's first line, at y 102,
+is under it while the Record is open: 0.16.18 moved the page 8 px lower meanwhile, and 0.16.21
+put it back.) The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
 on screen whose sprites start below `0x2c0` (the loader's test at `0x08014dca`; Armando's start at
 `0x284`) to `0x80` (`0x08014ddc`, attribute at `0x08014e9a`): the original's spare tiles of the item
 shown in court, the third line's here. While it is there `vwf_frame` hides the third line, and

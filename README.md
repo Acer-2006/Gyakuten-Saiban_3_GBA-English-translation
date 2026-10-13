@@ -105,6 +105,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.21 — the page stays where it is when the Court Record opens (0.16.18 undone). A pale strip
+  in the top corner left by an evidence box under an earlier build (and kept in saves made with
+  it) is cleared as soon as the game is continued.
 * 0.16.20 — opening the Court Record with certain large characters on screen (Armando, for
   one) turned the page's third line into coloured blocks, which stayed after the Record closed:
   the Record puts its picture in the original's spare tiles there, which are the third line's
