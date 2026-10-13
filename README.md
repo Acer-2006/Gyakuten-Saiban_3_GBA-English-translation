@@ -105,6 +105,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.23 — the newly added episode's box no longer loses its bottom-right corner on the screen
+  that announces it after an episode ends: the prompt under it cleared tiles the box needs.
 * 0.16.22 — the third line stays on screen while the Court Record is open with a large
   character in the scene: it moves to sprite tiles nothing on screen is using (and gives them
   back when the Record closes) instead of being hidden. "THE END" after an episode is no longer

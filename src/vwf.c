@@ -119,6 +119,7 @@ static u32 glog[GLOG_MAX];          /* glyph | x << 9 | y << 17 | colour << 23 *
 struct vwf_ext {
     u8 lbl_trim[LBL_LINES];   /* leading space of each line dropped so that it fits (page_scan) */
     u16 l3_tile;        /* while the Court Record borrows 0x80-0xbf: line 3's stand-in tiles (0: none) */
+    u8 lbl_dirty;       /* lines whose tiles are still to be cleared for this page (line_clean) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -369,12 +370,21 @@ static int measure_line(const u16* p) {
 }
 
 /* ---------------------------------------------------------------- choice labels */
+/* A line's tiles are cleared when the page first puts a character on it, not all three when it
+   starts: a line the page leaves empty keeps what is in its tiles.  On the screen that shows a
+   newly added episode, the box (OBJ tiles 0x398-0x417) runs past the end of OBJ VRAM into tiles
+   0-23, line 1's, as in the original, and the prompt under it is on lines 2 and 3. */
+static void line_clean(int L) {
+    if (!(vx.lbl_dirty & (1 << L))) return;
+    vx.lbl_dirty &= ~(1 << L);
+    for (int c = 0; c < LBL_CELLS; c++) {
+        volatile u32* p = (volatile u32*)(0x06010000 + lbl_tile(L, c) * 32);
+        for (int i = 0; i < 64; i++) p[i] = 0;
+    }
+}
+
 static void labels_reset(void) {
-    for (int L = 0; L < LBL_LINES; L++)
-        for (int c = 0; c < LBL_CELLS; c++) {
-            volatile u32* p = (volatile u32*)(0x06010000 + lbl_tile(L, c) * 32);
-            for (int i = 0; i < 64; i++) p[i] = 0;
-        }
+    vx.lbl_dirty = (1 << LBL_LINES) - 1;
     for (int i = 0; i < LBL_LINES; i++) vs.lbl_width[i] = 0;
     vs.lbl_pen = 0; vs.lbl_line = 0;
 }
@@ -445,6 +455,7 @@ static void label_draw_char(u32 code, int col, int row) {
     }
     int L = row - vs.lbl_row0;
     if (L < 0 || L >= LBL_LINES) return;
+    line_clean(L);
     if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = -vx.lbl_trim[L]; }
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
@@ -769,6 +780,7 @@ static void box_glyph(u32 code, u32 col) {
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;
+    line_clean(L);
     int x = (vs.inset ? STMT_X0 : TEXT_X0) + vs.line_x0 + vs.pen_x;
     if (x > 240 - 4) return;
     u32 c = lbl_colour(text_colors[TXT_COLOR & 0xf]);

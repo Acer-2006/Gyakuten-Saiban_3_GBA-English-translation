@@ -231,7 +231,10 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   number of lines at the first character; the system messages are centred (the English lines
   have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
   a page with a third English line uses the three-line box's rows (y 102 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
-  shows its Yes / No in entries 40 and 41.
+  shows its Yes / No in entries 40 and 41. Likewise only the tiles of the lines a page writes on
+  are cleared, each when its first character comes (`line_clean`): on the screen that announces
+  a newly added episode the new box, at OBJ tile `0x398`, runs past the end of OBJ VRAM into
+  tiles 0–23, the first line's, and the prompt under it is on the second and third lines.
   A line wider than 222 pixels with leading spaces drops as many of their pixels as it takes
   to fit (`LBL_FIT`, `lbl_trim`): the episode endings' "THE END" is pushed right by spaces in
   the DS's script, which the DS's 256-pixel screen had room for, and on the GBA's it ran off

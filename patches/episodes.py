@@ -20,9 +20,11 @@ of a dozen shades from dark red to white; each pixel takes the nearest of the sh
 box's palette has for its own lettering (indices 4-11 and the white fill, 12), so the grey
 palette greys the English letters as it greys the Japanese ones.  Two 64x64 sprites, 128
 tiles.  The label is the DS word Episode and the episode's digit, 96x24 in six sprites at OBJ tile
-24: on this screen OBJ tiles 0-63 are free (the prompt under the boxes is sprite text in tiles
-64-127), and the box of episode 5, shown next to episode 4, runs 24 tiles past the end of OBJ
-VRAM, which wraps to tiles 0-23 (as in the original).
+24: on this screen OBJ tiles 0-63 are free (the prompt under the boxes is sprite text on the text
+box's second and third lines, tiles 64-191), and a box at OBJ tile 0x398 (episode 5's next to
+episode 4, or the one sliding in on the screen that announces a newly added episode) runs 24
+tiles past the end of OBJ VRAM, which wraps to tiles 0-23 (as in the original).  The text engine
+only clears the tiles of the lines a page writes on (vwf.c, line_clean), so those 24 stay.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
