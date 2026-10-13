@@ -105,6 +105,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.24 — the episode select's prompt box is whole again (since 0.16.22 its top edge sat a row
+  too high over an empty row) and grows to hold the two-line prompt for a newly added episode.
+  Pieces some rooms draw over their background as it loads (the statue in the basement warehouse,
+  the stone at the bridge) no longer bring back strips of the Japanese signs behind them.
 * 0.16.23 — the newly added episode's box no longer loses its bottom-right corner on the screen
   that announces it after an episode ends: the prompt under it cleared tiles the box needs.
 * 0.16.22 — the third line stays on screen while the Court Record is open with a large

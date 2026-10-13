@@ -983,6 +983,29 @@ static void resume_frame(void) {
    then carries them (the save keeps the map's rows).  Only the item box puts those tiles there,
    in the game's modes with a box (dialogue 3, investigation 4, cross-examination 6, the Court
    Record 7).  Clear them. */
+/* The episode select's box is the original's short one (the box routine's mode 2, 0x080055f0:
+   top edge on row 16, two interior rows, bottom on 19; patches/text.py) for its one-line prompts.
+   An English prompt of two lines (a newly added episode) is set on the three-line box's second
+   and third rows (y 118, 134, labels_oam): the box grows two rows for it, top edge on row 14, and
+   goes back for a one-line page.  A box left by 0.16.22-0.16.23 (top edge on row 15, row 16
+   empty) is put right too. */
+#define MODE_NEW_EPISODE 0x0b
+#define MODE_SELECT      0x0c
+static void select_box(int tall) {
+    if (SYS[8] != MODE_NEW_EPISODE && SYS[8] != MODE_SELECT) return;
+    volatile u16* m = BG1MAP;
+    if ((m[13 * 32 + 8] & 0x3ff) || (m[17 * 32] & 0x3ff) != 0x06 || (m[18 * 32] & 0x3ff) != 0x06 ||
+        (m[19 * 32] & 0x3ff) != 0x04) return;
+    int at = 0;
+    for (int r = 14; r <= 16; r++) if ((m[r * 32 + 8] & 0x3ff) == 0x08) { at = r; break; }
+    int edge = tall ? 14 : 16;
+    if (!at || (at == edge && (m[16 * 32] & 0x3ff) == (tall ? 0x06 : 0x02))) return;
+    for (int r = 14; r <= 16; r++)
+        for (int tx = 0; tx < 32; tx++)
+            m[r * 32 + tx] = r < edge ? 0 : BOX_TEMPLATE[(r == edge ? 12 : 13) * 32 + tx];
+    SYS_BGDIRTY |= 2;
+}
+
 static void box_leftovers(void) {
     u32 m = SYS[8];
     if (SYS[0x99] != 0 || (m != 3 && m != 4 && m != 6 && m != MODE_RECORD)) return;
@@ -996,6 +1019,7 @@ static void box_leftovers(void) {
 
 void vwf_frame(void) {
     box_leftovers();
+    if (vs.lbl_shown && vs.lbl_caption) select_box(vs.lbl_rows > 2);
     if (vs.overlay) { labels_hide(); return; }
     record_lend();
     if (vs.resume) resume_frame();

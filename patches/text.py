@@ -151,8 +151,12 @@ def apply(rom, ctx):
     # template rows 0-13 to the map, rows 14-16 cleared, template row 14 (the original's top edge)
     # to row 16.  With the taller template that would put our top edge at row 12 and interior
     # rows at 15-16.  Now: template rows 0-11 to the map, rows 12-16 cleared, template rows 11-12
-    # (blank, top edge) to rows 15-16.
+    # (blank, top edge) to rows 15-16.  (The top edge copy's destination is the cleared rows'
+    # start plus 0x80 bytes, two rows: from row 12 it has to be 0xc0, three, or the top edge
+    # lands on row 15 over an empty row 16, as it did up to 0.16.23.)  src/vwf.c, select_box,
+    # grows the box two rows for the English prompt of two lines.
     for addr, old, new in ((0x080055fa, 0x20e0, 0x20c0),    # the cleared rows start at row 12
+                           (0x08005600, 0x3080, 0x30c0),    # ... the top edge copy goes to row 15
                            (0x08005650, 0x1bf, 0x17f),      # ... the plain copy ends at row 11
                            (0x08005616, 0x22e0, 0x22c0),    # ... entry 0x180
                            (0x0800562a, 0x22e0, 0x22b0),    # the top edge copy reads from row 11

@@ -69,6 +69,23 @@ newspaper. The rebuilt objects keep the original chunk sizes (chunks that did no
 their compressed bytes, `chunkimg.build(..., old=...)`), and every image-table entry that used an
 old object is pointed at the new one.
 
+### Background parts
+
+Some rooms draw pieces over their picture as it is loaded: the routine at `0x08033274` takes a
+list of 12-byte records `{u32 LZ tiles, u16 x, y, w, h}` (in tiles), a count and flags (bit 0:
+60-tile rows, a wide picture; bit 4: 4bpp; bit 12: straight to BG VRAM), decompresses each part
+to `0x0202b1c0` and copies its rows into the decompressed picture at `0x0202cfc0` (the caller then
+DMAs the visible part to BG3). The records are at `0x08163ce0`–`0x081642fb`, passed by about 30
+small routines that check a story flag first: the statue in the basement warehouse (two places),
+the stone and the planks at the bridge, the burnt-down hall on the temple map, and others. A part
+is cut from the Japanese picture with what is behind the object, so over a picture changed by
+`patches/pictures.py` it brought the Japanese writing back (a strip of the sign over the
+warehouse's ORG crates). `PARTS` lists the records by the picture they go on (found by matching
+every part against every picture at its place); a part over a changed picture takes the new
+picture's pixels wherever it has the old picture's own, unless it draws over most of the changed
+area itself (the temple map's part removes the hall and its label with it), and goes to the
+expansion area with its record pointed at it.
+
 ## Sprite text on the title screen
 
 The title menu items are raw 4bpp sprites, each 64×16 pixels stored as two 32×16 one-dimensional

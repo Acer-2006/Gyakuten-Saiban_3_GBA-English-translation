@@ -235,6 +235,9 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   are cleared, each when its first character comes (`line_clean`): on the screen that announces
   a newly added episode the new box, at OBJ tile `0x398`, runs past the end of OBJ VRAM into
   tiles 0–23, the first line's, and the prompt under it is on the second and third lines.
+  The episode select's box is the original's short one (top edge on map row 16, for the
+  one-line prompts at y 134); while that two-line prompt is up, `select_box` grows it two rows
+  (top edge on row 14, around y 118 and 134) and puts it back for the next one-line page.
   A line wider than 222 pixels with leading spaces drops as many of their pixels as it takes
   to fit (`LBL_FIT`, `lbl_trim`): the episode endings' "THE END" is pushed right by spaces in
   the DS's script, which the DS's 256-pixel screen had room for, and on the GBA's it ran off

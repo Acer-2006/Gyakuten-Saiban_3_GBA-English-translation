@@ -355,19 +355,76 @@ def make(rom, ctx, lang, entry, how, opts):
     new = METHODS[how](g, jp, en, **opts)
     if new is None:
         raise SystemExit(f'pictures: image {entry} does not match DS picture {lang} ({how})')
-    return obj, new, chunks
+    return obj, new, chunks, g
+
+# Background parts.  Some rooms draw pieces over their picture as it is loaded (0x08033274, called
+# with a list of {u32 LZ tiles, u16 x, y, w, h} in tiles and flags: bit 0 = 60-tile rows, bit 4 =
+# 4bpp; the rows are copied into the decompressed picture at 0x0202cfc0): the statue in the
+# basement warehouse, the stone and the planks at the bridge.  They are cut from the Japanese
+# picture with what is behind the object, so over a picture changed here they brought the
+# Japanese writing back (a strip of the sign above the warehouse's ORG crates).  A part over a
+# changed picture takes the new picture's pixels wherever it has the old picture's own, unless
+# it draws over most of the changed area itself (the temple map with the hall burnt down: its
+# label goes with it).  The parts' records, by the picture they go on (found by matching every
+# part against every picture at its place):
+PARTS = {
+    8: (0x08163ce0, 0x08163cec, 0x08163cf8, 0x08163d04, 0x08163d10, 0x08163d1c, 0x08163d28),
+    18: (0x08163d64, 0x08163d70, 0x08163d7c),
+    20: (0x08163d94,),
+    27: (0x08163f54, 0x08163f60, 0x08163f6c, 0x08163f78, 0x08163f84, 0x08163f90, 0x08163f9c,
+         0x08163fa8, 0x08163fb4, 0x08163fc0),
+    39: (0x081642d8,),
+    98: (0x08163e88, 0x08163e94, 0x08163ea0, 0x08163eac, 0x08163eb8, 0x0816420c),
+    110: (0x0816417c, 0x08164188, 0x08164194, 0x081641a0, 0x081641ac, 0x081641b8),
+}
+PART_KEEP = 0.75     # share of the changed pixels under a part it must leave as they were
+PART_MATCH = 0.5     # share of a redrawn part that must be the old picture's own pixels
+
+def parts(rom, pics):
+    """pics: GBA image entry -> (old Pic, new Pic).  Redraws the parts over changed pictures."""
+    done = []
+    for entry, recs in PARTS.items():
+        if entry not in pics: continue
+        old, new = pics[entry]
+        for ra in recs:
+            src, x, y, w, h = struct.unpack_from('<IHHHH', rom.d, ra - 0x08000000)
+            data, _ = lz.decompress(rom.d, src - 0x08000000)
+            if len(data) != w * h * (64 if old.bpp8 else 32):
+                raise SystemExit(f'pictures: part {ra:#x} is not a part of image {entry}')
+            px, pw, ph = untile(data, old.bpp8, w)
+            fixed = bytearray(px)
+            under = same = kept = 0
+            for yy in range(ph):
+                for xx in range(pw):
+                    i = (y * 8 + yy) * old.w + x * 8 + xx
+                    o, n, v = old.px[i], new.px[i], px[yy * pw + xx]
+                    same += v == o
+                    if o != n:
+                        under += 1
+                        if v == o: fixed[yy * pw + xx] = n; kept += 1
+            if not under or kept < PART_KEEP * under: continue
+            if same < PART_MATCH * pw * ph:
+                raise SystemExit(f'pictures: part {ra:#x} does not look like image {entry}')
+            tiles = retile(Pic(pw, ph, old.pal, fixed, old.bpp8))
+            rom.w32(ra, rom.store(lz.compress(tiles), 'ext', 4, f'background part {ra:#x}'))
+            done.append(ra)
+    return done
 
 def apply(rom, ctx):
     if struct.unpack_from('<II', ctx.arm9, LANG_JP - DS_ARM9 + 8 * LANG_N) != (0, 0):
         raise SystemExit('pictures: unexpected DS picture tables')
     entries = [struct.unpack_from('<II', rom.d, IMAGE_TABLE - 0x08000000 + 8 * k) for k in range(IMAGES)]
     total = 0
+    pics = {}
     for lang, entry, how, opts in PICTURES:
-        obj, new, chunks = make(rom, ctx, lang, entry, how, opts)
+        obj, new, chunks, old = make(rom, ctx, lang, entry, how, opts)
+        pics[entry] = (old, new)
         pal = struct.pack('<%dH' % len(new.pal), *new.pal)
         data = chunkimg.build(pal, retile(new), [len(c) for c, _ in chunks], chunks)
         addr = rom.store(data, 'ext', 4, f'picture {entry}')
         for k, (o, f) in enumerate(entries):
             if o == obj: rom.w32(IMAGE_TABLE + 8 * k, addr)
         total += 1
-    print(f"  pictures with writing: {total} from the DS English ones")
+    done = parts(rom, pics)
+    print(f"  pictures with writing: {total} from the DS English ones; {len(done)} background parts "
+          f"over them redrawn ({', '.join(f'{a:#x}' for a in done)})")
