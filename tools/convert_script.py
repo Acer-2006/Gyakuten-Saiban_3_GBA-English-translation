@@ -35,6 +35,10 @@ DS_EFFECTS = {0x27, 0x47, 0x12, 0x13, 0x4e}
 # text layout (0x5d): the DS centres the date and place cards and the testimony titles
 # ({5d 1} ... {5d 0}, 332 pairs the GBA's script does not have); the DS's are kept
 ALIGN_CMD = 0x5d
+# Map markers (0x39 load, 0x3a place, 0x3c show; graphics.md "Map markers"): the DS draws its maps
+# with their markers in, so its script has none of these where the GBA places one, and they are
+# the GBA's own, put back where the GBA has them (as the GBA's sounds are).
+MARKER_CMDS = {0x39, 0x3a, 0x3c}
 
 def tok(ws, tab):
     out = []; i = 0
@@ -110,6 +114,13 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
     """emap (optional dict) receives E item index -> output item index, for label entries."""
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
+    # the GBA's commands that line up with none of the DS's, by (command, arguments): one the DS
+    # has elsewhere in the section is the same command, moved (see 'moved' below)
+    g_free = defaultdict(list)
+    matched_g = set(gj.values())
+    for k, gi in enumerate(g):
+        if gi[0] == 'c' and k not in matched_g: g_free[(gi[1], gi[2])].append(k)
+    g_moved = set()
     out = []
     epos = {}                       # e index -> output index
     ds_sounds = Counter()           # sound commands of the DS that line up with none of the GBA's
@@ -184,6 +195,16 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
                 out.append(('c', c, map_args(c, it[2], argmap)))
                 if stats is not None: stats['ds_effects'] += 1
                 i += 1; continue
+            # a command the DS moved: the GBA has the same one (same arguments) elsewhere in the
+            # section, where it lines up with nothing.  It is kept where the DS has it, with the
+            # GBA's arguments; dropping it lost it on both sides (a flag that marks a conversation
+            # as heard, a speaker's name tag, a box hidden)
+            free = g_free.get((c, j[jk][2]))
+            if free:
+                gk2 = free.pop(0); g_moved.add(gk2)
+                out.append(('c', c, g[gk2][2]))
+                if stats is not None: stats['moved'] += 1
+                i += 1; continue
             # DS-only insertion (J has it, G doesn't): drop
             if stats is not None: stats['dropped_ds_ins'] += 1
             i += 1; continue
@@ -201,13 +222,13 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
     matched = set(gj.values())
     inserts = []
     for gk, gi in enumerate(g):
-        if gi[0] != 'c' or gi[1] not in SOUND_CMDS or gk in matched: continue
-        if ds_sounds[(gi[1], gi[2])]:
+        if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS or gk in matched or gk in g_moved: continue
+        if gi[1] in SOUND_CMDS and ds_sounds[(gi[1], gi[2])]:
             ds_sounds[(gi[1], gi[2])] -= 1; continue
         prev = max((k for k in g_e if k < gk), default=None)
         ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
         inserts.append((0 if ek is None else epos[ek] + 1, gi))
-        if stats is not None: stats['gba_sounds'] += 1
+        if stats is not None: stats['gba_markers' if gi[1] in MARKER_CMDS else 'gba_sounds'] += 1
     for pos, gi in reversed(sorted(inserts, key=lambda x: x[0])):   # (in order where they meet)
         out.insert(pos, gi)
     if emap is not None and inserts:

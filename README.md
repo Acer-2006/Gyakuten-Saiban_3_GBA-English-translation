@@ -30,8 +30,11 @@ flash cart.
 In-game saves carry over to newer builds: a save also notes where in the script you stopped,
 and a newer build finds that place in its own script. Saves made with 0.11.6 or older are placed
 by their position, which is right unless that part of the script changed in between. Emulator
-savestates do not carry over: one made with an older build can show a garbled text box until
-the next page of text.
+savestates hold the script's addresses: from 0.16.27 every script bank has a fixed slot in the
+ROM (`data/bank_slots.json`), so a fix in one part of the script moves nothing else and a
+savestate made with 0.16.27 or later keeps working in later builds. One made with 0.16.26 or
+older finds its script moved in 0.16.27 and can freeze or show garbage; load an in-game save
+instead.
 
 ## What the English build changes
 
@@ -105,6 +108,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.27 — a check of every jump and command in the script against the Japanese one: where the
+  DS moved a command further along a section, the converter lost it on both sides. Four
+  conversations in episode 3 never marked themselves as heard (and played their first-time
+  version every time), four lines lost their speaker's name tag, and a few box hides went with
+  them: 24 commands, now kept where the DS has them. The markers the GBA places on episode 4's
+  maps (the DS draws its maps with them in) were missing too: 22 marker commands are back.
+  The script banks now sit in fixed slots, so later script fixes no longer move them (savestates
+  from 0.16.27 on keep working in newer builds; older ones do not carry over to this one).
 * 0.16.26 — the L button's label while breaking Psyche-Locks reads Stop (it was still やめる), and
   the Court Record's A-button label きりかえ reads Swap.
 * 0.16.25 — a soft lock halfway through episode 2: asking about a topic again could leave the

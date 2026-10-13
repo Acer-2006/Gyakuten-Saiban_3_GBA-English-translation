@@ -22,6 +22,20 @@ RESTORE_TEXT = 0x08020024
 SRAM_SYMS = {'sram_write': 0x0803a1ad, 'sram_read': 0x0803a075}   # WriteSramEx, ReadSram
 DIRECTORY = 0x08800000               # bank directory written for tools: 'GS3E', u32 1, u32 45, {u32 addr, u32 len} x 45
                                      # (banks 0..43 then the common bank; len 0 = LZ-compressed at addr)
+# Every English bank sits in a slot of a fixed size (data/bank_slots.json: its length when the slots
+# were set, plus a sixteenth and 1 KB), so that a script fix that changes one bank's length moves
+# no other: a save state holds absolute script addresses (the text pointer, script.c's bank_base),
+# and one made with an earlier build then still finds its script.  A bank that outgrows its slot
+# stops the build; raising the slot moves every bank after it (and breaks save states once).
+SLOTS = os.path.join(ROOT, 'data', 'bank_slots.json')
+
+def place(rom, data, size, note):
+    if len(data) > size:
+        raise SystemExit(f'script: {note} is {len(data)} bytes, more than its slot of {size} '
+                         f'(raise it in data/bank_slots.json; every bank after it moves)')
+    a = rom.alloc(size, 'ext', 4)
+    rom.write(a, data, note)
+    return a
 
 def apply(rom, ctx):
     table = ctx.gba_table
@@ -30,9 +44,10 @@ def apply(rom, ctx):
     dir_addr = rom.alloc(16 + 45 * 8, 'ext', 4)
     assert dir_addr == DIRECTORY, hex(dir_addr)
     bank_addr = {}
+    slots = json.load(open(SLOTS))
     for b in range(42):
-        bank_addr[b] = rom.store(en[b], 'ext', 4, f'en bank {b}')
-    common = rom.store(en['common'], 'ext', 4, 'en common bank')
+        bank_addr[b] = place(rom, en[b], slots[str(b)], f'en bank {b}')
+    common = place(rom, en['common'], slots['common'], 'en common bank')
     print(f"  English banks at {bank_addr[0]:#x}.., common at {common:#x}; ext used {rom.regions['ext'].used/1e6:.2f} MB")
     entries = []
     for b in range(44):

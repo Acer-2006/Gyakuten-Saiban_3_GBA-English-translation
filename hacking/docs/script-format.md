@@ -197,3 +197,13 @@ Two commands differ between the versions:
   as they are, since the two scripts agree on them wherever both have the command (`DS_EFFECTS`
   in `tools/convert_script.py`). The rest (the DS's graphic loads, `0x69`/`0x6b`, the box
   hide/shows around its top-screen updates, `0x53`, the DS-only `0x74`...) is dropped.
+  Except a command the DS only moved: when the GBA has the same command with the same
+  arguments elsewhere in the section, lining up with nothing, it is the same one, and it is
+  kept where the DS has it (24 of them: four flags that mark a conversation as heard, four
+  speakers' name tags, box hides and others). Before 0.16.27 these were dropped on both sides,
+  and the conversations behind those four flags played their first-time version every time.
+* Map markers (`0x39`, `0x3a`, `0x3c`) the GBA places where the DS script has none (the DS draws
+  its maps with their markers in): the GBA's own are put back where the GBA has them, as the
+  GBA's sounds are (22, on the maps of episode 4's investigation). Other GBA-only commands are
+  left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own
+  `0x69`/`0x6b` (screen movement) where the DS has its own instead.

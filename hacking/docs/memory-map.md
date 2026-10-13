@@ -40,7 +40,9 @@ Gyakuten Saiban 3 (Japan), A3JJ, 8 MB (`0x08000000`–`0x087fffff`), CRC32 `51B6
 
 The ROM is full: anything of size has to go either into the padding at `0x08164640` or into an
 expansion. The English build pads the ROM to 16 MB and uses `0x08800000`–`0x08ffffff` for the
-bank directory (`0x08800000`, see script-format.md), the English script banks, graphics and
+bank directory (`0x08800000`, see script-format.md), the English script banks (each in a slot
+of a fixed size from `data/bank_slots.json`, so that a change to one bank moves no other and an
+emulator savestate, which holds script addresses, survives a newer build), graphics and
 samples; a 16 MB ROM is fine for the GBA and every emulator. The hacking tools put new data
 after the last used byte, growing the ROM when needed.
 Keep in mind that Thumb `bl` only reaches ±4 MB, so new *code* that is called from the original
