@@ -120,7 +120,8 @@ struct vwf_ext {
     u8 lbl_trim[LBL_LINES];   /* leading space of each line dropped so that it fits (page_scan) */
     u16 l3_tile;        /* while the Court Record borrows 0x80-0xbf: line 3's stand-in tiles (0: none) */
     u8 lbl_dirty;       /* lines whose tiles are still to be cleared for this page (line_clean) */
-    u8 q_bare;          /* the canvas tiles hold the letters alone (BG0 shows them over the box) */
+    u8 q_bare;          /* the canvas tiles hold the letters alone (BG0 shows them over the box): set
+                           by canvas_tiles, from q_want, so it always says how the tiles are drawn */
     u8 q_on;            /* the question is on BG0 this frame (q_frame) */
     u8 q_new;           /* ... from this frame: BG0's whole map is cleared first */
     u8 q_bg1;           /* the game DMAs BG1's map this frame: its canvas cells are patched after */
@@ -129,6 +130,8 @@ struct vwf_ext {
     u16 q_save_disp, q_save_bld;   /* the game's shadow values around its IO register update */
     u32 q_save_win;
     u8 q_saved;
+    u8 q_want;          /* BG0 is free: canvases are drawn bare (q_bare is how the tiles are now) */
+    u8 cur_ahead;       /* the choice cursor is in OAM CURSOR_AHEAD (cursor_ahead) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -230,6 +233,7 @@ static void fill_tile(int dst_tile, const u32* src) {
 
 static void canvas_tiles(void) {
     static const u32 bare[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    vx.q_bare = vx.q_want;
     if (vx.q_bare) {
         for (int t = 0; t < CV_ROWS * CV_COLS; t++) fill_tile(CV_TILE0 + t, bare);
         vs.q_noedge = 0;
@@ -634,6 +638,29 @@ static void choice_frame(void) {
     labels_oam();
 }
 
+/* The engine's choice cursor, a 16x16 hand at OBJ tiles 0xfc-0xff, is OAM 57, after the defence
+   bench (48-51, priority 3, from y 128).  The hardware draws an earlier, lower-priority sprite that
+   overlaps a later, higher-priority one with the latter's priority: where the cursor (priority 1)
+   met the bench, a square of the bench came up over the box.  A three-line question puts the
+   options a row lower than the Japanese two-line ones, so the third option's cursor (y 126) does
+   meet it.  The engine writes the cursor every frame; it is shown from OAM 33 instead (free while
+   the full-screen box is up: the page's sprite text is 3-26), ahead of the bench. */
+#define CURSOR_OBJ   57
+#define CURSOR_TILE  0xfc
+#define CURSOR_AHEAD 33
+static void cursor_ahead(int on) {
+    volatile u16* c = OAMBUF + CURSOR_OBJ * 4;
+    volatile u16* d = OAMBUF + CURSOR_AHEAD * 4;
+    if (on && (c[2] & 0x3ff) == CURSOR_TILE) {
+        d[0] = c[0]; d[1] = c[1]; d[2] = c[2];
+        c[0] = 0x0200;
+        vx.cur_ahead = 1;
+    } else if (vx.cur_ahead) {
+        d[0] = 0x0200;
+        vx.cur_ahead = 0;
+    }
+}
+
 /* Before a choice the box grows (and after it shrinks) a few rows a frame, the engine copying map
    rows upward (or downward): rows with the canvas in them would show copies of the text in every
    row.  A copied canvas row keeps each tile in its column. */
@@ -1036,8 +1063,10 @@ static void box_leftovers(void) {
 
 static void q_frame(void);
 static void frame_body(void);
+static void cursor_ahead(int on);
 void vwf_frame(void) {
     frame_body();
+    cursor_ahead(fullscreen_box() && !vs.overlay);
     q_frame();
 }
 
@@ -1135,14 +1164,18 @@ static void frame_body(void) {
 static void q_frame(void) {
     u32 disp = SH_DISPCNT;
     int bg0_free = !(disp & 0x100) && (disp & 0x200) && (disp & 7) <= 1;
-    /* the canvas's tiles follow (drawn again from the glyph log) while they are still the page's */
-    if (bg0_free != vx.q_bare) {
-        int ours = vs.mapped && !vs.lost && vs.csum_ok && canvas_sum() == vs.csum;
-        vx.q_bare = bg0_free;
-        if (ours) { canvas_redraw(); vs.csum = canvas_sum(); vs.csum_ok = 1; }
+    /* the canvas's tiles follow, drawn again from the glyph log, while the page is mapped (a lost
+       page is drawn again later, as q_want says).  The full-screen choice box skips canvas_check,
+       so its checksum is not to be relied on; nothing else has the tiles while the page is mapped
+       and not lost.  q_bare changes only with the tiles, so BG0 never shows framed ones (a page
+       left framed by a save state from 0.16.30 or before showed the box opaque behind the
+       question) and BG1 never bare ones. */
+    vx.q_want = bg0_free;
+    if (vx.q_want != vx.q_bare && vs.mapped && !vs.lost) {
+        canvas_redraw();
     }
     u32 rows = 0;
-    if (vx.q_bare && vs.mapped && !vs.lost && !vs.overlay)
+    if (vx.q_bare && vx.q_want && vs.mapped && !vs.lost && !vs.overlay)
         for (int row = 0; row < 20; row++)
             for (int tx = 0; tx < CV_COLS; tx++)
                 if (canvas_tile(BG1MAP[row * 32 + tx])) { rows |= 1u << row; break; }

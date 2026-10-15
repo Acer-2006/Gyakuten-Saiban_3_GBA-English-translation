@@ -248,6 +248,13 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   The engine puts its cursor at y 18 · (row + selection), the row being the question's lines plus
   a blank one (`TXT+0x29` + 1 when the first option is drawn); the English build's option
   sprites go on those rows, 18 px apart.
+  The engine's cursor is OAM 57 (a 16×16 hand, OBJ tiles `0xfc`–`0xff`, priority 1), after the defence
+  bench's sprites (48–51, priority 3, from y 128). The hardware draws an earlier, lower-priority sprite that
+  overlaps a later, higher-priority one with the latter's priority, so where the cursor met the bench a
+  square of the bench came up over the box; a three-line question puts the options a row lower than the
+  Japanese ones, and the third option's cursor (y 126) meets it. The engine writes the cursor every frame;
+  while the full-screen box is up the English build shows it from OAM 33 (free then) and hides 57
+  (`cursor_ahead`).
 
 ## Where the English build hooks in
 
