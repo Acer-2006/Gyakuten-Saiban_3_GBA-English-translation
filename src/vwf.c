@@ -1102,12 +1102,17 @@ void vwf_restore(void) {
 }
 
 /* Replaces the engine's "clear box rows" loop: rows 10..19 of the BG1 map (the name tag's two
-   rows and the box's eight). */
+   rows and the box's eight).  A page of sprite text keeps its lines: command 0x1c can hide the
+   box in the middle of a page (14 pages, the same in the Japanese GBA script and the DS's: the
+   box goes for an animation, a point or a desk slam, and comes back with the page's text, which
+   goes on where it was; the Japanese even goes on in the same line), and the original keeps its
+   sprite text through it.  Starting the page over here lost the lines typed before the hide.
+   A page that ends, or a new one typed from the first cell, starts over anyway. */
 void vwf_boxclear(void) {
     for (int i = 10 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
-    vs.mode = 0;
+    if (vs.mode != 2) vs.mode = 0;
     vs.overlay = 0;
 }
 

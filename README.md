@@ -108,6 +108,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.28 — a page whose box hides partway through (for a point or a desk slam, 14 pages in all,
+  as in the Japanese and the DS) lost the lines typed before the hide: the box came back with
+  only the rest of the page. The page's text now comes back with the box.
 * 0.16.27 — a check of every jump and command in the script against the Japanese one: where the
   DS moved a command further along a section, the converter lost it on both sides. Four
   conversations in episode 3 never marked themselves as heard (and played their first-time
