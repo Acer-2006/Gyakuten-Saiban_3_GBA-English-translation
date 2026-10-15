@@ -421,8 +421,11 @@ over from them (and the halves the same as its last frame when they take over ag
 DS anchors the banners at y 76 (its effect table, 24-byte entries from arm9 `0x020a0558`: the
 whole banners and the halves sliding in from x 0 and 256 are entries 64–69, Unlock Successful
 85–88) and hangs the lettering from 24 rows above it (23 for Unlock Successful); the English
-build keeps that offset, shrunk with the picture, from the GBA's anchor (y 60): the sprites start
-20 rows above it (23 for Unlock Successful), the lettering 16 (14). The testimony banners keep two palettes, so their flash is drawn into the pictures (four palettes
+build keeps that offset, shrunk with the picture, from the GBA's anchor (y 60), but no lower than
+leaves the lettering 4 rows above the text box (its top edge at y 96, up with the testimony's
+title): Witness Testimony and Cross Examination start 28 rows above the anchor (the DS's offset
+would be 20, its lettering touching the box), the lettering at y 36–91; Unlock Successful keeps
+the DS's 23 (lettering y 46–91). The testimony banners keep two palettes, so their flash is drawn into the pictures (four palettes
 from OBJ palette 11 would reach the witness's 14); Unlock Successful flashes through the DS's
 four palettes, as the original's did. The frames keep the DS's timing.
 

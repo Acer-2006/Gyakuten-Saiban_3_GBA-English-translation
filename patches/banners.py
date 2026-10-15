@@ -65,7 +65,8 @@ VRAM = (0x06010000 + 32 * TILE0, 0x06010000 + 32 * (TILE0 + 64), 0x06010000 + 32
 W, H = 128, 64
 # The banners' sprites start this far above the anchor (y 60), worked out per banner in
 # top_offset from where the DS puts its lettering about its own anchor (y 76 on the DS, the
-# effect table at arm9 0x020a0558 + 24 * n): the same offset, shrunk with the picture.
+# effect table at arm9 0x020a0558 + 24 * n): the same offset, shrunk with the picture, and
+# higher still where that would leave the lettering on the text box (clear_of_box).
 HI = {'testimony': 0x000, 'cross': 0x000, 'unlock': 0x800}   # palette mode on the GBA
 SQUARE = dspic.SHAPE[(64, 64)] << 12
 
@@ -144,13 +145,27 @@ def top_offset(win):
     s = min(W / (x1 - x0), H / (y1 - y0))
     return round((y0 - 96) * s) - (H - round((y1 - y0) * s)) // 2
 
+ANCHOR_Y = 60      # the GBA banners' anchor (the animation table entries)
+BOX_Y = 96         # the text box's top edge (map row 12), up during a testimony with its title
+GAP = 4            # rows of the scene left between the lettering and the box
+
+def clear_of_box(win):
+    """The lowest canvas top (from the anchor) that keeps the shrunk lettering GAP rows above
+    the text box: the DS hangs its two lines low enough to touch its box, which on the GBA's
+    shorter screen looks low; Witness Testimony / Cross Examination go up 8 rows from the DS's
+    spacing, Unlock Successful (shorter) clears the box as it is."""
+    x0, y0, x1, y1 = win
+    s = min(W / (x1 - x0), H / (y1 - y0))
+    th = round((y1 - y0) * s)
+    return BOX_Y - GAP - ANCHOR_Y - (H - th) // 2 - th
+
 def build(rom, ctx, names, gba_pals):
     """One sub-archive for these banners (with the palettes `gba_pals`, DS palette numbers) and
     the frame data of their effects -> {name: (whole, left, right) frame data}, sub-archive"""
     data = ctx.data
     bs = {n: ds_banner(data, n) for n in names}
     win = window(bs.values())
-    TOP = top_offset(win)
+    TOP = min(top_offset(win), clear_of_box(win))
     cells, frames = [], {}
     def cell(c):
         if c not in cells: cells.append(c)

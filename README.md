@@ -108,6 +108,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.30 — the Witness Testimony / Cross Examination banners go 8 pixels higher again, so their
+  lettering ends 4 pixels above the text box (which shows the testimony's title under them)
+  instead of touching it.
 * 0.16.29 — the Witness Testimony / Cross Examination banners sit 4 pixels higher and Unlock
   Successful 7: each now keeps the DS's spacing from its anchor (shrunk with the picture) instead
   of hanging from where the original's one-line banner started.
