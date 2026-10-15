@@ -108,6 +108,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.29 — the Witness Testimony / Cross Examination banners sit 4 pixels higher and Unlock
+  Successful 7: each now keeps the DS's spacing from its anchor (shrunk with the picture) instead
+  of hanging from where the original's one-line banner started.
 * 0.16.28 — a page whose box hides partway through (for a point or a desk slam, 14 pages in all,
   as in the Japanese and the DS) lost the lines typed before the hide: the box came back with
   only the rest of the page. The page's text now comes back with the box.

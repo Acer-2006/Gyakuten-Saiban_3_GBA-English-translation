@@ -418,7 +418,11 @@ Examination are 128×56, Unlock Successful 128×46. The banner takes OBJ tiles `
 before: the right half at `0x240`, the left half at `0x280`, and the whole banner at `0x240` too,
 right half first, so that its first frame writes the same tiles the halves have when it takes
 over from them (and the halves the same as its last frame when they take over again). The
-testimony banners keep two palettes, so their flash is drawn into the pictures (four palettes
+DS anchors the banners at y 76 (its effect table, 24-byte entries from arm9 `0x020a0558`: the
+whole banners and the halves sliding in from x 0 and 256 are entries 64–69, Unlock Successful
+85–88) and hangs the lettering from 24 rows above it (23 for Unlock Successful); the English
+build keeps that offset, shrunk with the picture, from the GBA's anchor (y 60): the sprites start
+20 rows above it (23 for Unlock Successful), the lettering 16 (14). The testimony banners keep two palettes, so their flash is drawn into the pictures (four palettes
 from OBJ palette 11 would reach the witness's 14); Unlock Successful flashes through the DS's
 four palettes, as the original's did. The frames keep the DS's timing.
 
