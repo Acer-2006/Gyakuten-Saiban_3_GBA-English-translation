@@ -108,6 +108,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.31 — a question asked before a choice (Phoenix's blue thoughts, an orange word) took the
+  colour of the scene behind it, paler over a bright wall than over a dark suit: it was drawn on the
+  text box's own layer, which the game blends with the scene. It now goes on a layer of its own over
+  the box and keeps the same colours as every other page.
 * 0.16.30 — the Witness Testimony / Cross Examination banners go 8 pixels higher again, so their
   lettering ends 4 pixels above the text box (which shows the testimony's title under them)
   instead of touching it.

@@ -23,6 +23,9 @@ BOX_CLEARS = [(0x08022166, 0x08022186, 'adds r4, r7, #0\n adds r4, #0x23'),   # 
 TAG_ERASE_DST   = 0x08006596   # movs r5, #0xc0 (<< 2: map byte offset 0x300, row 12)
 STMT_ARROW_Y    = (0x0800ebc8, 0x0800ebfe)   # movs r0, #0x80: the statement arrows' y (0x0800ebb0)
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
+IOREG_CALL      = 0x08000422   # bl IOREG_UPDATE, in the main loop's per-frame updates
+BGCNT_STORE     = 0x0800673a   # ldr r0,[r2]; str r0,[r1]: BG0CNT | BG1CNT << 16 from the shadow, after the map DMAs
+IOREG_UPDATE    = 0x080009bc   # DISPCNT, DISPSTAT, windows, blending from the shadow at 0x03003a90
 RESTORE_TEXT    = 0x08020024   # redraws text sprites from the sprite records after a state restore
 RESTORE_CALLS   = (0x0800bcc4, 0x08014464)   # 0x0800dcd4, continuing a save: patches/script.py
 SAVE_BACK       = 0x0800bd54   # bl 0x080201e4: the save screen's last call once the game state is back
@@ -113,6 +116,37 @@ def apply(rom, ctx):
     assert rom.u32(0x0800674c) == 0x030037b0, hex(rom.u32(0x0800674c))
     assert rom.u32(0x08006750) == 0x03003a90, hex(rom.u32(0x08006750))
     rom.thumb(VRAMUPD_HOOK, f'bl #{tramp_fr & ~1:#x}', 'frame hook')
+
+    # 4a. the choice question on BG0 over the box (src/vwf.c, "the question on BG0"): BG0's
+    # control register in place of the store of BG0CNT | BG1CNT << 16 right after the map DMAs,
+    # and the game's shadow of DISPCNT, blending and windows around its IO register update
+    assert rom.read(BGCNT_STORE, 4) == rom.asm_thumb(BGCNT_STORE, 'ldr r0, [r2]\n str r0, [r1]')
+    tramp_bc = rom.thumb_code(f'''
+        push {{r1, r2, r3, lr}}
+        mov r0, r12
+        push {{r0}}
+        ldr r0, [r2]
+        bl #{syms["vwf_bgcnt"] & ~1:#x}
+        pop {{r3}}
+        mov r12, r3
+        pop {{r1, r2, r3}}
+        str r0, [r1]
+        pop {{pc}}
+    ''', note='BG control trampoline')
+    rom.thumb(BGCNT_STORE, f'bl #{tramp_bc & ~1:#x}', 'BG control hook')
+    assert rom.read(IOREG_CALL, 4) == rom.asm_thumb(IOREG_CALL, f'bl #{IOREG_UPDATE:#x}')
+    tramp_io = rom.thumb_code(f'''
+        push {{lr}}
+        mov r0, r12
+        push {{r0}}
+        bl #{syms["vwf_io_pre"] & ~1:#x}
+        bl #{IOREG_UPDATE:#x}
+        bl #{syms["vwf_io_post"] & ~1:#x}
+        pop {{r0}}
+        mov r12, r0
+        pop {{pc}}
+    ''', note='IO register trampoline')
+    rom.thumb(IOREG_CALL, f'bl #{tramp_io & ~1:#x}', 'IO register hook')
 
     # 4b. overlay screens (save screen, ...) restore the game state on exit and call 0x08020024
     # to redraw the text sprites from the restored records: drop the overlay's sprite text first

@@ -120,6 +120,15 @@ struct vwf_ext {
     u8 lbl_trim[LBL_LINES];   /* leading space of each line dropped so that it fits (page_scan) */
     u16 l3_tile;        /* while the Court Record borrows 0x80-0xbf: line 3's stand-in tiles (0: none) */
     u8 lbl_dirty;       /* lines whose tiles are still to be cleared for this page (line_clean) */
+    u8 q_bare;          /* the canvas tiles hold the letters alone (BG0 shows them over the box) */
+    u8 q_on;            /* the question is on BG0 this frame (q_frame) */
+    u8 q_new;           /* ... from this frame: BG0's whole map is cleared first */
+    u8 q_bg1;           /* the game DMAs BG1's map this frame: its canvas cells are patched after */
+    u32 q_rows;         /* BG0 map rows (0-19) holding canvas entries */
+    u32 q_rows_now;     /* ... this frame's */
+    u16 q_save_disp, q_save_bld;   /* the game's shadow values around its IO register update */
+    u32 q_save_win;
+    u8 q_saved;
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -220,6 +229,13 @@ static void fill_tile(int dst_tile, const u32* src) {
 }
 
 static void canvas_tiles(void) {
+    static const u32 bare[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+    if (vx.q_bare) {
+        for (int t = 0; t < CV_ROWS * CV_COLS; t++) fill_tile(CV_TILE0 + t, bare);
+        vs.q_noedge = 0;
+        vs.csum_ok = 0;
+        return;
+    }
     for (int ty = 0; ty < CV_ROWS; ty++) {
         for (int tx = 0; tx < CV_COLS; tx++) {
             int src;
@@ -236,6 +252,7 @@ static void canvas_tiles(void) {
    edge would draw a line across the screen: frame_bottom(0) turns it into plain interior and side
    edges, frame_bottom(1) puts it back.  Only frame pixels change (text has colours 8 and up). */
 static void frame_bottom(int on) {
+    if (vx.q_bare) { vs.q_noedge = !on; return; }   /* no frame in the tiles: BG1 has the box */
     for (int tx = 0; tx < CV_COLS; tx++) {
         int edge = (tx == 0) ? 1 : (tx == CV_COLS - 1) ? 2 : 6;
         int side = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;
@@ -325,7 +342,7 @@ static u32 canvas_sum(void) {
 static int canvas_in_use(void) {
     u32 dispcnt = REG16(0x04000000);
     for (int bg = 0; bg < 3; bg++) {
-        if (!(dispcnt & (0x100 << bg))) continue;
+        if (!(dispcnt & (0x100 << bg)) || (bg == 0 && vx.q_on)) continue;
         u32 cnt = REG16(0x04000008 + 2 * bg);
         if (cnt & 0x0c) continue;                        /* other char base */
         volatile u16* m = (volatile u16*)(VRAM + ((cnt >> 8) & 31) * 0x800);
@@ -1017,7 +1034,14 @@ static void box_leftovers(void) {
     if (dirty) SYS_BGDIRTY |= 2;
 }
 
+static void q_frame(void);
+static void frame_body(void);
 void vwf_frame(void) {
+    frame_body();
+    q_frame();
+}
+
+static void frame_body(void) {
     box_leftovers();
     if (vs.lbl_shown && vs.lbl_caption) select_box(vs.lbl_rows > 2);
     if (vs.overlay) { labels_hide(); return; }
@@ -1081,6 +1105,107 @@ void vwf_frame(void) {
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
     } else vs.arrow_t = 0;
     if (vs.mapped) canvas_check();
+}
+
+/* ---------------------------------------------------------------- the question on BG0 */
+/* The question canvas is on BG1, the box's layer, which the game blends with the scene (the box
+   lets 7/16 of it through): its letters took the colour of what was behind them, a blue line
+   paler over a bright wall than over a dark suit (white, at full brightness, does not show it).
+   The page text is sprites and keeps its colours, as the original's and the DS's do.  While the
+   game has BG0 off (every choice page seen), the letters go there instead: the canvas tiles hold
+   them alone (vx.q_bare), BG0 maps them where BG1's map has the canvas, at BG1's priority (BG0 is
+   drawn over BG1 at the same priority) and scroll, and BG1 shows the box's own tiles in their
+   place.  BG0 is not a blending target, so the letters keep their colours over the box, which
+   blends as before.  BG1's map shadow keeps the canvas entries (everything above works on it):
+   only VRAM differs.  Everything is written where the game writes its own, so that nothing
+   lands later in the frame than the game's (a first try that did it all after the game's
+   updates tore the screen while the box slid): q_frame, before the map DMAs (0x08006684), takes
+   BG0 off the game's DMA; vwf_bgcnt, called in place of the BG0CNT / BG1CNT store right after
+   them, patches the maps in VRAM and gives the BG0 control and scroll; vwf_io_pre / vwf_io_post,
+   around the IO register update (0x080009bc), add BG0 to DISPCNT (and to a fade's targets, and
+   to the windows that show BG1) in the game's shadow and put the shadow back.  The game's BG0
+   map and scroll go back (its DMA) the frame the question goes. */
+#define SH_DISPCNT   (*(volatile u16*)0x03003ada)
+#define SH_BLDCNT    (*(volatile u16*)0x03003ad8)
+#define SH_WIN       (*(volatile u32*)0x03003ad0)   /* WININ | WINOUT << 16 */
+#define SH_BG1SCROLL (*(volatile u32*)0x03003a9c)
+#define BG0VRAM ((volatile u16*)0x0600e000)
+#define BG1VRAM ((volatile u16*)0x0600e800)
+
+static void q_frame(void) {
+    u32 disp = SH_DISPCNT;
+    int bg0_free = !(disp & 0x100) && (disp & 0x200) && (disp & 7) <= 1;
+    /* the canvas's tiles follow (drawn again from the glyph log) while they are still the page's */
+    if (bg0_free != vx.q_bare) {
+        int ours = vs.mapped && !vs.lost && vs.csum_ok && canvas_sum() == vs.csum;
+        vx.q_bare = bg0_free;
+        if (ours) { canvas_redraw(); vs.csum = canvas_sum(); vs.csum_ok = 1; }
+    }
+    u32 rows = 0;
+    if (vx.q_bare && vs.mapped && !vs.lost && !vs.overlay)
+        for (int row = 0; row < 20; row++)
+            for (int tx = 0; tx < CV_COLS; tx++)
+                if (canvas_tile(BG1MAP[row * 32 + tx])) { rows |= 1u << row; break; }
+    if (!rows) {
+        if (vx.q_on) {
+            vx.q_on = 0; vx.q_rows = 0;
+            SYS_BGDIRTY |= 3;       /* the game's BG0 map and scroll, and BG1's map as it is */
+        }
+        return;
+    }
+    if (!vx.q_on) { vx.q_new = 1; SYS_BGDIRTY |= 2; }
+    vx.q_on = 1;
+    SYS_BGDIRTY &= ~1;              /* BG0's map in VRAM is ours until the question goes */
+    vx.q_bg1 = (SYS_BGDIRTY & 2) != 0;
+    vx.q_rows_now = rows;
+}
+
+/* In place of the store of BG0CNT | BG1CNT << 16 (0x0800673a), after the game's map DMAs. */
+u32 vwf_bgcnt(u32 v) {
+    if (!vx.q_on) return v;
+    u32 rows = vx.q_rows_now;
+    if (vx.q_new)
+        for (int i = 0; i < 32 * 32; i++) BG0VRAM[i] = 0;
+    for (int row = 0; row < 20; row++) {
+        volatile u16* b0 = BG0VRAM + row * 32;
+        if (rows >> row & 1) {
+            volatile u16* m = BG1MAP + row * 32;
+            volatile u16* b1 = BG1VRAM + row * 32;
+            for (int tx = 0; tx < 32; tx++) {
+                u32 e = m[tx];
+                if (canvas_tile(e)) {
+                    b0[tx] = e;
+                    if (vx.q_bg1 || vx.q_new) b1[tx] = tx == 0 ? 0x06 : tx == CV_COLS - 1 ? 0x07 : 0x01;   /* the box's own */
+                } else b0[tx] = 0;
+            }
+        } else if (vx.q_rows >> row & 1)
+            for (int tx = 0; tx < 32; tx++) b0[tx] = 0;
+    }
+    vx.q_rows = rows;
+    vx.q_new = 0;
+    REG(0x04000010) = SH_BG1SCROLL;
+    return (v & 0xffff0000) | 0x1c00 | (v >> 16 & 3);     /* char block 0, map 0x600e000 */
+}
+
+void vwf_io_pre(void) {
+    vx.q_saved = 0;
+    if (!vx.q_on) return;
+    vx.q_save_disp = SH_DISPCNT; vx.q_save_bld = SH_BLDCNT; vx.q_save_win = SH_WIN;
+    vx.q_saved = 1;
+    SH_DISPCNT = vx.q_save_disp | 0x100;
+    u32 bld = vx.q_save_bld;
+    if ((bld >> 6 & 3) >= 2 && (bld & 2)) SH_BLDCNT = bld | 1;     /* a fade takes BG0 with the box */
+    if (vx.q_save_disp & 0xe000) {
+        u32 w = vx.q_save_win;
+        for (int k = 0; k < 32; k += 8) if (w >> k & 2) w |= 1u << k;
+        SH_WIN = w;
+    }
+}
+
+void vwf_io_post(void) {
+    if (!vx.q_saved) return;
+    SH_DISPCNT = vx.q_save_disp; SH_BLDCNT = vx.q_save_bld; SH_WIN = vx.q_save_win;
+    vx.q_saved = 0;
 }
 
 /* The save screen opens over the game (START; patches/ui.py, with hdr_game): the page's sprite
