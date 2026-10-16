@@ -132,6 +132,7 @@ struct vwf_ext {
     u8 q_saved;
     u8 q_want;          /* BG0 is free: canvases are drawn bare (q_bare is how the tiles are now) */
     u8 cur_ahead;       /* the choice cursor is in OAM CURSOR_AHEAD (cursor_ahead) */
+    u8 lo_rows;         /* box_leftovers: the pair of rows it looks at this frame (0-4) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -178,6 +179,15 @@ static const u32 frame_tiles[7][8] = {
     {0x33333333, 0x22222222, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111}, /* 5 top */
     {0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x11111111, 0x22222222, 0x33333333}, /* 6 bottom */
 };
+
+/* A 32-bit DMA3 copy (or fill, the source fixed: it must then be in RAM, as a DMA from the
+   cartridge always steps its source).  The game uses DMA3 too, never across our calls. */
+static void dma32(const volatile void* src, volatile void* dst, u32 words, u32 fixed) {
+    REG(0x040000d4) = (u32)src;
+    REG(0x040000d8) = (u32)dst;
+    REG(0x040000dc) = words | 0x84000000 | (fixed ? 0x01000000 : 0);
+    (void)REG(0x040000dc);
+}
 
 /* ---------------------------------------------------------------- glyph blitting */
 static int glyph_index(u32 code) {
@@ -232,10 +242,10 @@ static void fill_tile(int dst_tile, const u32* src) {
 }
 
 static void canvas_tiles(void) {
-    static const u32 bare[8] = {0, 0, 0, 0, 0, 0, 0, 0};
     vx.q_bare = vx.q_want;
     if (vx.q_bare) {
-        for (int t = 0; t < CV_ROWS * CV_COLS; t++) fill_tile(CV_TILE0 + t, bare);
+        volatile u32 zero = 0;
+        dma32(&zero, VRAM + CV_TILE0 * 32, CV_ROWS * CV_COLS * 8, 1);
         vs.q_noedge = 0;
         vs.csum_ok = 0;
         return;
@@ -285,16 +295,19 @@ static void canvas_reset(void) {
    right of its rest to two pixels left and back (an 18-frame cycle).  The original's is a
    10x5 triangle pointing down in the box's bottom edge, bobbing.  A 16x16 sprite, tiles
    0xf8-0xfb, OBJ palette 2 entry 8 (white). */
+/* Rows 1, 3, 5, 7, 9, 7, 5, 3, 1 pixels wide from the left, in colour 8; the engine rewrites
+   its arrow cells every frame, so this is copied every frame the arrow is up (working the rows
+   out each time took six scanlines of the vertical blank). */
+static const u32 arrow_tiles[32] = {
+    0x00000008, 0x00000888, 0x00088888, 0x08888888, 0x88888888, 0x08888888, 0x00088888, 0x00000888,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000008, 0x00000000, 0x00000000, 0x00000000,
+    0x00000008, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+};
 static void arrow_load(void) {
     volatile u32* d = (volatile u32*)(0x06010000 + ARROW_TILE * 32);
-    for (int t = 0; t < 4; t++)
-        for (int r = 0; r < 8; r++) {
-            int y = (t >> 1) * 8 + r, x0 = (t & 1) * 8;
-            int w = y < 9 ? (y <= 4 ? 2 * y + 1 : 17 - 2 * y) : 0;   /* 1, 3, 5, 7, 9, 7, 5, 3, 1 */
-            u32 row = 0;
-            for (int x = 0; x < 8; x++) if (x0 + x < w) row |= 8u << (4 * x);
-            d[t * 8 + r] = row;
-        }
+    if (d[4] == arrow_tiles[4] && d[12] == arrow_tiles[12] && d[16] == arrow_tiles[16] && d[1] == arrow_tiles[1]) return;
+    for (int i = 0; i < 32; i++) d[i] = arrow_tiles[i];
 }
 
 /* Choice menus grow the box to the whole screen: its top-left corner tile sits at row 0. */
@@ -398,10 +411,8 @@ static int measure_line(const u16* p) {
 static void line_clean(int L) {
     if (!(vx.lbl_dirty & (1 << L))) return;
     vx.lbl_dirty &= ~(1 << L);
-    for (int c = 0; c < LBL_CELLS; c++) {
-        volatile u32* p = (volatile u32*)(0x06010000 + lbl_tile(L, c) * 32);
-        for (int i = 0; i < 64; i++) p[i] = 0;
-    }
+    volatile u32 zero = 0;          /* a line's eight cells are one run of 64 tiles */
+    dma32(&zero, (volatile u32*)(0x06010000 + lbl_tile(L, 0) * 32), LBL_CELLS * 64, 1);
 }
 
 static void labels_reset(void) {
@@ -542,7 +553,7 @@ void vwf_resume(void);
 static void l3_give_back(void) {
     if (vx.l3_tile < L3_FROM || vx.l3_tile + 64 > L3_TO) { vx.l3_tile = 0; return; }
     volatile u32* v = (volatile u32*)(0x06010000 + vx.l3_tile * 32);
-    for (int i = 0; i < 64 * 8; i++) v[i] = L3_BACKUP[i];
+    dma32(L3_BACKUP, v, 64 * 8, 0);
     vx.l3_tile = 0;
 }
 
@@ -553,7 +564,7 @@ static void record_lend(void) {
         u32 base = l3_block();
         if (!base) return;                           /* the third line waits, hidden */
         volatile u32* v = (volatile u32*)(0x06010000 + base * 32);
-        for (int i = 0; i < 64 * 8; i++) L3_BACKUP[i] = v[i];
+        dma32(v, L3_BACKUP, 64 * 8, 0);
         vx.l3_tile = base;
         vwf_resume();                                /* the page again, its third line there */
         return;
@@ -1057,10 +1068,21 @@ static void select_box(int tall) {
 static void box_leftovers(void) {
     u32 m = SYS[8];
     if (SYS[0x99] != 0 || (m != 3 && m != 4 && m != 6 && m != MODE_RECORD)) return;
+    /* two rows a frame, two cells a read: the whole ten rows cell by cell took eight scanlines of
+       the vertical blank, every frame, and pushed the game's own updates past it on busy frames.
+       A leftover is a safety net for saves made before 0.16.17; it goes within five frames. */
+    u32 r = vx.lo_rows < 5 ? vx.lo_rows : 0;
+    vx.lo_rows = r == 4 ? 0 : r + 1;
+    volatile u32* w = (volatile u32*)BG1MAP;
     int dirty = 0;
-    for (int i = 0; i < 10 * 32; i++) {
-        u32 t = BG1MAP[i] & 0x3ff;
-        if (t >= 0x30 && t <= 0x38) { BG1MAP[i] = 0; dirty = 1; }
+    for (int i = r * 32; i < r * 32 + 32; i++) {
+        u32 v = w[i];
+        if ((v & 0x3ff) - 0x30 <= 8 || (v >> 16 & 0x3ff) - 0x30 <= 8) {
+            volatile u16* h = BG1MAP + 2 * i;
+            if ((h[0] & 0x3ff) - 0x30 <= 8) h[0] = 0;
+            if ((h[1] & 0x3ff) - 0x30 <= 8) h[1] = 0;
+            dirty = 1;
+        }
     }
     if (dirty) SYS_BGDIRTY |= 2;
 }
@@ -1202,12 +1224,6 @@ static void q_frame(void) {
    tiles): only what changed is written, a row at a time by DMA (doing all twenty rows every frame,
    with the canvas scan, took 23 scanlines and pushed the game's updates past the blank, and the top
    of the screen showed a character half updated). */
-static void dma32(const volatile void* src, volatile void* dst, u32 words, u32 fixed) {
-    REG(0x040000d4) = (u32)src;
-    REG(0x040000d8) = (u32)dst;
-    REG(0x040000dc) = words | 0x84000000 | (fixed ? 0x01000000 : 0);
-    (void)REG(0x040000dc);
-}
 static const u16 box_row[CV_COLS] = {
     0x06, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
     0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x07,

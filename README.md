@@ -108,6 +108,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.34 — the English text engine's work between frames is down to about a quarter (4 scanlines a
+  frame on a dialogue page, from 16): on busy frames it pushed the game's own updates past the
+  time the screen is not drawn, and a character or effect showed half updated at the top of the
+  screen about ten times as often as in the Japanese game. Frames that run late because of it are
+  now about one in four hundred in a trial, where the Japanese game's own heavy frames are about
+  one in two hundred; the game also drops fewer frames on busy choice screens.
 * 0.16.33 — on a choice, a block of a character could show torn at the top of the screen
   (Phoenix's hair over the question): the work 0.16.31 added between frames pushed the game's
   own updates past the time the screen is not being drawn. It now writes only what changed, and
