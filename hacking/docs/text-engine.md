@@ -187,6 +187,12 @@ indices 4, 3, 2, 1 (`0x6b5a`, `0x5294`, `0x4210`, `0x318c`), and nothing from co
 script uses it for the last line of a page when a character trails off. The DS keeps the same
 table at `0x020a1ca0` and one for English after it, (8, 16, 22, 28, 32), counted in characters;
 the English build uses that one, with the greys 4, 3, 3 and 2 of the UI palette.
+The bit lasts one line: the engine clears it at the next line (`0x01`, `0x0802172c`), at a page
+end (`0x02`, `0x07`, `0x0a`, `0x2d`: `0x080217d8`; `0x2e`: `0x0802258c`) and at a jump (`0x2c`).
+A page laid out again after the save screen or a continued save (`vwf_resume`, `resume_replay`)
+follows the same rule (`ends_trail`); before 0.16.36 a line that trailed off earlier in the
+section left the bit set for the page being put back, and a choice's question came back grey
+from its ninth character on.
 
 ## Pace and text blips
 

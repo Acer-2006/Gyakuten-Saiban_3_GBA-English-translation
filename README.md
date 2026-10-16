@@ -108,6 +108,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.36 — after the save screen (saving, or closing it with "No") or a continued save, a
+  choice's question could come back with its lines going grey partway along: a line that trailed
+  off earlier in the conversation ("..." fading out) was still counted as fading. The page is
+  now put back with the fade on only the lines that have it, as the game types them.
 * 0.16.35 — a choice whose options are too long for the box (eight in the game, such as "Mr. Atmey
   is no Ace Detective!") had their ends cut off at the right edge. When one of a menu's options
   does not fit, every option of that menu has its letters set a pixel closer together, the way a

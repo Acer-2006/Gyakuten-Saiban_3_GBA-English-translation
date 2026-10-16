@@ -953,6 +953,13 @@ static u32 align_cmd(u32 a, u32 v) {
 
 static int page_end(u32 t) { return t == 0x02 || t == 0x2d || t == 0x2e; }
 
+/* A line's trailing off (command 0x5d 5, bit 0x20 of TXT+0x22) is the engine's for that line
+   alone: the new line (0x0802172c), the page ends (0x080217d8 for 0x02 / 0x07 / 0x0a / 0x2d,
+   0x0802258c for 0x2e) and a jump (0x2c) clear it. */
+static int ends_trail(u32 t) {
+    return t == 0x01 || t == 0x02 || t == 0x07 || t == 0x0a || t == 0x2c || t == 0x2d || t == 0x2e;
+}
+
 /* Called when a saved game is continued, after script_resume has put the script pointer back. */
 void vwf_resume(void) {
     vs.resume = 0;
@@ -970,6 +977,7 @@ void vwf_resume(void) {
         if (w == 0x03) c = *p & 0xf;
         else if (w == 0x5d) a = align_cmd(a, *p);
         else if (w == 0x42) caption = *p == 0;
+        else if (ends_trail(w)) a &= ~0x20;
         p += cmd_args[w];
         if (page_end(w)) { page = p; pc = c; pa = a; }
     }
@@ -1008,6 +1016,7 @@ static void resume_replay(int choice) {
             col++;
             continue;
         }
+        if (ends_trail(t)) TXT_ALIGN &= ~0x20;
         if (t == 0x01) { if (caption) {} else if (labels) row++; else { vwf_newline(); qrows++; } col = 0; }
         else if (t == 0x03) TXT_COLOR = (TXT_COLOR & 0xf0) | (*p & 0xf);
         else if (t == 0x5d) TXT_ALIGN = align_cmd(TXT_ALIGN, *p);
