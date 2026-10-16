@@ -108,6 +108,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.35 — a choice whose options are too long for the box (eight in the game, such as "Mr. Atmey
+  is no Ace Detective!") had their ends cut off at the right edge. When one of a menu's options
+  does not fit, every option of that menu has its letters set a pixel closer together, the way a
+  page line that does not fit already was, so they all fit and still look alike.
 * 0.16.34 — the English text engine's work between frames is down to about a quarter (4 scanlines a
   frame on a dialogue page, from 16): on busy frames it pushed the game's own updates past the
   time the screen is not drawn, and a character or effect showed half updated at the top of the

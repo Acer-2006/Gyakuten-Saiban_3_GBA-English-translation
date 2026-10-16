@@ -133,6 +133,7 @@ struct vwf_ext {
     u8 q_want;          /* BG0 is free: canvases are drawn bare (q_bare is how the tiles are now) */
     u8 cur_ahead;       /* the choice cursor is in OAM CURSOR_AHEAD (cursor_ahead) */
     u8 lo_rows;         /* box_leftovers: the pair of rows it looks at this frame (0-4) */
+    u8 lbl_sq;          /* a choice's options: pixels taken out of every letter gap (line_done) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -428,36 +429,46 @@ static void labels_reset(void) {
    as much of that leading space as it takes is dropped (lbl_trim), so it ends LBL_FIT px from
    its start, before the right edge as far as the text starts from the left. */
 #define LBL_FIT 222
-static void line_done(int L, int w, int lead) {
+/* A choice's options start at x 24, after the engine's cursor, and the full-screen box's right
+   border is at x 238: an option wider than OPT_FIT ran off the box (the DS's screen is wider).
+   Like a page line that does not fit (box_glyph), its letters close up a pixel, two if one is not
+   enough; every option of the menu takes the same spacing, so that they still look alike. */
+#define OPT_FIT (236 - LBL_X0)
+static void line_done(int L, int w, int lead, int n) {
     if (L < 0 || L >= LBL_LINES) return;
     int trim = 0;
     if (w > LBL_FIT) { trim = w - LBL_FIT; if (trim > lead) trim = lead; }
     w -= trim;
     vs.lbl_full[L] = w > 255 ? 255 : w;
     vx.lbl_trim[L] = trim > 255 ? 255 : trim;
+    if (!vs.lbl_caption && n > 1) {
+        int sq = 0;
+        while (w - sq * (n - 1) > OPT_FIT && sq < 2) sq++;
+        if (sq > vx.lbl_sq) vx.lbl_sq = sq;
+    }
 }
 
 static int page_scan(const u16* p, u32 code, int row) {
     int L = row - vs.lbl_row0;
-    int w = font_w[glyph_index(code)];
+    int w = font_w[glyph_index(code)], g = 1;
     int lead = code == 0x17f ? w : 0, inlead = code == 0x17f;
     for (int n = 0; n < 1024; n++) {
         u32 t = *p++;
         if (t >= 0x80) {
             int gw = font_w[glyph_index(t)];
-            w += gw;
+            w += gw; g++;
             if (inlead && t == 0x17f) lead += gw; else inlead = 0;
             continue;
         }
         if (t == 0x01) {
-            line_done(L, w, lead);
-            row++; L++; w = 0; lead = 0; inlead = 1; continue;
+            line_done(L, w, lead, g);
+            row++; L++; w = 0; g = 0; lead = 0; inlead = 1; continue;
         }
         if (t == 0x00 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
             t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36 || t == 0x42) break;
         p += cmd_args[t];
     }
-    line_done(L, w, lead);
+    line_done(L, w, lead, g);
     return row + 1;
 }
 
@@ -479,6 +490,7 @@ static void label_draw_char(u32 code, int col, int row) {
         vs.lbl_free = (TXT_FLAGS & 4) ? 1 : 0;
         vs.lbl_fx = TXT_OFSX; vs.lbl_fy = TXT_OFSY;
         for (int i = 0; i < LBL_LINES; i++) { vs.lbl_full[i] = 0; vx.lbl_trim[i] = 0; }
+        vx.lbl_sq = 0;
         vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
         /* alignment-2 lines sit at y 71 while TXT+0x1a is 0, which it is until the engine
            reaches the first new line: a one-line caption stays there, a longer one moves up
@@ -492,7 +504,7 @@ static void label_draw_char(u32 code, int col, int row) {
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
     if (vs.lbl_pen >= 0 && vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
-    vs.lbl_pen += font_w[gi];
+    vs.lbl_pen += font_w[gi] - (vs.lbl_caption ? 0 : vx.lbl_sq);
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
 }

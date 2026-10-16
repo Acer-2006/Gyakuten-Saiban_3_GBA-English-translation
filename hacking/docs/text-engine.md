@@ -247,7 +247,12 @@ engine itself only uses the alignment for its sprite cells (`0x0801f014`: the of
   mode), the question stays in the top rows and the labels are drawn as text in the lower part.
   The engine puts its cursor at y 18 · (row + selection), the row being the question's lines plus
   a blank one (`TXT+0x29` + 1 when the first option is drawn); the English build's option
-  sprites go on those rows, 18 px apart.
+  sprites go on those rows, 18 px apart, from x 24 (`LBL_X0`, after the cursor). The box's right
+  border is at x 238, so an option may take 212 pixels (`OPT_FIT`); eight of the script's 27
+  choices have one wider (up to 234 pixels; the DS's screen is 16 pixels wider). As a page line
+  that does not fit closes its letters up a pixel (`box_glyph`), `page_scan` works out the
+  smallest gap cut (`vx.lbl_sq`, at most 2; 1 does for all of them) that fits the menu's widest
+  option, and every option of that menu is drawn with it, so that they keep the same spacing.
   The engine's cursor is OAM 57 (a 16×16 hand, OBJ tiles `0xfc`–`0xff`, priority 1), after the defence
   bench's sprites (48–51, priority 3, from y 128). The hardware draws an earlier, lower-priority sprite that
   overlaps a later, higher-priority one with the latter's priority, so where the cursor met the bench a
