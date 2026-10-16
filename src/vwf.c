@@ -623,15 +623,19 @@ static void labels_oam(void) {
 static void choice_frame(void) {
     int dirty = 0;
     if (!vs.q_noedge) frame_bottom(0);
+    /* rows are written and copied whole: two columns tell a row that is already right (the full
+       scan of every cell every frame was a good part of the vertical blank) */
     for (int row = 0; row < 20; row++) {
+        volatile u16* m = BG1MAP + row * 32;
         int qrow = row - Q_MAPROW;
-        for (int tx = 0; tx < CV_COLS; tx++) {
-            u32 e = BG1MAP[row * 32 + tx] & 0x3ff;
-            u32 want;
-            if (qrow >= 0 && qrow < CV_ROWS) want = CV_TILE0 + qrow * CV_COLS + tx;
-            else if (e >= CV_TILE0 && e < CV_TILE0 + CV_ROWS * CV_COLS) want = 0x01;
-            else continue;
-            if (e != want) { BG1MAP[row * 32 + tx] = want; dirty = 1; }
+        if (qrow >= 0 && qrow < CV_ROWS) {
+            u32 t0 = CV_TILE0 + qrow * CV_COLS;
+            if (m[1] == t0 + 1 && m[CV_COLS - 2] == t0 + CV_COLS - 2 && m[0] == t0 && m[CV_COLS - 1] == t0 + CV_COLS - 1) continue;
+            for (int tx = 0; tx < CV_COLS; tx++) m[tx] = t0 + tx;
+            dirty = 1;
+        } else if (canvas_tile(m[1]) || canvas_tile(m[CV_COLS - 2])) {
+            for (int tx = 0; tx < CV_COLS; tx++) if (canvas_tile(m[tx])) m[tx] = 0x01;
+            dirty = 1;
         }
     }
     if (dirty) SYS_BGDIRTY |= 2;
@@ -1174,11 +1178,11 @@ static void q_frame(void) {
     if (vx.q_want != vx.q_bare && vs.mapped && !vs.lost) {
         canvas_redraw();
     }
+    /* canvas rows are whole rows (canvas_map, choice_frame; the engine copies rows whole) */
     u32 rows = 0;
     if (vx.q_bare && vx.q_want && vs.mapped && !vs.lost && !vs.overlay)
         for (int row = 0; row < 20; row++)
-            for (int tx = 0; tx < CV_COLS; tx++)
-                if (canvas_tile(BG1MAP[row * 32 + tx])) { rows |= 1u << row; break; }
+            if (canvas_tile(BG1MAP[row * 32 + 1])) rows |= 1u << row;
     if (!rows) {
         if (vx.q_on) {
             vx.q_on = 0; vx.q_rows = 0;
@@ -1193,26 +1197,36 @@ static void q_frame(void) {
     vx.q_rows_now = rows;
 }
 
-/* In place of the store of BG0CNT | BG1CNT << 16 (0x0800673a), after the game's map DMAs. */
+/* In place of the store of BG0CNT | BG1CNT << 16 (0x0800673a), after the game's map DMAs.  This
+   runs in the vertical blank, ahead of the game's own updates (the OAM DMA, the characters'
+   tiles): only what changed is written, a row at a time by DMA (doing all twenty rows every frame,
+   with the canvas scan, took 23 scanlines and pushed the game's updates past the blank, and the top
+   of the screen showed a character half updated). */
+static void dma32(const volatile void* src, volatile void* dst, u32 words, u32 fixed) {
+    REG(0x040000d4) = (u32)src;
+    REG(0x040000d8) = (u32)dst;
+    REG(0x040000dc) = words | 0x84000000 | (fixed ? 0x01000000 : 0);
+    (void)REG(0x040000dc);
+}
+static const u16 box_row[CV_COLS] = {
+    0x06, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
+    0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x07,
+};
 u32 vwf_bgcnt(u32 v) {
     if (!vx.q_on) return v;
-    u32 rows = vx.q_rows_now;
-    if (vx.q_new)
-        for (int i = 0; i < 32 * 32; i++) BG0VRAM[i] = 0;
+    /* the fill's zero is on the stack: a DMA from the cartridge always steps its source, fixed or
+       not, so a zero in ROM filled the map with whatever follows it */
+    volatile u32 zero_word = 0;
+    u32 rows = vx.q_rows_now, old = vx.q_rows;
+    if (vx.q_new) { dma32(&zero_word, BG0VRAM, 32 * 32 / 2, 1); old = 0; }
     for (int row = 0; row < 20; row++) {
-        volatile u16* b0 = BG0VRAM + row * 32;
-        if (rows >> row & 1) {
-            volatile u16* m = BG1MAP + row * 32;
-            volatile u16* b1 = BG1VRAM + row * 32;
-            for (int tx = 0; tx < 32; tx++) {
-                u32 e = m[tx];
-                if (canvas_tile(e)) {
-                    b0[tx] = e;
-                    if (vx.q_bg1 || vx.q_new) b1[tx] = tx == 0 ? 0x06 : tx == CV_COLS - 1 ? 0x07 : 0x01;   /* the box's own */
-                } else b0[tx] = 0;
-            }
-        } else if (vx.q_rows >> row & 1)
-            for (int tx = 0; tx < 32; tx++) b0[tx] = 0;
+        u32 bit = 1u << row;
+        if (rows & bit) {
+            if (!(old & bit) || BG0VRAM[row * 32 + 1] != BG1MAP[row * 32 + 1])
+                dma32(BG1MAP + row * 32, BG0VRAM + row * 32, 16, 0);
+            if (vx.q_bg1 || vx.q_new) dma32(box_row, BG1VRAM + row * 32, CV_COLS / 2, 0);   /* the box's own */
+        } else if (old & bit)
+            dma32(&zero_word, BG0VRAM + row * 32, 16, 1);
     }
     vx.q_rows = rows;
     vx.q_new = 0;

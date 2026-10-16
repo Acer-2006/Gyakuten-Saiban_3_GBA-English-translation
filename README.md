@@ -108,6 +108,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.33 — on a choice, a block of a character could show torn at the top of the screen
+  (Phoenix's hair over the question): the work 0.16.31 added between frames pushed the game's
+  own updates past the time the screen is not being drawn. It now writes only what changed, and
+  the text engine's checks on a choice screen are cheaper too, so the updates end earlier than
+  before 0.16.31.
 * 0.16.32 — the hand cursor on a choice's third option showed a square of the defence bench
   over the box (a sprite-order quirk of the hardware, met now that a three-line question puts the
   options a row lower): the cursor is drawn ahead of the bench. And a choice left framed by a
