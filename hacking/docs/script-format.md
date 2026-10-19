@@ -258,10 +258,17 @@ Two commands differ between the versions:
   of the crime" (bank 7 section `0xa8`) a fade in from white of 32 frames (`12 302 1 1f`) runs
   under a wait of 15 (`0c f`), the flash after it starts at 9, and the screen flashed every four
   frames for several pages, until the next fade. The Japanese game does the same from the same
-  state. The English build (0.16.39) starts fades with `fade_start` (`src/script.c`, in place of
-  the body of `0x08000b40`): when the new fade could not land from the current level, it first
-  finishes the fade under way (with none, it starts from the level below that it can land from),
-  so the flash goes off once as after a whole fade. And the step in the main loop (`0x08000c26`,
-  `0x08000dfc` down, `0x08000d98`, `0x08000e70` up) stops on the target where it would go past it
-  from the near side, so a fade already going round (in a savestate) ends too. Where a fade
-  lands, which is everywhere the bit is clear, nothing changes.
+  state. The English build plays such a place as the game does with the bit clear (0.16.40):
+  the dispatcher's test (`0x0801f86e`) calls `fade_hold` (`src/script.c`), which keeps the
+  game's rule and, with the bit set, looks past the commands just ahead that take no time
+  (`0x05`, `0x06`, `0x0e`, `0x1c`) and at most one wait (`0x0c`; one under way has `0x0c` in
+  `TXT+0xa` and the frames left in `TXT+0x12`). When they lead to a fade that could not land
+  from the level the fade under way will be at by then, it clears the bit and the script
+  waits: in Ron's scene the fade in from white runs its 32 frames, then the wait of 15, then
+  the flash, frame for frame as with the bit clear. It never stops a fade that lands, so the
+  places that set the bit on purpose play as before. Two fallbacks (0.16.39): `fade_start`
+  (in place of the body of `0x08000b40`) first finishes the fade under way when a new one could
+  not land all the same (with none, it starts from the level below that it can land from), and
+  the step in the main loop (`0x08000c26`, `0x08000dfc` down, `0x08000d98`, `0x08000e70` up)
+  stops on the target where it would go past it from the near side, so a fade already going
+  round (in a savestate) ends too. With the bit clear, nothing changes.

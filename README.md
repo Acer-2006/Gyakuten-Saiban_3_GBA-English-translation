@@ -109,6 +109,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.40 — Ron's "night of the crime" flashback now keeps the original timing too in a save
+  with that flag on: the game sees the flash that could not end coming, switches the flag off
+  there and waits for the fade, as the scene plays with the flag off. The fade back from white
+  runs its full length, then the pause, then the one flash, frame for frame as in the Japanese
+  game and the DS (0.16.39 had the flash half a second early). The flag stays off afterwards
+  until a scene sets it on purpose. Nothing changes in a save with the flag off.
 * 0.16.39 — asking Ron DeLite about the night of the crime, the screen flashed white every four
   frames through his second flashback, for several pages. The game holds the script while the
   screen fades, except while a flag lets it run on; that flag is set by the opening of episode 1

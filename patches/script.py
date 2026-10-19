@@ -20,6 +20,9 @@ FADE_START_BYTES = bytes.fromhex('30b5094ca44688340025238063468a33188060468e3001
 # the step of a fade in the main loop: BLDY - step (modes 1, 3) or + step (modes 2, 4), stored
 FADE_STEPS = ((0x08000c26, '081a1080', 'down'), (0x08000dfc, '081a1080', 'down'),
               (0x08000d98, '28181080', 'up'), (0x08000e70, '28181080', 'up'))
+# the dispatcher, before each command while a fade runs (r2 = TXT+0x1c): bit 1 clear -> stop
+FADE_WAIT = 0x0801f86e                # movs r0, #2; ands r0, r2; cmp r0, #0; bne 0x0801f878; b 0x0801fa54
+FADE_WAIT_BYTES = bytes.fromhex('02201040002800d1ede0')
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
@@ -142,6 +145,13 @@ def apply(rom, ctx):
     for site, old, fn in FADE_STEPS:
         assert rom.read(site, 4) == bytes.fromhex(old), hex(site)
         rom.hook_bl(site, down if fn == 'down' else up, 'fade step')
+    # ... and the dispatcher asks fade_hold whether the script waits for the fade under way: the
+    # game's rule (wait unless bit 1 of TXT+0x1c is set), and with the bit set, wait when the
+    # commands just ahead lead to a fade that could not land (fade_hold returns -1 to stop, or the
+    # flags, which the code after keeps in r2)
+    assert rom.read(FADE_WAIT, 10) == FADE_WAIT_BYTES, rom.read(FADE_WAIT, 10).hex()
+    rom.thumb(FADE_WAIT, f'bl #{syms["fade_hold"] & ~1:#x}\n adds r2, r0, #0\n bpl #{FADE_WAIT + 10:#x}',
+              'fade_hold')
 
     # 6. saved games (src/script.c): the save also records where the script stopped, and continuing
     # a save finds that place in this build's script, then draws the page again (src/vwf.c)

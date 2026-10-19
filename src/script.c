@@ -203,10 +203,60 @@ u32 psyche_end(void) {
  * the save keeps it), and then a fade can start while another is under way, from a level its
  * step never lands on the target from: the screen strobes every four frames until the next fade
  * (Ron's "night of the crime": a fade in from white of 32 frames under a wait of 15, then a flash
- * from 9; the Japanese game does the same with the bit set).  Such a fade now first finishes the
- * one under way (or, with none, starts from the level below that it can land from), so the flash
- * goes off as it does after a whole fade; a fade that can land starts as before.  (A fade already
- * going round, in a savestate, is stopped by the step in the main loop: patches/script.py.) */
+ * from 9; the Japanese game does the same with the bit set).
+ *
+ * The English build plays such a place as the game does with the bit clear.  fade_hold, asked by
+ * the dispatcher before each command while a fade runs, looks past the sounds, name tag, box and
+ * at most one wait (0x05, 0x06, 0x0e, 0x1c, 0x0c) that come next: when they lead to a fade that
+ * could not land from the level the fade under way will be at by then, it clears the bit and the
+ * script waits for the fade, the wait and the flash coming after it as they would with the bit
+ * clear.  It never stops a fade that lands, so the places that set the bit on purpose (episode 1's
+ * opening, 0x62 3d) play as before.  Should a fade that cannot land start all the same (text in
+ * between), fade_start first finishes the one under way (or, with none, starts from the level
+ * below that it can land from); and a fade already going round (in a savestate) is stopped by the
+ * step in the main loop (patches/script.py). */
+
+/* The level the fade under way is at after n more frames of the main loop (0x08000b6c, with the
+ * English build's step, which stops on the target). */
+static u32 fade_level_after(u32 n) {
+    volatile u8* sys = SYS;
+    u32 mode = *(volatile u16*)(sys + 0x8a), per = sys[0x8e], step = sys[0x8f];
+    u32 cnt = *(volatile u16*)(sys + 0x8c), lv = *(volatile u16*)0x03003ade & 0x1f;
+    u32 target = mode & 1 ? 0 : 16;
+    for (; n; n--) {
+        if ((u16)++cnt < per) continue;
+        cnt = 0;
+        if (!step) return target;
+        if (mode & 1) lv = lv && lv < step ? 0 : (lv - step) & 0x1f;
+        else lv = lv < 16 && lv + step > 16 ? 16 : (lv + step) & 0x1f;
+        if (lv == target) return target;
+    }
+    return lv;
+}
+
+/* Returns TXT+0x1c for the dispatcher to go on, or -1 for it to stop until the fade is over. */
+s32 fade_hold(void) {
+    u32 f = TXT_FLAGS;
+    if (!(f & 2)) return -1;              /* the game's own rule */
+    const u16* p = (const u16*)TXT_PTR;
+    u32 n = 0, waited = 0;
+    for (int k = 0; k < 8; k++) {
+        u32 c = *p;
+        if (c == 0x0c && !waited) {      /* under way: TXT+0xa is 0x0c, frames left in TXT+0x12 */
+            u32 left = TXT[0x12];
+            n = *(volatile u16*)(TXT + 0xa) == 0x0c && left ? left - 1 : p[1] & 0xff;
+            waited = 1;
+        } else if (c != 0x05 && c != 0x06 && c != 0x0e && c != 0x1c) break;
+        p += 1 + cmd_args[c];
+    }
+    if (*p != 0x12) return f;
+    u32 mode = p[1] >> 8, g = p[2] & 0xff;
+    g &= -g;
+    if (mode - 1 >= 4 || !g || g >= 32 || !(fade_level_after(n) & (g - 1))) return f;
+    TXT_FLAGS = f & ~2;
+    return -1;
+}
+
 void fade_start(u32 mode, u32 period, u32 step, u32 layers) {
     volatile u8* sys = SYS;
     volatile u16* bldy = (volatile u16*)0x03003ade;
