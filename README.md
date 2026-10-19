@@ -109,6 +109,15 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.39 — asking Ron DeLite about the night of the crime, the screen flashed white every four
+  frames through his second flashback, for several pages. The game holds the script while the
+  screen fades, except while a flag lets it run on; that flag is set by the opening of episode 1
+  and by a later scene, is kept in the save, and was on in this playthrough. A flash then started
+  in the middle of the fade in from white, at a brightness its steps never bring back to normal,
+  and it went round and round; the Japanese game does the same with the flag on. A fade that
+  could never end now finishes the fade under way first (the flash goes off once, as when the
+  fade has ended), and one already going round stops. Fades that end as before are unchanged.
+  Savestates from earlier builds keep working; one taken during the flashing stops it at once.
 * 0.16.38 — after asking Ron DeLite about the night of the crime, the security camera's picture
   stayed up behind the talk menu instead of his room. The DS changes the background back with a
   command of its own there, which the conversion left out, and the GBA's own was not put back.

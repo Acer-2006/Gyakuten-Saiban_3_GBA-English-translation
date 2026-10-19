@@ -33,7 +33,7 @@ newline — `0x0802172d`).
 | +0x12 | u16 | property bits of the current command (`0x08049834[cmd] | 0x0804991c[cmd]`) |
 | +0x14 | u16 | property bits of the previous command |
 | +0x16 | u16 | text blips: 0 = the typewriter (command `0x30 2`, and every text reset), 2 after a name tag (command `0x0e`); the original counts 2, 1 in it to blip on every other letter |
-| +0x1c | u16 | flags. Bit 2 selects the "free sprite slot" text path (used for text drawn outside the dialogue box); bit 15 is cleared on every command except `0x0c`. The bit is *not* a reliable "choice menu" indicator — it stays set after caption screens |
+| +0x1c | u16 | flags. Bit 1 lets the script run while the screen fades (`0x12`, see script-format.md); bit 2 selects the "free sprite slot" text path (used for text drawn outside the dialogue box); bit 15 is cleared on every command except `0x0c`. The bit is *not* a reliable "choice menu" indicator — it stays set after caption screens |
 | +0x22 | u8 | alignment (command `0x5d`): low nibble non-zero = centred; bit 5 enables colour-by-column (thresholds: the 5 words at `0x08049c1c`) |
 | +0x24 | u8 | speaker (command `0x0e`, high byte): the name tag, and the blip from the table at `0x08049af2` (0 the low blip, sound `0x2d`; 1 the high one, `0x2e`) |
 | +0x25 | u8 | colour: low nibble = palette index used for glyph pixels, high nibble = colour-by-column state |

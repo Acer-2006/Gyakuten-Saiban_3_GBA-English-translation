@@ -14,6 +14,12 @@ LOADER_POOLS = (0x1ee80, 0x1f000)   # the loader's literal pools (offsets)
 COMMON_LITS = [(0x1ed64, 0), (0x1ed60, 4)]   # (literal address, offset from bank base)
 CMD_TABLE = 0x08163afc                # the script's dispatch table (121 entries)
 PSYCHE_END_HANDLER = 0x0802393c       # command 0x64
+FADE_START = 0x08000b40               # start a brightness fade (mode, frames per step, step, layers)
+FADE_START_BYTES = bytes.fromhex('30b5094ca44688340025238063468a33188060468e30017001300270'
+                                 '0338058030bc01bc0047')
+# the step of a fade in the main loop: BLDY - step (modes 1, 3) or + step (modes 2, 4), stored
+FADE_STEPS = ((0x08000c26, '081a1080', 'down'), (0x08000dfc, '081a1080', 'down'),
+              (0x08000d98, '28181080', 'up'), (0x08000e70, '28181080', 'up'))
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
@@ -102,6 +108,40 @@ def apply(rom, ctx):
     # stops for the frame after it, as it does on the wait that follows it everywhere but once
     assert rom.u32(CMD_TABLE + 0x64 * 4) == PSYCHE_END_HANDLER | 1
     rom.w32(CMD_TABLE + 0x64 * 4, syms['psyche_end'] | 1)
+
+    # 5c. the start of a brightness fade (0x08000b40: command 0x12 and the engine's own) ->
+    # fade_start (src/script.c), which first finishes a fade under way that the new one could not
+    # end from (a strobe in Ron's "night of the crime"); the function keeps its push and pop
+    assert rom.read(FADE_START, 0x26) == FADE_START_BYTES, rom.read(FADE_START, 0x26).hex()
+    rom.thumb(FADE_START + 2, f'bl #{syms["fade_start"] & ~1:#x}\n b #{FADE_START + 0x20:#x}', 'fade_start')
+    # ... and a fade under way that still cannot land (one in a savestate, or a level the engine set
+    # itself) stops on its target where its step would take it past: down from above 0 (modes 1
+    # and 3: r1 the level, r0 the step) or up from below 16 (modes 2 and 4: r5 the level).  From
+    # the target itself it goes round as before (a flash).  Only r0 and the flags change.
+    down = rom.thumb_code('''
+        subs r0, r1, r0
+        bpl store
+        cmp r1, #0
+        beq store
+        movs r0, #0
+    store:
+        strh r0, [r2]
+        bx lr
+    ''', note='fade step down')
+    up = rom.thumb_code('''
+        adds r0, r5, r0
+        cmp r5, #16
+        bhs store
+        cmp r0, #16
+        bls store
+        movs r0, #16
+    store:
+        strh r0, [r2]
+        bx lr
+    ''', note='fade step up')
+    for site, old, fn in FADE_STEPS:
+        assert rom.read(site, 4) == bytes.fromhex(old), hex(site)
+        rom.hook_bl(site, down if fn == 'down' else up, 'fade step')
 
     # 6. saved games (src/script.c): the save also records where the script stopped, and continuing
     # a save finds that place in this build's script, then draws the page again (src/vwf.c)

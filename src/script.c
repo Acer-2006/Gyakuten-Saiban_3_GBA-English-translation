@@ -192,4 +192,35 @@ u32 psyche_end(void) {
     return 1;
 }
 
+/* ---- brightness fades ----
+ * 0x08000b40 (command 0x12, and the engine's own fades) starts a fade of the screen's brightness
+ * (BLDY, IO shadow +0x4e): SYS+0x8a the mode (1 darker down to 0, 2 darker up to 16, 3 brighter
+ * down to 0, 4 brighter up to 16), +0x8e frames per step, +0x8f the step, +0x88 the layers, +0x8c
+ * the frame counter.  The main loop (0x08000b6c) moves BLDY by the step, keeps its low 5 bits and
+ * stops when it lands on the target; a flash is a fade that starts on its target and goes once
+ * round (12 301 8 1f: 0, 24, 16, 8, 0).  The script waits while a fade runs unless bit 1 of
+ * TXT+0x1c is set (effect 1 of 0x69 sets it, at the start of episode 1, as does effect 0x62 3d;
+ * the save keeps it), and then a fade can start while another is under way, from a level its
+ * step never lands on the target from: the screen strobes every four frames until the next fade
+ * (Ron's "night of the crime": a fade in from white of 32 frames under a wait of 15, then a flash
+ * from 9; the Japanese game does the same with the bit set).  Such a fade now first finishes the
+ * one under way (or, with none, starts from the level below that it can land from), so the flash
+ * goes off as it does after a whole fade; a fade that can land starts as before.  (A fade already
+ * going round, in a savestate, is stopped by the step in the main loop: patches/script.py.) */
+void fade_start(u32 mode, u32 period, u32 step, u32 layers) {
+    volatile u8* sys = SYS;
+    volatile u16* bldy = (volatile u16*)0x03003ade;
+    u32 g = step & 0xff;
+    g &= -g;                          /* BLDY moves in multiples of this, modulo 32 */
+    if ((u32)(u16)mode - 1 < 4 && g && g < 32 && (*bldy & (g - 1))) {
+        u32 run = *(volatile u16*)(sys + 0x8a);
+        *bldy = run - 1 < 4 ? (run & 1 ? 0 : 16) : (*bldy & 0x1f & ~(g - 1));
+    }
+    *(volatile u16*)(sys + 0x88) = layers;
+    *(volatile u16*)(sys + 0x8a) = mode;
+    sys[0x8e] = period;
+    sys[0x8f] = step;
+    *(volatile u16*)(sys + 0x8c) = 0;
+}
+
 void _start(void) {}
