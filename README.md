@@ -109,6 +109,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.41 — character poses checked against the DS and the Japanese GBA across the game. Four
+  were off, all outside episode 2: in two of the Judge's lines in episode 1 he spoke with his
+  mouth shut (the GBA sets his pose twice there and the DS once, and the conversion took the
+  wrong one of the two), and two poses the DS writes a little later than the GBA were missing
+  (one of Godot's in episode 3, one of Gumshoe's in episode 5). The rest match the GBA everywhere; where a
+  mouth stays still in episode 2 (some of Godot's and Pearl's gestures, a pause in a line), the
+  Japanese GBA game plays it the same way. Savestates from earlier builds keep working.
 * 0.16.40 — Ron's "night of the crime" flashback now keeps the original timing too in a save
   with that flag on: the game sees the flash that could not end coming, switches the flag off
   there and waits for the fade, as the scene plays with the flag off. The fade back from white

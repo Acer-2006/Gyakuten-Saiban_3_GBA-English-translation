@@ -48,7 +48,17 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     episode 5), and those are dropped: after Ron DeLite's talk about Mask*DeMasque the room did
 #     not come back over the security camera's picture.
 #     The ending's picture is also panned with the GBA's 0x1d, which the DS has no use for.
-FIX_LEVEL = 1
+#   2 (0.16.41): poses (0x1e) the two scripts write differently.  The DS numbers a character's
+#     animations its own way, so a pose of the GBA's that the DS moved a little (bank 21 section
+#     0xdd, bank 35 section 0x13c) did not pair up with its DS counterpart and was lost on both
+#     sides; and where the GBA sets a pose twice in a row and the DS once (the Judge, bank 1
+#     sections 0xb1 and 0xd5: a still pose, the background, then his talking one), the DS's paired
+#     with the first, and the Judge spoke with his mouth shut.  A pose of the DS's now takes the
+#     GBA's that its own translates to (POSE_CMD; the argument map gets every pose of these right),
+#     when the GBA has that one free, right after the pose it lines up with or elsewhere in the
+#     section.
+FIX_LEVEL = 2
+POSE_CMD = 0x1e
 GBA_BACKGROUND = 0x1b
 GBA_PAN = 0x1d
 LEVEL1_RESTORED = {GBA_BACKGROUND, GBA_PAN}
@@ -220,12 +230,32 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                 out.append(('c', c, g[gk2][2]))
                 if stats is not None: stats['moved'] += 1
                 i += 1; continue
+            # a pose the DS moved, written in its own numbering (fix level 2)
+            free = g_free.get((c, map_args(c, j[jk][2], argmap))) if level >= 2 and c == POSE_CMD else None
+            if free:
+                gk2 = free.pop(0); g_moved.add(gk2)
+                out.append(('c', c, g[gk2][2]))
+                if info is not None: info.setdefault('fixes', set()).add(2)
+                if stats is not None: stats['poses_moved'] += 1
+                i += 1; continue
             # DS-only insertion (J has it, G doesn't): drop
             if stats is not None: stats['dropped_ds_ins'] += 1
             i += 1; continue
         gi = g[gk]; ji = j[jk]
         if it[2] == ji[2]:
-            out.append(('c', c, gi[2]))
+            args = gi[2]
+            if level >= 2 and c == POSE_CMD:
+                # the GBA sets the pose twice before the text and the DS once: the GBA's pose that
+                # the DS's translates to, when it is the free one of the two (fix level 2)
+                want = map_args(c, it[2], argmap)
+                k = gk + 1
+                while args != want and k < len(g) and g[k][0] == 'c':
+                    if g[k][1] == c and g[k][2] == want and k in g_free.get((c, want), ()):
+                        g_free[(c, want)].remove(k); g_moved.add(k); args = want
+                        if info is not None: info.setdefault('fixes', set()).add(2)
+                        if stats is not None: stats['poses_doubled'] += 1
+                    k += 1
+            out.append(('c', c, args))
         else:
             out.append(('c', c, map_args(c, it[2], argmap)))
             if stats is not None: stats['en_edit'] += 1
@@ -396,15 +426,27 @@ def items_to_words(items):
         else: ws.append(it[1]); ws.extend(it[2])
     return ws
 
+def same_shape(a, b):
+    """Two versions of a section with every word where it was: the same text and commands at the
+    same places, arguments aside."""
+    return len(a) == len(b) and all(x[0] == y[0] and (x[0] == 't' or (x[1] == y[1] and len(x[2]) == len(y[2])))
+                                    for x, y in zip(a, b))
+
 def layered(s, conv, fixes, convert_at, layers):
     """A section's versions for banks.build_bank_layered: {fix level: bytes}, level 0 being the
-    section as 0.16.37 had it, and one entry for each later fix level that changed it."""
+    section as 0.16.37 had it, and one entry for each later fix level that changed it.  A fix that
+    only changes arguments (every word where it was) changes the section in place instead: a
+    savestate in it finds its place all the same."""
     v = {0: pack(items_to_words(conv))}
     if fixes:
-        prev = pack(items_to_words(convert_at(0)))
+        base = convert_at(0)
+        levels = [conv if lv == FIX_LEVEL else convert_at(lv) for lv in range(1, FIX_LEVEL + 1)]
+        if all(same_shape(base, it) for it in levels):
+            return v
+        prev = pack(items_to_words(base))
         v = {0: prev}
-        for lv in range(1, FIX_LEVEL + 1):
-            cur = pack(items_to_words(conv if lv == FIX_LEVEL else convert_at(lv)))
+        for lv, it in enumerate(levels, 1):
+            cur = pack(items_to_words(it))
             if cur != prev: v[lv] = cur
             prev = cur
         if len(v) > 1: layers.append(s)

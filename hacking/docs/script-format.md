@@ -202,6 +202,21 @@ Two commands differ between the versions:
   kept where the DS has it (24 of them: four flags that mark a conversation as heard, four
   speakers' name tags, box hides and others). Before 0.16.27 these were dropped on both sides,
   and the conversations behind those four flags played their first-time version every time.
+* Poses (`0x1e c t i`: character `c`, talking animation `t`, idle `i`). The two games number a
+  character's animations differently (the DS by index, the GBA by offset into its animation
+  data), so a pose takes the GBA's arguments where it lines up with the GBA's, and a pose the
+  English DS script changed or added goes through the argument map (all 507 come out as the
+  GBA animation the DS one stands for, character by character). Since 0.16.41 (fix level 2) a
+  pose the DS moved is found again by its translated arguments (two: bank 21 section `0xdd`,
+  bank 35 section `0x13c`), and where the GBA sets a pose twice before the text (a still one, the
+  background, the talking one) and the DS once, the DS's takes the GBA pose it translates to
+  (the Judge, bank 1 sections `0xb1` and `0xd5`, spoke with his mouth shut). The mouth moves
+  while text is typed with the talking animation; `0x4e` (a pause) and the page ends `0x2d`,
+  `0x07`, `0x0a` put the idle one up, and only `0x02` or a new pose brings the talking one back
+  (`0x0c` leaves it); a one-shot animation holds its last frame. The DS does all of this the same
+  way. A few poses have no talking frames on the GBA where the DS's do (Godot's coffee and
+  others, `11 591c 591c`, `11 7698 7698`, `11 7094 7094`, `11 72d0 72d0`; Pearl's `1e 2894
+  2894`): the Japanese GBA script uses them for whole lines too, and so does the English one.
 * Map markers (`0x39`, `0x3a`, `0x3c`) the GBA places where the DS script has none (the DS draws
   its maps with their markers in): the GBA's own are put back where the GBA has them, as the
   GBA's sounds are (22, on the maps of episode 4's investigation).
@@ -220,7 +235,8 @@ Two commands differ between the versions:
   laid out with every section's level-0 version where 0.16.37 had it, and a section a later fix
   changes gets its new version after the bank's sections, level by level
   (`banks.build_bank_layered`), with its entry pointing there. A savestate inside the old version
-  carries on in it; nothing else moves. The tools read such a bank with `parse_bank(...,
+  carries on in it; nothing else moves. A fix that only changes arguments, every word staying
+  where it was, changes the section in place instead (0.16.41). The tools read such a bank with `parse_bank(...,
   english=True)` (`hacking/tools/gs3_script.py` does), and show an old version as the end of the
   section before it. Other GBA-only commands are
   left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own
