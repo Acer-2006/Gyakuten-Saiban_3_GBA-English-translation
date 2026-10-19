@@ -109,6 +109,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.45 — a line that trails off (Ron's mumbling) fades out in the DS's four greys: the
+  second step was darker than the DS's and the same as the third, so the line went from light
+  grey straight to the darker one and stayed there. The split points were already the DS's (the
+  last few characters in the darkest grey, nearly the box's own, as on the DS and the Japanese
+  GBA). Savestates from earlier builds keep working.
 * 0.16.44 — Godot's coffee mug: after the mug slides along the desk into his hand, he settles
   holding it, as on the DS, where the GBA kept the last frame of the slide (the DS gives the pose
   its own resting picture, which the GBA has too). The script nearly always moves him on to

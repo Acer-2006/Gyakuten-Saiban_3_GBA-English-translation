@@ -820,7 +820,8 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
     if (TXT_ALIGN & 0x20) {
         /* command 0x5d 5: the line trails off (Ron's mumbling).  The engine greys the text out by
            column and leaves out everything from a last column on; these are the DS English
-           version's columns, in characters, and the nearest greys of the UI palette */
+           version's columns, in characters, and the nearest greys of the UI palette (no choice's
+           question trails off: the page's own lines are sprite text, box_glyph) */
         static const u8 fade_end[5] = {8, 16, 22, 28, 32};
         static const u8 fade_col[5] = {0, 4, 3, 3, 2};
         int k = 0;
@@ -839,8 +840,8 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
 }
 
 /* The same character as sprite text in the box (the page is not a choice's question): the
-   engine's sprite-text palette, white 3 and the colours at 6, 9 and 12, greys 2, 14 and 1 for
-   a line trailing off. */
+   engine's sprite-text palette, white 3 and the colours at 6, 9 and 12, greys 13, 2, 14 and 1
+   for a line trailing off (the DS's text palette is the same, entry for entry). */
 static void box_glyph(u32 code, u32 col) {
     int gi = glyph_index(code);
     if (vs.pen_x == 0) {
@@ -860,8 +861,12 @@ static void box_glyph(u32 code, u32 col) {
     u32 c = lbl_colour(text_colors[TXT_COLOR & 0xf]);
     int draw = code != 0x17f;
     if (TXT_ALIGN & 0x20) {
+        /* command 0x5d 5: the DS English version's columns (characters) and its greys, the same
+           entries of the same palette (its glyph draw, 0x020239bc, recolours a character with
+           the table at 0x020a1cc8: 13, 2, 14, 1 from the first step on); before 0.16.45 this
+           took 2, 14, 14, 1, the second step darker than the DS's and the same as the third */
         static const u8 fade_end[5] = {8, 16, 22, 28, 32};
-        static const u8 fade_col[5] = {0, 2, 14, 14, 1};
+        static const u8 fade_col[5] = {0, 13, 2, 14, 1};
         int k = 0;
         while (k < 5 && col >= fade_end[k]) k++;
         if (k == 5) draw = 0;
