@@ -61,7 +61,7 @@ instead.
   DS LOAD header, names the part you saved in and offers the DS buttons From save point. /
   From chapter start.
 * The DS version's W, V and K markers (witness, victim, killer) on maps and diagrams.
-* College Phoenix's sweater says P instead of RYU, and the policeman's armband with Japanese
+* College Phoenix's sweater says P instead of RYU, and Larry's armband with Japanese
   writing is gone, as in the DS version's sprites.
 * The DS version's Unlock Successful banner when the last Psyche-Lock breaks, and its Not Guilty
   / Guilty verdict letters, each landing with a slam and a shake as on the DS.
