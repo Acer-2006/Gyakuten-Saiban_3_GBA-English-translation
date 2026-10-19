@@ -63,9 +63,22 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     the GBA's 0x2288 as its idle wherever the DS has its own there (53 poses; the Japanese GBA
 #     script pairs them so once itself), so she blinks once she has finished talking, as on the
 #     DS.  Only the pose's arguments change.
-FIX_LEVEL = 3
+#   4 (0.16.44): the same for two of Godot's gestures, which hold their last frame on the GBA
+#     where the DS gives the pose an idle: 0x591c, a mug sliding along the desk into his hand
+#     (DS 0x115), whose DS idle (0x10f, the GBA's 0x2864) has him holding it (68 poses), and
+#     0x72d0, which ends with his mouth open (DS 0x124), whose DS idle (0x125, the GBA's 0x7614)
+#     has it shut (5).  An idle shows only once a page ends or pauses on the pose, and the script
+#     nearly always sets another first (after the gesture's wait): of these 73, one shows (bank 15
+#     section 0x8e, his grip on the mug while a short line waits).  His 0x7094 and 0x7698 have DS
+#     idles too (0x125, 0x127: the GBA's 0x7614, 0x7918), but the same picture as the frame the GBA
+#     holds, and are left as they are.
+FIX_LEVEL = 4
 POSE_CMD = 0x1e
-DS_IDLES = {(0x1e, 0x2894, 0x2894): 0x2288}     # GBA pose -> the idle the DS gives it (fix level 3)
+# GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
+# frames, checked frame by frame and cell by cell against the DS's; the fix level)
+DS_IDLES = {(0x1e, 0x2894, 0x2894): (0x1b5, 0x2288, 3),
+            (0x11, 0x591c, 0x591c): (0x10f, 0x2864, 4),
+            (0x11, 0x72d0, 0x72d0): (0x125, 0x7614, 4)}
 GBA_BACKGROUND = 0x1b
 GBA_PAN = 0x1d
 LEVEL1_RESTORED = {GBA_BACKGROUND, GBA_PAN}
@@ -262,11 +275,12 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                         if info is not None: info.setdefault('fixes', set()).add(2)
                         if stats is not None: stats['poses_doubled'] += 1
                     k += 1
-            if level >= 3 and c == POSE_CMD and args in DS_IDLES and it[2][1] != it[2][2] \
-                    and map_args(c, it[2], argmap)[2] == DS_IDLES[args]:
-                args = args[:2] + (DS_IDLES[args],)       # the DS's own idle (fix level 3)
-                if info is not None: info.setdefault('fixes', set()).add(3)
-                if stats is not None: stats['ds_idles'] += 1
+            if c == POSE_CMD and args in DS_IDLES:
+                ds_idle, gba_idle, lv = DS_IDLES[args]
+                if level >= lv and it[2][1] != it[2][2] and it[2][2] == ds_idle:
+                    args = args[:2] + (gba_idle,)         # the DS's own idle (fix levels 3, 4)
+                    if info is not None: info.setdefault('fixes', set()).add(lv)
+                    if stats is not None: stats['ds_idles'] += 1
             out.append(('c', c, args))
         else:
             out.append(('c', c, map_args(c, it[2], argmap)))
@@ -448,19 +462,22 @@ def layered(s, conv, fixes, convert_at, layers):
     """A section's versions for banks.build_bank_layered: {fix level: bytes}, level 0 being the
     section as 0.16.37 had it, and one entry for each later fix level that changed it.  A fix that
     only changes arguments (every word where it was) changes the section in place instead: a
-    savestate in it finds its place all the same."""
+    savestate in it finds its place all the same.  So does a later fix that only changes arguments
+    in a section an earlier one moved: it changes that version in place (fix level 4 in bank 41)."""
     v = {0: pack(items_to_words(conv))}
     if fixes:
         base = convert_at(0)
         levels = [conv if lv == FIX_LEVEL else convert_at(lv) for lv in range(1, FIX_LEVEL + 1)]
         if all(same_shape(base, it) for it in levels):
             return v
-        prev = pack(items_to_words(base))
+        prev = pack(items_to_words(base)); prev_items = base; last = 0
         v = {0: prev}
         for lv, it in enumerate(levels, 1):
             cur = pack(items_to_words(it))
-            if cur != prev: v[lv] = cur
-            prev = cur
+            if cur != prev:
+                if last and same_shape(prev_items, it): v[last] = cur
+                else: v[lv] = cur; last = lv
+            prev = cur; prev_items = it
         if len(v) > 1: layers.append(s)
     return v
 

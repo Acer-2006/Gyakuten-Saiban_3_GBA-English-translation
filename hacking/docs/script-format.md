@@ -218,13 +218,22 @@ Two commands differ between the versions:
   others, `11 591c 591c`, `11 7698 7698`, `11 7094 7094`, `11 72d0 72d0`; Pearl's `1e 2894
   2894`): the Japanese GBA script uses them for whole lines too, and so does the English one.
   The DS's talking animations for these are the GBA's gestures frame for frame (its data.bin:
-  Godot's at `0x5b575c` and `0x5c4064`, Pearl's at `0x66c5f8`, the Judge's at `0x500d88`;
-  the arm9 table at `0x0209f88c` gives each animation number a file and an offset in it); the
-  DS gives the pose an idle of its own where the GBA holds the gesture. Pearl's is the GBA's
-  `0x2288` (the same frames, starting on the picture the gesture ends on, then blinking), and
-  since 0.16.42 (fix level 3, `DS_IDLES`) her 53 gestures take it as their idle where the DS
-  has it, as the Japanese GBA script does once. Godot's DS idle (`0x2864` on the GBA) puts the
-  mug back in his hand, a different picture, and is left out.
+  frame data for Godot at `0x5b575c` and `0x5c4064`, sub-archives at `0x5b0b54` and `0x5c0244`;
+  Pearl's at `0x66c5f8` and `0x6683f8`; the Judge's at `0x500d88`; the arm9 table at
+  `0x0209f88c` gives each animation number a file and an offset in it; the DS's cells are
+  numbered differently, so pictures are compared cell by cell, unpacked: the same timing, the
+  same sprites, except that the DS's taller screen adds a sprite or two off the GBA's, at y 56,
+  and draws the top of Godot's hair from y -88 where the GBA's starts at -80); the DS gives the
+  pose an idle of its own where the GBA holds the gesture. Pearl's is the GBA's `0x2288` (the
+  same frames, starting on the picture the gesture ends on, then blinking), and since 0.16.42
+  (fix level 3, `DS_IDLES`) her 53 gestures take it as their idle where the DS has it, as the
+  Japanese GBA script does once. Since 0.16.44 (fix level 4) two of Godot's do too: `591c`
+  (the mug sliding along the desk into his hand; DS idle `0x10f`, the GBA's `0x2864`, him
+  holding it, 68 poses) and `72d0` (ending with his mouth open; DS idle `0x125`, the GBA's
+  `0x7614`, mouth shut, 5). An idle shows only once a page ends or pauses on its pose, and the
+  script nearly always sets another pose first, after the gesture's wait: one of the 73 shows,
+  in bank 15 section `0x8e`. His `7094` and `7698` have DS idles too (`0x125`, `0x127`: the
+  GBA's `0x7614`, `0x7918`), the same picture as the frame the GBA holds, and keep theirs.
 * Map markers (`0x39`, `0x3a`, `0x3c`) the GBA places where the DS script has none (the DS draws
   its maps with their markers in): the GBA's own are put back where the GBA has them, as the
   GBA's sounds are (22, on the maps of episode 4's investigation).

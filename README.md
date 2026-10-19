@@ -109,6 +109,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.44 — Godot's coffee mug: after the mug slides along the desk into his hand, he settles
+  holding it, as on the DS, where the GBA kept the last frame of the slide (the DS gives the pose
+  its own resting picture, which the GBA has too). The script nearly always moves him on to
+  another pose before he would settle, so it shows in one place, a short line of his in
+  episode 3. One more of his gestures gets the DS's resting picture (mouth shut instead of
+  open), though the script never lets it show. Savestates from earlier builds keep working.
 * 0.16.43 — the page arrow stays white after a Psyche-Lock is broken: it used a sprite palette
   that the Psyche-Lock sequence loads its own colours into, and came out pale blue after one.
   It now uses the text's white, which stays the same in every scene. Savestates from earlier
