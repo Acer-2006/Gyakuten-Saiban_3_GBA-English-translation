@@ -217,6 +217,14 @@ Two commands differ between the versions:
   way. A few poses have no talking frames on the GBA where the DS's do (Godot's coffee and
   others, `11 591c 591c`, `11 7698 7698`, `11 7094 7094`, `11 72d0 72d0`; Pearl's `1e 2894
   2894`): the Japanese GBA script uses them for whole lines too, and so does the English one.
+  The DS's talking animations for these are the GBA's gestures frame for frame (its data.bin:
+  Godot's at `0x5b575c` and `0x5c4064`, Pearl's at `0x66c5f8`, the Judge's at `0x500d88`;
+  the arm9 table at `0x0209f88c` gives each animation number a file and an offset in it); the
+  DS gives the pose an idle of its own where the GBA holds the gesture. Pearl's is the GBA's
+  `0x2288` (the same frames, starting on the picture the gesture ends on, then blinking), and
+  since 0.16.42 (fix level 3, `DS_IDLES`) her 53 gestures take it as their idle where the DS
+  has it, as the Japanese GBA script does once. Godot's DS idle (`0x2864` on the GBA) puts the
+  mug back in his hand, a different picture, and is left out.
 * Map markers (`0x39`, `0x3a`, `0x3c`) the GBA places where the DS script has none (the DS draws
   its maps with their markers in): the GBA's own are put back where the GBA has them, as the
   GBA's sounds are (22, on the maps of episode 4's investigation).

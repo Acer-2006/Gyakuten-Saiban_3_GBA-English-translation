@@ -57,8 +57,15 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     GBA's that its own translates to (POSE_CMD; the argument map gets every pose of these right),
 #     when the GBA has that one free, right after the pose it lines up with or elsewhere in the
 #     section.
-FIX_LEVEL = 2
+#   3 (0.16.42): Pearl's gesture 0x2894 (a one-shot that holds its last frame) is her talking and
+#     her idle animation on the GBA, where the DS gives the pose its blinking idle (DS 0x1b5, the
+#     GBA's 0x2288: the same frames, starting on the picture the gesture ends on).  The pose takes
+#     the GBA's 0x2288 as its idle wherever the DS has its own there (53 poses; the Japanese GBA
+#     script pairs them so once itself), so she blinks once she has finished talking, as on the
+#     DS.  Only the pose's arguments change.
+FIX_LEVEL = 3
 POSE_CMD = 0x1e
+DS_IDLES = {(0x1e, 0x2894, 0x2894): 0x2288}     # GBA pose -> the idle the DS gives it (fix level 3)
 GBA_BACKGROUND = 0x1b
 GBA_PAN = 0x1d
 LEVEL1_RESTORED = {GBA_BACKGROUND, GBA_PAN}
@@ -255,6 +262,11 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                         if info is not None: info.setdefault('fixes', set()).add(2)
                         if stats is not None: stats['poses_doubled'] += 1
                     k += 1
+            if level >= 3 and c == POSE_CMD and args in DS_IDLES and it[2][1] != it[2][2] \
+                    and map_args(c, it[2], argmap)[2] == DS_IDLES[args]:
+                args = args[:2] + (DS_IDLES[args],)       # the DS's own idle (fix level 3)
+                if info is not None: info.setdefault('fixes', set()).add(3)
+                if stats is not None: stats['ds_idles'] += 1
             out.append(('c', c, args))
         else:
             out.append(('c', c, map_args(c, it[2], argmap)))

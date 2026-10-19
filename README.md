@@ -109,6 +109,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.42 — Pearl blinks after her shy hand-to-mouth gesture, as on the DS: the GBA held the
+  gesture's last frame until the next page, the DS switches to her blinking idle once she has
+  finished talking. The GBA has that animation already (it starts on the picture the gesture
+  ends on), so 53 of her poses take it as their idle, 17 of them in episode 2. Savestates from
+  earlier builds keep working.
 * 0.16.41 — character poses checked against the DS and the Japanese GBA across the game. Four
   were off, all outside episode 2: in two of the Judge's lines in episode 1 he spoke with his
   mouth shut (the GBA sets his pose twice there and the DS once, and the conversion took the
