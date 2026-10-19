@@ -109,6 +109,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.43 — the page arrow stays white after a Psyche-Lock is broken: it used a sprite palette
+  that the Psyche-Lock sequence loads its own colours into, and came out pale blue after one.
+  It now uses the text's white, which stays the same in every scene. Savestates from earlier
+  builds keep working.
 * 0.16.42 — Pearl blinks after her shy hand-to-mouth gesture, as on the DS: the GBA held the
   gesture's last frame until the next page, the DS switches to her blinking idle once she has
   finished talking. The GBA has that animation already (it starts on the picture the gesture

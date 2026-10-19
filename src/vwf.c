@@ -295,14 +295,17 @@ static void canvas_reset(void) {
    right of the third line; it slides a pixel at a time, three frames a step, from one pixel
    right of its rest to two pixels left and back (an 18-frame cycle).  The original's is a
    10x5 triangle pointing down in the box's bottom edge, bobbing.  A 16x16 sprite, tiles
-   0xf8-0xfb, OBJ palette 2 entry 8 (white). */
-/* Rows 1, 3, 5, 7, 9, 7, 5, 3, 1 pixels wide from the left, in colour 8; the engine rewrites
+   0xf8-0xfb, in the text's white: OBJ palette 0 entry 3, the engine's sprite-text palette, the
+   same in every scene.  (Until 0.16.43 it was OBJ palette 2 entry 8, white too, but a
+   Psyche-Lock sequence loads gradients into OBJ palettes 1-4 and leaves 2's entry 8 pale
+   blue-violet, 0x7f18, after it.) */
+/* Rows 1, 3, 5, 7, 9, 7, 5, 3, 1 pixels wide from the left, in colour 3; the engine rewrites
    its arrow cells every frame, so this is copied every frame the arrow is up (working the rows
    out each time took six scanlines of the vertical blank). */
 static const u32 arrow_tiles[32] = {
-    0x00000008, 0x00000888, 0x00088888, 0x08888888, 0x88888888, 0x08888888, 0x00088888, 0x00000888,
-    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000008, 0x00000000, 0x00000000, 0x00000000,
-    0x00000008, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
+    0x00000003, 0x00000333, 0x00033333, 0x03333333, 0x33333333, 0x03333333, 0x00033333, 0x00000333,
+    0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000003, 0x00000000, 0x00000000, 0x00000000,
+    0x00000003, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 };
 static void arrow_load(void) {
@@ -1178,7 +1181,7 @@ static void frame_body(void) {
         vs.arrow_t++;
         OAMBUF[ARROW_OBJ * 4 + 0] = ARROW_Y | (0 << 14);      /* y, square shape, 4bpp */
         OAMBUF[ARROW_OBJ * 4 + 1] = (x & 0x1ff) | (1 << 14);  /* x, size 1 -> 16x16 */
-        OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (2 << 12);
+        OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (0 << 12);   /* palette 0 */
     } else vs.arrow_t = 0;
     if (vs.mapped) canvas_check();
 }
