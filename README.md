@@ -354,7 +354,7 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
   Objection! / Hold it! / Take that! bubbles (shrunk to the GBA screen), the SAVE and LOAD
   headers, the Yes / No and continue-screen buttons (now From save point. / From chapter start.,
   as on the DS), and the episode-select boxes and labels. College Phoenix's sweater says P, and
-  the policeman loses his armband, as on the DS. Fixes: while the text box grows into a choice
+  Larry loses his armband, as on the DS. Fixes: while the text box grows into a choice
   (and shrinks back after it), the page's text no longer smears over the rows the box passes; a
   strip of the name tag no longer stays above the box when the next line has no name, after a
   choice or when the box closes; hiding the text box no longer writes its state to a stray

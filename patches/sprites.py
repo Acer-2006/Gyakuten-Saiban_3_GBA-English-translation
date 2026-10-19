@@ -1,6 +1,6 @@
 """Character sprites the DS version changed for its English release: college Phoenix's sweater
-says P instead of RYU (person 7 and the close-up of effects 35-37), and the policeman of person
-12 no longer wears his armband with Japanese writing on it.
+says P instead of RYU (person 7 and the close-up of effects 35-37), and Larry (person 12, the
+script's character 0x0f) no longer wears his armband with Japanese writing on it.
 
 Characters (the person table at 0x08046920: {u32 sub-archive, u32 animations, u32 count} per
 person, and further sub-archives after each one for its other poses) and cut-scene effects keep
@@ -25,9 +25,9 @@ DS_PAIRS = [                                   # (Japanese, English) sub-archive
     (0x544150, 0x6fb274, 'college Phoenix'),
     (0x548ad0, 0x6ffaf8, 'college Phoenix'),
     (0x758718, 0x75ac78, 'college Phoenix (cut-in)'),
-    (0x58b270, 0x704db8, 'policeman'),
-    (0x590f5c, 0x70a9dc, 'policeman'),
-    (0x593cc4, 0x70d710, 'policeman'),
+    (0x58b270, 0x704db8, 'Larry'),
+    (0x590f5c, 0x70a9dc, 'Larry'),
+    (0x593cc4, 0x70d710, 'Larry'),
 ]
 GBA_AREA = (0x480000, 0x6e3578)               # the GBA's person and effect pictures (offsets)
 
@@ -84,4 +84,4 @@ def apply(rom, ctx):
                 h = g.find(a, h + 1, GBA_AREA[1])
         if not found: raise SystemExit(f'sprites: none of the {name} cells changed by the DS are in the GBA ROM')
         changed += found
-    print(f"  sprites: {changed} cells from the DS English sprites (college Phoenix's sweater, the policeman's armband)")
+    print(f"  sprites: {changed} cells from the DS English sprites (college Phoenix's sweater, Larry's armband)")

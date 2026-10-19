@@ -501,15 +501,15 @@ cut-scenes and the ending, with no writing.
 Each person's pictures are sub-archives in the effects-archive format (above): the first one,
 then more for its other poses, each a palette and its cells. The frame data (in the effects'
 format) gives the sub-archive as an offset from the person's first one. Person 7 is Phoenix at
-college (sub-archives `0x08501c50`, `0x08507708`, `0x0850b2a0`), person 12 a policeman
-(`0x08548548`, `0x0854a904`, `0x0854f42c`, `0x08551a74`); effects 35–37 (sub-archive
+college (sub-archives `0x08501c50`, `0x08507708`, `0x0850b2a0`), person 12 Larry
+(the script's character `0x0f`; `0x08548548`, `0x0854a904`, `0x0854f42c`, `0x08551a74`); effects 35–37 (sub-archive
 `0x086bb1cc`) are the close-up of Phoenix at college.
 
 The DS keeps the same sub-archives in `data.bin`, the ones its English version changed twice:
 Japanese (the GBA's cells, byte for byte) and English, with the same cells in the same order and
 a few cells the GBA does not have. Its English sprites put P on Phoenix's sweater instead of RYU
 (`0x53ccf0` / `0x6f3f9c`, `0x544150` / `0x6fb274`, `0x548ad0` / `0x6ffaf8`, and the close-up
-`0x758718` / `0x75ac78`) and take away the policeman's armband with Japanese writing on it
+`0x758718` / `0x75ac78`) and take away Larry's armband with Japanese writing on it
 (`0x58b270` / `0x704db8`, `0x590f5c` / `0x70a9dc`, `0x593cc4` / `0x70d710`). Two more pairs
 (`0x70f8dc` / `0x70fab8`, `0x712ac8` / `0x713258`, effects 204 and 211) change a few pixels of
 pictures with no writing in them. `patches/sprites.py` finds the GBA cell that is the same as each
