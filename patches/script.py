@@ -12,6 +12,8 @@ EXTRA_BLOCK_LITS = {                  # block index -> literal address (from the
     35: 0x1ef9c, 37: 0x1efa8, 40: 0x1efc0, 41: 0x1eff0}
 LOADER_POOLS = (0x1ee80, 0x1f000)   # the loader's literal pools (offsets)
 COMMON_LITS = [(0x1ed64, 0), (0x1ed60, 4)]   # (literal address, offset from bank base)
+CMD_TABLE = 0x08163afc                # the script's dispatch table (121 entries)
+PSYCHE_END_HANDLER = 0x0802393c       # command 0x64
 JUMP_SECTION = 0x0801fcd8
 JUMP_LABEL   = 0x0801fc9c
 
@@ -62,6 +64,7 @@ def apply(rom, ctx):
                                   os.path.join(ROOT, 'build/script'),
                                   defines=[f'COMMON_BANK_ADDR={common:#x}'], ld_defsyms={
                                       'f_801e210': 0x0801e211, 'f_801e4ac': 0x0801e4ad, 'f_801fb98': 0x0801fb99,
+                                      'f_802393c': PSYCHE_END_HANDLER | 1, 'f_802239c': 0x0802239d,
                                       'common_bank_addr': common, **SRAM_SYMS})
     rom.store(binary, 'font', 4, 'script code')
     print(f"  script code at {text_addr:#x} ({len(binary)} bytes)")
@@ -94,6 +97,11 @@ def apply(rom, ctx):
     for lit, off in COMMON_LITS:
         assert rom.u32(0x08000000 + lit) == 0x086e3578 + off
         rom.w32(0x08000000 + lit, common + off)
+
+    # 5b. command 0x64 (a Psyche-Lock conversation ends) -> psyche_end (src/script.c): the script
+    # stops for the frame after it, as it does on the wait that follows it everywhere but once
+    assert rom.u32(CMD_TABLE + 0x64 * 4) == PSYCHE_END_HANDLER | 1
+    rom.w32(CMD_TABLE + 0x64 * 4, syms['psyche_end'] | 1)
 
     # 6. saved games (src/script.c): the save also records where the script stopped, and continuing
     # a save finds that place in this build's script, then draws the page again (src/vwf.c)

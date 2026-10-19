@@ -167,4 +167,29 @@ void script_resume(void) {
     TXT_PTR = target ? target : nstart;     /* nothing matches: the section starts again */
 }
 
+/* ---- the end of a Psyche-Lock conversation ----
+ * Command 0x64 (0x0802393c) starts the unlock sequence (SYS+8 = 0x40a04): the game's main loop
+ * runs it (the chains break, the background goes back to the room, "Unlock Successful") and the
+ * script is not run meanwhile.  Every other 0x64 of the Japanese GBA script and the DS's is
+ * followed by a wait (0x0c, after a 0x26 or a sound when there is one), which ends the script's
+ * run for that frame, so the commands after it (the location's lock flag, 0x37; the room's
+ * background, 0x1b) come once the sequence is over.  The DS's English script lost that wait once
+ * (bank 8 section 0xbb, Larry's locks): 0x37 and 0x1b ran under the sequence, and it broke up a
+ * grey copy of the room instead of the Psyche-Lock's background.  Putting the wait back in the
+ * script would move the rest of the bank, and a savestate in it with it: the run stops here
+ * instead, after a 0x26 that comes next as in the Japanese script. */
+extern u32 f_802393c(void);           /* 0x64 */
+extern u32 f_802239c(void);           /* 0x26 */
+
+u32 psyche_end(void) {
+    u32 r = f_802393c();
+    const u16* q = (const u16*)TXT_PTR;
+    if (*q == 0x26) q += 2;
+    while (*q == 0x05 || *q == 0x06) q += 1 + cmd_args[*q];
+    if (r || *q == 0x0c) return r;
+    if (*(const u16*)TXT_PTR == 0x26) { TXT_PTR += 2; f_802239c(); }
+    TXT_PTR += 2;                     /* the dispatcher steps back over a command that waits */
+    return 1;
+}
+
 void _start(void) {}

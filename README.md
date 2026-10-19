@@ -108,6 +108,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.37 — breaking Larry's last Psyche-Lock: instead of the locks shattering over the dark
+  background, the room came back in grey and broke up into a mess of tiles before the
+  "Unlock Successful" banner. The DS's English script lost a one-frame wait there that the
+  Japanese GBA and DS scripts have at the end of every Psyche-Lock, so the room's background
+  and the lock flag were changed while the unlock sequence was still running. The game now
+  stops for that frame as the Japanese script does; the scene plays out as in the Japanese
+  game (checked frame by frame), and savestates from earlier builds keep working.
 * 0.16.36 — after the save screen (saving, or closing it with "No") or a continued save, a
   choice's question could come back with its lines going grey partway along: a line that trailed
   off earlier in the conversation ("..." fading out) was still counted as fading. The page is

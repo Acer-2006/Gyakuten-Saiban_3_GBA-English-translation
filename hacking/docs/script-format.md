@@ -206,4 +206,22 @@ Two commands differ between the versions:
   its maps with their markers in): the GBA's own are put back where the GBA has them, as the
   GBA's sounds are (22, on the maps of episode 4's investigation). Other GBA-only commands are
   left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own
-  `0x69`/`0x6b` (screen movement) where the DS has its own instead.
+  `0x69`/`0x6b` (screen movement) where the DS has its own instead. The 13 `0x41` all end a
+  Psyche-Lock conversation, after the unlock sequence: the game goes back to the investigation
+  without them (the sequence's last step sets `SYS+8` to `0x104` itself and `0x5b` brings up the
+  talk menu, as with them).
+* `0x64` (a Psyche-Lock conversation ends; its argument is not read on the GBA) sets `SYS+8` to
+  `0x40a04`: the game's main loop then runs the unlock sequence (`0x08011e4c`: with no lock left,
+  `0x03003968` reaching 0, step 7: the locks break, the background is broken up, the white flash,
+  "Unlock Successful"; otherwise step 3), and the script is not run until it is over. In the
+  Japanese GBA script and the DS's, every `0x64` is followed by a wait (`0x0c`, after a `0x26`
+  or a sound when there is one), which ends the script's run for that frame, so the commands
+  after it run once the sequence is over: `0x37` (the location's lock flag, byte 3 of its
+  20-byte entry at `0x03002920`) and `0x1b` (the room's background). The DS's English script
+  lost that wait once, at the end of Larry's locks (bank 8 section `0xbb`): `0x37` and `0x1b`
+  ran under the sequence, the background was loaded again from the room's, and the sequence
+  broke up a grey copy of the room instead. The English build does not put the wait back in
+  the script (the rest of the bank would move, and a savestate in it with it): `psyche_end`
+  (`src/script.c`, dispatch entry `0x64`) ends the script's run after `0x64` (and a `0x26` right
+  after it, which the Japanese script runs first) when no wait follows. It changes nothing
+  where the wait is there.
