@@ -38,15 +38,19 @@ def tokens(sec, cmd_args=CMD_ARGS):
             n = cmd_args.get(w, 0); out.append((i, w, tuple(ws[i + 1:i + 1 + n]))); i += 1 + n
     return out
 
-def parse_bank(data, main=None, cmd_args=CMD_ARGS, labels=None):
+def parse_bank(data, main=None, cmd_args=CMD_ARGS, labels=None, english=False):
     """-> dict(n, entries, present, sections, labels, stale)
     main: the chapter's main bank (bytes) when `data` may be a partial bank, else None.
-    labels: explicit set of label-entry indices (default: the targets of command 0x36 in the bank)."""
+    labels: explicit set of label-entry indices (default: the targets of command 0x36 in the bank).
+    english: a bank of the English build, whose sections may be out of order (a section a later
+    fix changed is at the end, its old version where it was: build_bank_layered); a section then
+    runs to the next section start by address, and an old version shows as the end of the section
+    before it."""
     ents = entries(data); n = len(ents); hdr = 4 + 4 * n
     # 1. monotonic chain of in-range offsets
     chain = []; last = hdr
     for i, o in enumerate(ents):
-        if hdr <= o <= len(data) and o >= last: chain.append(i); last = o
+        if hdr <= o <= len(data) and (o >= last or english): chain.append(i); last = max(last, o)
     present = chain
     # 2. partial bank: entries equal to the main bank's are stale copies
     if main is not None and main is not data:
@@ -56,9 +60,13 @@ def parse_bank(data, main=None, cmd_args=CMD_ARGS, labels=None):
     # 3. label entries: indices used by command 0x36
     used = set(labels) if labels is not None else set()
     pres = sorted(present)
+    def end_of(k, i):
+        if not english: return ents[pres[k + 1]] if k + 1 < len(pres) else len(data)
+        later = [ents[j] for j in pres if ents[j] > ents[i]]
+        return min(later) if later else len(data)
     if labels is None:
         for k, i in enumerate(pres):
-            end = ents[pres[k + 1]] if k + 1 < len(pres) else len(data)
+            end = end_of(k, i)
             for _, w, args in tokens(data[ents[i]:end], cmd_args):
                 if w == 0x36 and args: used.add(args[0])
     labels = {}
@@ -69,7 +77,7 @@ def parse_bank(data, main=None, cmd_args=CMD_ARGS, labels=None):
     sections = {}
     pres = sorted(present)
     for k, i in enumerate(pres):
-        end = ents[pres[k + 1]] if k + 1 < len(pres) else len(data)
+        end = end_of(k, i)
         sections[i] = data[ents[i]:end]
     stale = {i: ents[i] for i in range(n) if i not in sections and i not in labels}
     return {'n': n, 'entries': ents, 'present': pres, 'sections': sections, 'labels': labels, 'stale': stale}
@@ -89,6 +97,27 @@ def build_bank(n, sections, labels=None, stale=None):
         elif i in stale: ents.append(stale[i] & 0xffffffff)
         else: raise ValueError(f'entry {i} undefined')
     return struct.pack('<I', n) + b''.join(struct.pack('<I', e) for e in ents) + body
+
+def build_bank_layered(n, versions, labels=None, stale=None):
+    """versions: {index: {fix level: bytes}} (tools/convert_script.py, FIX_LEVEL).  Every section's
+    level-0 version goes where build_bank puts it, so the bank keeps the layout it had before the
+    fixes; a version a later fix made goes after them, level by level, and the section's entry
+    points to its last one.  A savestate holds the script pointer as an address: one made inside
+    any section stays in a copy of the script it was made in (the old version is still there,
+    though nothing jumps to it any more), and the sections after a changed one do not move."""
+    labels = labels or {}; stale = stale or {}
+    base = {i: v[0] for i, v in versions.items()}
+    data = build_bank(n, base, labels, stale)
+    if all(len(v) == 1 for v in versions.values()):
+        return data
+    ents = entries(data)
+    body = bytearray(data)
+    for lv in sorted({lv for v in versions.values() for lv in v if lv}):
+        for i in sorted(versions):
+            if lv in versions[i]:
+                ents[i] = len(body); body += versions[i][lv]
+    struct.pack_into('<%dI' % n, body, 4, *ents)
+    return bytes(body)
 
 def simple_sections(data):
     """Plain section list (every entry an offset) for banks known to have no stale/label entries."""

@@ -204,7 +204,25 @@ Two commands differ between the versions:
   and the conversations behind those four flags played their first-time version every time.
 * Map markers (`0x39`, `0x3a`, `0x3c`) the GBA places where the DS script has none (the DS draws
   its maps with their markers in): the GBA's own are put back where the GBA has them, as the
-  GBA's sounds are (22, on the maps of episode 4's investigation). Other GBA-only commands are
+  GBA's sounds are (22, on the maps of episode 4's investigation).
+* Background changes (`0x1b`) the GBA has where the DS has none (0.16.38): the DS makes a few
+  with commands of its own, which are dropped (`0x4d bg 1` where the GBA has `0x1b bg`, twice in
+  bank 7 after the security camera's picture; its own top-screen pictures after episode 5's
+  staff roll, bank 41 section `0x8b`). The GBA's are put back where the GBA has them, or, when
+  the DS shows a picture of its own in their place (the end of episode 5), where the DS has it;
+  one that sets the background already set just before or just after is left out (the judge's,
+  twice in a row, in five places of episode 1's trial). Six in all, with the pan over the first
+  picture at the end (`0x1d 0x201`), which the DS has no use for. `0x1b bg` waits until the
+  background is up; `0x4d bg n` only asks for it (and sets bit 0 of `SYS+0x3d` when `n` is 0).
+* Sections keep their place from build to build (0.16.38): a savestate holds the script
+  pointer and its section's start as addresses. Fixes to the conversion are numbered
+  (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is
+  laid out with every section's level-0 version where 0.16.37 had it, and a section a later fix
+  changes gets its new version after the bank's sections, level by level
+  (`banks.build_bank_layered`), with its entry pointing there. A savestate inside the old version
+  carries on in it; nothing else moves. The tools read such a bank with `parse_bank(...,
+  english=True)` (`hacking/tools/gs3_script.py` does), and show an old version as the end of the
+  section before it. Other GBA-only commands are
   left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own
   `0x69`/`0x6b` (screen movement) where the DS has its own instead. The 13 `0x41` all end a
   Psyche-Lock conversation, after the unlock sequence: the game goes back to the investigation

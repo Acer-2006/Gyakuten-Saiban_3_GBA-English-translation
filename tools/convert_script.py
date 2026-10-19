@@ -39,6 +39,19 @@ ALIGN_CMD = 0x5d
 # with their markers in, so its script has none of these where the GBA places one, and they are
 # the GBA's own, put back where the GBA has them (as the GBA's sounds are).
 MARKER_CMDS = {0x39, 0x3a, 0x3c}
+# Script fixes made after 0.16.37 are numbered (FIX_LEVEL): a section a fix changes keeps its
+# earlier version where it was and gets the new one after the bank's other sections (see run_mem
+# and banks.build_bank_layered), so a savestate keeps its place in the script.
+#   1 (0.16.38): the GBA's background changes (0x1b) the DS has none for are put back, as its
+#     sounds are.  The DS changes the background with commands of its own in a few places (0x4d
+#     with its second argument 1 where the GBA has 0x1b, its own top-screen pictures at the end of
+#     episode 5), and those are dropped: after Ron DeLite's talk about Mask*DeMasque the room did
+#     not come back over the security camera's picture.
+#     The ending's picture is also panned with the GBA's 0x1d, which the DS has no use for.
+FIX_LEVEL = 1
+GBA_BACKGROUND = 0x1b
+GBA_PAN = 0x1d
+LEVEL1_RESTORED = {GBA_BACKGROUND, GBA_PAN}
 
 def tok(ws, tab):
     out = []; i = 0
@@ -110,8 +123,10 @@ def map_args(cmd, args, argmap):
         else: res.append(a)
     return tuple(res)
 
-def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
-    """emap (optional dict) receives E item index -> output item index, for label entries."""
+def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=FIX_LEVEL, info=None):
+    """emap (optional dict) receives E item index -> output item index, for label entries.
+    level: the script fixes applied (FIX_LEVEL); info (optional dict) gets 'fixes', the levels of
+    the fixes that changed this section."""
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
     # the GBA's commands that line up with none of the DS's, by (command, arguments): one the DS
@@ -221,14 +236,36 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None):
     g_e = {gj[jk]: ek for ek, jk in je.items() if jk in gj}
     matched = set(gj.values())
     inserts = []
+    # a background change of the GBA's that the DS makes differently: the same background with a
+    # command of its own (0x4d) or a little earlier stays where the GBA has it; a picture of the
+    # DS's own in its place (the end of episode 5) gives the GBA's its place.  The last ones of
+    # each side are paired up.
+    bg_cmds = (0x1b, 0x4d)
+    j_e = {jk: ek for ek, jk in je.items()}
+    g_bg = [k for k, gi in enumerate(g) if gi[0] == 'c' and gi[1] == GBA_BACKGROUND and k not in matched]
+    j_bg = [k for k, ji in enumerate(j) if ji[0] == 'c' and ji[1] in bg_cmds and k not in gj and k in j_e]
+    bg_pos = {gk: epos[j_e[jk]] for gk, jk in zip(reversed(g_bg), reversed(j_bg))
+              if j_e[jk] in epos and map_args(j[jk][1], j[jk][2], argmap)[:1] != g[gk][2][:1]}
     for gk, gi in enumerate(g):
-        if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS or gk in matched or gk in g_moved: continue
+        if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS | LEVEL1_RESTORED or gk in matched or gk in g_moved: continue
         if gi[1] in SOUND_CMDS and ds_sounds[(gi[1], gi[2])]:
             ds_sounds[(gi[1], gi[2])] -= 1; continue
+        if gi[1] in LEVEL1_RESTORED and level < 1: continue
         prev = max((k for k in g_e if k < gk), default=None)
         ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
-        inserts.append((0 if ek is None else epos[ek] + 1, gi))
-        if stats is not None: stats['gba_markers' if gi[1] in MARKER_CMDS else 'gba_sounds'] += 1
+        pos = 0 if ek is None else epos[ek] + 1
+        if gi[1] == GBA_BACKGROUND:
+            pos = bg_pos.get(gk, pos)
+            # the same background again (the GBA sets the judge's twice in a row in episode 1's
+            # trial, where the DS sets it once, a moment later): nothing to put back
+            last = next((it for it in reversed(out[:pos]) if it[0] == 'c' and it[1] in bg_cmds), None)
+            if last is not None and last[2][:1] == gi[2][:1]: continue
+            nxt = next((it for it in out[pos:] if it[0] == 't' or it[1] in bg_cmds), None)
+            if nxt is not None and nxt[0] == 'c' and nxt[2][:1] == gi[2][:1]: continue
+        inserts.append((pos, gi))
+        if gi[1] in LEVEL1_RESTORED and info is not None: info.setdefault('fixes', set()).add(1)
+        if stats is not None:
+            stats['gba_markers' if gi[1] in MARKER_CMDS else 'gba_backgrounds' if gi[1] in LEVEL1_RESTORED else 'gba_sounds'] += 1
     for pos, gi in reversed(sorted(inserts, key=lambda x: x[0])):   # (in order where they meet)
         out.insert(pos, gi)
     if emap is not None and inserts:
@@ -359,6 +396,20 @@ def items_to_words(items):
         else: ws.append(it[1]); ws.extend(it[2])
     return ws
 
+def layered(s, conv, fixes, convert_at, layers):
+    """A section's versions for banks.build_bank_layered: {fix level: bytes}, level 0 being the
+    section as 0.16.37 had it, and one entry for each later fix level that changed it."""
+    v = {0: pack(items_to_words(conv))}
+    if fixes:
+        prev = pack(items_to_words(convert_at(0)))
+        v = {0: prev}
+        for lv in range(1, FIX_LEVEL + 1):
+            cur = pack(items_to_words(conv if lv == FIX_LEVEL else convert_at(lv)))
+            if cur != prev: v[lv] = cur
+            prev = cur
+        if len(v) > 1: layers.append(s)
+    return v
+
 def run_mem(ctx):
     """Convert using data from a BuildContext; returns ({bank idx: bytes, 'common': bytes}, stats)."""
     from labels_en import menu_labels
@@ -391,21 +442,27 @@ def run_mem(ctx):
             if any(it[0] == 'c' and it[1] == 0x07 for it in tg): gba_menus.setdefault(b, []).append(s)
     labels = menu_labels(ctx.arm9, gba_menus)
     out = {}
+    layers = []
     for b in range(42):
         G, J, E = parsed[b]
         secs = {}; emaps = {}
         label_secs = {sec for sec, off in E['labels'].values()}
         for s in G['present']:
-            emap = {}
             e_items = tok(words(E['sections'][s]), ADS)
-            conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
-                                   e_items, argmap, labels=labels.get((b, s)), stats=stats, emap=emap)
-            wmap = {}
-            reworded = gba_wording(conv, stats, wmap)
-            if reworded != conv and s in label_secs:
-                raise ValueError(f'bank {b} section {s}: GBA wording in a section with label entries')
-            conv = section_jumps(reworded, e_items, emap, wmap, stats)
-            secs[s] = pack(items_to_words(conv)); emaps[s] = (conv, emap)
+            def convert(level, st):
+                emap = {}; info = {}
+                conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
+                                       e_items, argmap, labels=labels.get((b, s)), stats=st, emap=emap,
+                                       level=level, info=info)
+                wmap = {}
+                reworded = gba_wording(conv, st, wmap)
+                if reworded != conv and s in label_secs:
+                    raise ValueError(f'bank {b} section {s}: GBA wording in a section with label entries')
+                conv = section_jumps(reworded, e_items, emap, wmap, st)
+                return conv, emap, info.get('fixes', set())
+            conv, emap, fixes = convert(FIX_LEVEL, stats)
+            secs[s] = layered(s, conv, fixes, lambda lv: convert(lv, Counter())[0], layers)
+            emaps[s] = (conv, emap)
         # label entries (command 0x36 targets): E's byte offset -> E item index -> output item -> byte offset
         new_labels = {}
         for idx, (sec, off) in E['labels'].items():
@@ -422,17 +479,21 @@ def run_mem(ctx):
         # a partial bank's unused entries stay copies of its (already converted) main bank's
         m = bk.main_bank_of(b)
         stale = {i: bk.entries(out[m])[i] for i in G['stale']} if m != b and len(bk.entries(out[m])) == G['n'] else G['stale']
-        out[b] = bk.build_bank(G['n'], secs, new_labels, stale)
+        out[b] = bk.build_bank_layered(G['n'], secs, new_labels, stale)
     secs = {}
     for s in Graw['present']:   # GBA numbering (see COMMON_DS_ONLY)
         d = ds_common_section(s)
         emap = {}; wmap = {}
         e_items = tok(words(Eraw['sections'][d]), ADS)
-        conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][d]), ADS),
-                               e_items, argmap, stats=stats, emap=emap)
-        conv = section_jumps(gba_wording(conv, stats, wmap), e_items, emap, wmap, stats)
-        secs[s] = pack(items_to_words(conv))
-    out['common'] = bk.build_bank(Graw['n'], secs, Graw['labels'], Graw['stale'])
+        def convert(level, st):
+            emap = {}; wmap = {}; info = {}
+            conv = convert_section(tok(words(Graw['sections'][s]), A), tok(words(Jraw['sections'][d]), ADS),
+                                   e_items, argmap, stats=st, emap=emap, level=level, info=info)
+            return section_jumps(gba_wording(conv, st, wmap), e_items, emap, wmap, st), info.get('fixes', set())
+        conv, fixes = convert(FIX_LEVEL, stats)
+        secs[s] = layered(s, conv, fixes, lambda lv: convert(lv, Counter())[0], layers)
+    out['common'] = bk.build_bank_layered(Graw['n'], secs, Graw['labels'], Graw['stale'])
+    stats['sections_moved'] = len(layers)
     return out, dict(stats)
 
 def run(out_dir):

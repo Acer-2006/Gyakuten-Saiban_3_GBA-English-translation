@@ -31,10 +31,11 @@ In-game saves carry over to newer builds: a save also notes where in the script 
 and a newer build finds that place in its own script. Saves made with 0.11.6 or older are placed
 by their position, which is right unless that part of the script changed in between. Emulator
 savestates hold the script's addresses: from 0.16.27 every script bank has a fixed slot in the
-ROM (`data/bank_slots.json`), so a fix in one part of the script moves nothing else and a
-savestate made with 0.16.27 or later keeps working in later builds. One made with 0.16.26 or
-older finds its script moved in 0.16.27 and can freeze or show garbage; load an in-game save
-instead.
+ROM (`data/bank_slots.json`), and from 0.16.38 a script fix leaves every section where it was (a
+section a fix changes gets its new version after the other sections of its bank, and keeps the
+old one in its place), so a savestate made with 0.16.27 or later keeps working in later builds.
+One made with 0.16.26 or older finds its script moved in 0.16.27 and can freeze or show garbage;
+load an in-game save instead.
 
 ## What the English build changes
 
@@ -108,6 +109,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.38 — after asking Ron DeLite about the night of the crime, the security camera's picture
+  stayed up behind the talk menu instead of his room. The DS changes the background back with a
+  command of its own there, which the conversion left out, and the GBA's own was not put back.
+  Six such background changes were missing, now restored as the Japanese game has them: the
+  same thing in a second talk with the camera picture, a cut to the prosecutor's bench in
+  episode 2's trial, and, at the very end of the game, the two pictures after the staff roll
+  (with the first one's pan), where the screen stayed black. Savestates from earlier builds keep
+  working, the changed conversations included.
 * 0.16.37 — breaking Larry's last Psyche-Lock: instead of the locks shattering over the dark
   background, the room came back in grey and broke up into a mess of tiles before the
   "Unlock Successful" banner. The DS's English script lost a one-frame wait there that the

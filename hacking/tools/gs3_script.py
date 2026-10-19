@@ -142,11 +142,12 @@ def dump_section(ws, table, anchors=None):
 def read_bank(rom, bank):
     """-> (parsed bank, location) ; location = locate(rom, bank)"""
     loc = locate(rom, bank)
+    english = loc['comp_size'] is None and loc['addr'] >= UNCOMPRESSED   # sections may be out of order
     if bank == 'common':
-        return bk.parse_bank(loc['data']), loc
+        return bk.parse_bank(loc['data'], english=english), loc
     b = int(bank); m = bk.main_bank_of(b)
     main = locate(rom, m)['data'] if m != b else None
-    return bk.parse_bank(loc['data'], main), loc
+    return bk.parse_bank(loc['data'], main, english=english), loc
 
 def cmd_dump(a):
     rom = load_rom(a.rom); warn_not_gs3(rom)
