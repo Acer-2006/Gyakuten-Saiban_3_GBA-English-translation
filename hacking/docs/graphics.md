@@ -526,7 +526,7 @@ Raw 4bpp sprites, 32×16 one-dimensional cells (256 bytes):
 | `0x0818a720` | 64×16 | L ゆさぶる | cross-examination, top left; white box (1), lettering 3 / 2, OBJ palette 5 |
 | `0x0818a920` | 64×16 | つきつける R | cross-examination, top right |
 | `0x0818ab20` | 32×16 | 決定 | Court Record when presenting, next to the A icon; white (12), outline (10), OBJ palette 4 |
-| `0x0818ac20` | 32×16 | もどる | next to the B icon |
+| `0x0818ac20` | 32×16 | もどる | next to the B icon, at the screen's right edge in the two rows that show it: the Court Record while presenting (R / A / B icons and prompts placed by the routine at `0x08015034`, from `0x080150c0`: B icon x 200, prompt 216) and a photo's detail view (`0x08015170`: B and L icons x 184 and 200, prompt 216). The original's word takes 24 pixels; the English build draws Back 32 pixels wide and moves each row's icons and prompt left to leave it whole (present row: 190 and 206, the icon's tile, which was its x literal plus `0xfc`, loaded from the detail view's pool; detail view: 174, 190 and 206, the L icon's x the B icon's plus 16) |
 | `0x08190520` | 64×16 | L やめる | while breaking Psyche-Locks, top left (the Present button beside it is `0x0818a920`); the same layout and colours as ゆさぶる; loaded by the routine at `0x0801a900` |
 | `0x08190420` | 32×16 | きりかえ | Court Record step 5 (`0x08013e9a`): at x 204 after the A icon (`0x08189b20`), OBJ palette 4 like 決定 |
 

@@ -109,6 +109,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.46 — the Court Record's Back prompt is whole: while presenting, its k was cut off at the
+  screen's edge, and it was squeezed with the c against the k. Back is drawn at its full width
+  now (only the B and a set a pixel closer), and the B icon and the prompt sit 10 pixels left of
+  where the original has them, in a photo's detail view too (the L icon with them). Savestates
+  from earlier builds keep working; one made with the Court Record open shows the old prompt
+  until it is opened again.
 * 0.16.45 — a line that trails off (Ron's mumbling) fades out in the DS's four greys: the
   second step was darker than the DS's and the same as the third, so the line went from light
   grey straight to the darker one and stayed there. The split points were already the DS's (the
