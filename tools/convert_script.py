@@ -72,7 +72,15 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     section 0x8e, his grip on the mug while a short line waits).  His 0x7094 and 0x7698 have DS
 #     idles too (0x125, 0x127: the GBA's 0x7614, 0x7918), but the same picture as the frame the GBA
 #     holds, and are left as they are.
-FIX_LEVEL = 4
+#   5 (0.16.49): the English DS centres 29 lines its Japanese script does not ({5d 1}: Mia's voice
+#     in episode 2's flashback, "...click...", the date cards of episode 5's investigation, ...).
+#     Those went through the argument map, which has learnt 1 -> 2 from the captions the GBA
+#     places at caption height where the DS centres them, so they became {5d 2}: a line in the box
+#     lost its centring (bit 0 of TXT+0x22 is clear), and a caption (0x42 0) was drawn in the
+#     middle of the screen, above the box it belongs in (Mia's "...Phoenix..." over an empty box,
+#     where the Japanese GBA has it in the box).  They keep the DS's {5d 1} now, as the 332 lines
+#     both DS scripts centre do; only the argument changes.
+FIX_LEVEL = 5
 POSE_CMD = 0x1e
 # GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
 # frames, checked frame by frame and cell by cell against the DS's; the fix level)
@@ -220,8 +228,14 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
             if stats is not None: stats['dropped_dsonly'] += 1
             continue
         if jk is None:
-            # EN-only command: translate args
-            out.append(('c', c, map_args(c, it[2], argmap)))
+            if level >= 5 and c == ALIGN_CMD:
+                # the English DS's own centring, kept as the DS-only pairs are (fix level 5)
+                out.append(it)
+                if info is not None: info.setdefault('fixes', set()).add(5)
+                if stats is not None: stats['en_align'] += 1
+            else:
+                # EN-only command: translate args
+                out.append(('c', c, map_args(c, it[2], argmap)))
             if stats is not None: stats['en_only'] += 1
             i += 1; continue
         gk = gj.get(jk)

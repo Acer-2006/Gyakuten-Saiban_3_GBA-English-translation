@@ -230,7 +230,13 @@ The DS centres the date and place cards ("April 11, 9:40 AM / District Court / .
 testimony titles ("-- The Victim and I --") with command `0x5d 1` before them and `0x5d 0`
 after: it measures the line at its first character and starts it at (256 − width) / 2
 (`0x02023840`). The GBA's script has none of these (332 pairs); the English converter keeps the
-DS's, and a line under alignment 1 starts at (240 − width) / 2 on the screen. The
+DS's, and a line under alignment 1 starts at (240 − width) / 2 on the screen. The English DS
+centres 29 more lines its Japanese script does not (Mia's voice in episode 2's flashback, the
+"...*CRASH*..." of Adrian Andrews's, "...click...", the date cards of episode 5's investigation, ...);
+until 0.16.49 they took the argument map's 2 (the GBA's caption height, learnt from the captions
+the GBA raises where the DS centres them): a line in the box lost its centring and a caption
+(`0x42 0`) was drawn in the middle of the screen, above the box the original puts it in. They
+keep the DS's 1 now (fix level 5). The
 engine itself only uses the alignment for its sprite cells (`0x0801f014`: the offsets at
 `TXT+0x18`), which the English build does not draw.
 

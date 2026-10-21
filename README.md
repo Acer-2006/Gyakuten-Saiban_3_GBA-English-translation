@@ -109,6 +109,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.49 — lines the English DS centres where the Japanese script does not (29 of them) are
+  centred where they belong: Mia's "...Phoenix..." in episode 2's flashback, and the other
+  voices and sounds shown without a name tag ("...*CRASH*...", "...click..."), were drawn in the
+  middle of the screen above an empty text box; they are in the box now, centred, where the
+  Japanese GBA has them. The rest (episode 5's date cards among them) get the same centring as
+  the lines both DS scripts centre. Savestates from earlier builds keep working.
 * 0.16.48 — a choice's question sits 4 pixels lower at the top of the screen, clear of the
   penalty gauge: a long first line ran on under the gauge and touched it. The answers stay where
   they were. Savestates from earlier builds keep working.
