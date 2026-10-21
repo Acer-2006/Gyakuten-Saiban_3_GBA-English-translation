@@ -443,7 +443,9 @@ covering 256×192, followed by the sub-archive (one palette). The English build
 (`patches/shouts.py`) shrinks each picture to half size, 128×96 (area average,
 `tools/dspic.py`), maps the colours back to the DS palette, and writes a new sub-archive and
 frame data for each bubble with the original timing: four sprites (two 64×64 over two 64×32),
-192 of the 216 tiles. The anchors at x 45 / 190 move to 64 / 176 so the bubble stays on screen.
+192 of the 216 tiles. Every bubble is anchored in the middle of the screen, x 120 (y stays 80),
+as the DS shows them all, whoever shouts (checked against the US release in DeSmuME with
+Phoenix's and Godot's); until 0.16.52 the anchors at x 45 / 190 moved in to 64 / 176.
 
 The sprite count must not go above the original's seven. The animation renderer (`0x08017cc8`)
 gives every animation on screen OAM entries from 127 downwards, with no lower limit, while the
@@ -455,8 +457,8 @@ bar lost its frame and its end. The build refuses a bubble with more sprites tha
 original's. Presenting
 evidence from the Court Record starts effect 4 (Take that!, `0x08013488`) or 2 (Objection!,
 `0x080134ca`), and the item's icon shows at the top middle of the screen and spins away: the
-tall Japanese bubbles at x 45 left room for it, the wide English ones are under it for about
-half a second.
+tall Japanese bubbles at x 45 left room for it, the English ones in the middle are under it for
+about half a second.
 
 A copy of the banner kanji as 16×16 blocks also sits raw at `0x08186b20`; the game does not
 use it for the banners.

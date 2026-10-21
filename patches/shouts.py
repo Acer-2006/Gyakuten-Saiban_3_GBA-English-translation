@@ -9,8 +9,10 @@ The DS keeps its English bubbles in data.bin in the same formats: frame data, th
 sub-archive, a 256x192 picture as twelve 64x64 cells with one palette.  The build shrinks each
 one to half size, 128x96 (area average), maps the colours back to the DS palette, and writes a
 new sub-archive and frame data for each bubble with the original timing: four sprites (two
-64x64 over two 64x32), 192 of the 216 tiles.  The effects anchored at the screen edges (x 45 and
-190) move in so the bubble stays on screen.
+64x64 over two 64x32), 192 of the 216 tiles.  Every bubble is shown in the middle of the screen
+(x 120, y 80), as the DS shows them all whoever shouts (seen in DeSmuME, the US release: Phoenix's
+and Godot's alike); the GBA puts the defence's at x 45 and the prosecution's at x 190 (until 0.16.52
+the English build moved those in to 64 and 176).
 
 The sprite count matters more than the tiles.  The animation renderer (0x08017cc8) hands out OAM
 entries from 127 downwards to every animation on screen, with no lower limit, and the life bar
@@ -35,7 +37,8 @@ TILES = 216                          # the OBJ tiles the bubbles have
 # the sprites covering SIZE: whole 64x64 squares, then a row of 64x32 under them
 RECTS = [(x, y, 64, 64) for y in range(0, SIZE[1] - 63, 64) for x in range(0, SIZE[0], 64)] + \
         [(x, SIZE[1] // 64 * 64, 64, 32) for x in range(0, SIZE[0], 64)]
-EDGE_X = {45: SIZE[0] // 2, 190: 240 - SIZE[0] // 2}   # anchors at the screen edges, moved in
+CENTRE = (120, 80)                   # where every bubble goes, as on the DS
+GBA_X = (45, 120, 190)               # the original's anchors (defence, middle, prosecution)
 
 def ds_bubble(data, f, name):
     """-> (the 256x192 picture as rows of indices, its palette)"""
@@ -92,7 +95,8 @@ def apply(rom, ctx):
         if rom.u32(e) != FX_ARCHIVE: raise SystemExit(f'shouts: unexpected entry at {e:#x}')
         rom.w32(e, arch); rom.w32(e + 8, fd_addr[fp])
         rom.write(e + 17, bytes([count[fp]]), 'shout sprite count')
-        x = rom.u16(e + 12)
-        if x in EDGE_X:
-            rom.w16(e + 12, EDGE_X[x]); moved += 1
-    print(f"  shouts: the DS bubbles for {len(entries)} effects ({len(archive)} bytes), {moved} moved in from the edge")
+        x, y = rom.u16(e + 12), rom.u16(e + 14)
+        if x not in GBA_X or y != CENTRE[1]: raise SystemExit(f'shouts: unexpected anchor ({x}, {y}) at {e:#x}')
+        if x != CENTRE[0]:
+            rom.w16(e + 12, CENTRE[0]); moved += 1
+    print(f"  shouts: the DS bubbles for {len(entries)} effects ({len(archive)} bytes), {moved} moved to the middle")

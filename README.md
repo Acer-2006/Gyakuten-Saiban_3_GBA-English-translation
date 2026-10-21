@@ -109,6 +109,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.52 — every Objection!, Hold it! and Take that! bubble shows in the middle of the screen,
+  whoever shouts, as on the DS (checked against the US DS release running in DeSmuME), where the
+  defence's sat towards the left and the prosecution's towards the right.
 * 0.16.51 — lines shown in the text box without a name tag (Mia's "...Phoenix..." in episode 2's
   flashback, Adrian Andrews's "...*CRASH*...") start on the box's first line, as on the DS (checked
   against the US DS release running in DeSmuME), where they sat a line lower. Savestates from
