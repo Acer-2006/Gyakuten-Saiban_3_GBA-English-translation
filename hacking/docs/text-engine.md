@@ -127,7 +127,11 @@ the Record closes. Where the engine puts them:
 
 Command `0x42 0` (bit 2 of `SYS+0x25c`) is used for every line shown without the text box:
 captions, the episode-select prompt (common section 2), phone calls and voices over a black
-screen, "To be continued".
+screen, "To be continued". Some of these lines are shown with the box open (`0x1c 0`), a
+voice with no name tag: Mia's in episode 2's flashback, Adrian Andrews's "...*CRASH*...". The
+DS draws them on the box's own lines from the first (seen in DeSmuME, the US release), and so
+does the English build since 0.16.51 (`TEXT_Y0` + 16 · row while `box_open`); before, a one- or
+two-line one took the engine's rows above, from the box's second line.
 
 Screens that are opened over the game (the save screen, ...) save the records and the text
 state and put them back when they close; `0x08020024` then redraws the text sprites from the

@@ -612,7 +612,10 @@ static void labels_oam(void) {
                y 62 + 18 * row (y 71 when TXT+0x1a is 0). */
             int fw = vs.lbl_full[L] > w ? vs.lbl_full[L] : w;
             x = 9;
-            y = (vs.lbl_rows > 2) ? TEXT_Y0 + L * 16 : 116 + L * 18;
+            /* in the open box, the box's own lines, from the first, as the DS draws them (Mia's
+               voice in episode 2's flashback; before 0.16.51 a one- or two-line caption there
+               sat on the engine's rows, from the box's second line) */
+            y = (vs.lbl_rows > 2 || box_open()) ? TEXT_Y0 + L * LINE_H : 116 + L * 18;
             if (vs.lbl_free) {
                 /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
                    36 + 18 * row + y offset, and the writer adds 9 to x */

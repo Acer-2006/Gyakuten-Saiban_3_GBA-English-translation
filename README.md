@@ -109,6 +109,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.51 — lines shown in the text box without a name tag (Mia's "...Phoenix..." in episode 2's
+  flashback, Adrian Andrews's "...*CRASH*...") start on the box's first line, as on the DS (checked
+  against the US DS release running in DeSmuME), where they sat a line lower. Savestates from
+  earlier builds keep working.
 * 0.16.50 — lines shown in the text box without a name tag (Mia's voice in episode 2's
   flashback, and the like) wait with the DS's arrow at the right of the box, as every other page
   does; they had the original's, pointing down in the box's bottom edge. Savestates from earlier
