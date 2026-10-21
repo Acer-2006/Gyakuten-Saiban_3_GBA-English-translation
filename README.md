@@ -109,6 +109,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.48 — a choice's question sits 4 pixels lower at the top of the screen, clear of the
+  penalty gauge: a long first line ran on under the gauge and touched it. The answers stay where
+  they were. Savestates from earlier builds keep working.
 * 0.16.47 — a choice's question no longer disappears after continuing a save made while the
   question was waiting for the A Button: it came back in the box, and when the options came up
   the question was gone (and sometimes the box with it). It now comes back the way it is typed,

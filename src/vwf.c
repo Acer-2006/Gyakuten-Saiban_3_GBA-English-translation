@@ -60,6 +60,7 @@ static u32 lbl_tile(int L, int cell);
 static const u8 lbl_obj0[LBL_LINES] = {3, 11, 19};
 #define Q_MAPROW   2          /* question canvas rows in choice mode: its first line at y 17, as the
                                  original's question (row 1 put it against the box's top edge) */
+#define Q_DROP     4          /* ... shown this much lower, clear of the penalty gauge (vwf_bgcnt) */
 #define CAP_Y0     62         /* caption screen: first row y, 18 px pitch */
 #define CAP_PITCH  18
 #define SYS_Y0     56         /* system messages in the save / continue screen box: first row y */
@@ -1280,7 +1281,13 @@ u32 vwf_bgcnt(u32 v) {
     }
     vx.q_rows = rows;
     vx.q_new = 0;
-    REG(0x04000010) = SH_BG1SCROLL;
+    /* At the top of the full-screen choice box the question is drawn Q_DROP pixels lower than
+       the original's (its first line at y 21, not 17): an English first line runs on under the
+       penalty gauge at the top right (y 4-16, x 156-235), and touched its bottom edge.  The
+       options keep their rows; the question's last line still ends well above the first. */
+    u32 scroll = SH_BG1SCROLL;
+    if ((rows >> Q_MAPROW & 1) && fullscreen_box()) scroll -= Q_DROP << 16;
+    REG(0x04000010) = scroll;
     return (v & 0xffff0000) | 0x1c00 | (v >> 16 & 3);     /* char block 0, map 0x600e000 */
 }
 
