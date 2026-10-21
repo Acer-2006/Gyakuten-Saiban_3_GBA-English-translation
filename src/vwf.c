@@ -1058,11 +1058,16 @@ static void box_rows_fix(void) {
 static void resume_frame(void) {
     u32 p = TXT_PTR;
     if ((p != vs.resume_cur && p != vs.resume_cur + 2) || (SYS_CAPTION & 4)) { vs.resume = 0; return; }
-    int choice = fullscreen_box();
-    if (!choice) box_rows_fix();
-    if (!choice && !box_open()) return;
+    int full = fullscreen_box();
+    if (!full) box_rows_fix();
+    if (!full && !box_open()) return;
     vs.resume = 0;
-    resume_replay(choice);
+    /* A page that leads to a choice goes on the canvas, as when it is typed (vwf_draw_char): the
+       box has grown for the options if the save was made at them, but not if it was made while
+       the question waited at its 0x07 for the A Button, or before the question was finished.
+       Before 0.16.47 that question came back as sprite text in the box, which the options then
+       took the place of: the question was gone and the box with it. */
+    resume_replay(full || page_has_choice((const u16*)vs.resume_page));
 }
 
 /* Per frame (before the BG map / OAM DMA). */

@@ -155,10 +155,14 @@ stopped on again from the records. Two things change in the English build:
   question `{0c 1}`, ...), `vwf_resume` finds the page (from the last page end before the
   pointer, with the colour and layout commands before it), and the first frame that shows the
   box (or the full-screen choice box) lays it out again: the page as sprite text (its tiles
-  cleared first), or for a choice the question on the canvas and the options after `0x07` as
-  labels, under the question and a blank row (`lbl_base`: the engine's row counter has moved on
-  to the last option by then) and with the question's colours set. A caption (`0x42 0`) is left
-  to the engine, which draws it again every frame.
+  cleared first), or for a page that leads to a choice (`page_has_choice`, as when it is typed)
+  the question on the canvas and the options after `0x07` as labels, under the question and a
+  blank row (`lbl_base`: the engine's row counter has moved on to the last option by then) and
+  with the question's colours set. A save made while the question waited at its `0x07` for the
+  A Button (the box not grown yet) is such a page too: before 0.16.47 it was judged by the box
+  alone and came back as sprite text, which the options then replaced when they came up, the
+  question gone (and with it, sometimes, the box). A caption (`0x42 0`) is left to the engine,
+  which draws it again every frame.
   A save carries the box's map rows; one made with the 56-pixel box of builds before 0.16.8
   puts the box back a row lower than this build's, which `box_open` never saw: `box_rows_fix`
   moves it up (the tag rows too) before the page is looked for.

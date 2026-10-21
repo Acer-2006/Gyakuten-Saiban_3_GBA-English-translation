@@ -109,6 +109,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.47 — a choice's question no longer disappears after continuing a save made while the
+  question was waiting for the A Button: it came back in the box, and when the options came up
+  the question was gone (and sometimes the box with it). It now comes back the way it is typed,
+  so it moves to the top of the screen above the options as usual. Saves and savestates from
+  earlier builds keep working; a savestate already showing the broken choice stays that way, but
+  continuing the in-game save again brings it back right.
 * 0.16.46 — the Court Record's Back prompt is whole: while presenting, its k was cut off at the
   screen's edge, and it was squeezed with the c against the k. Back is drawn at its full width
   now (only the B and a set a pixel closer), and the B icon and the prompt sit 10 pixels left of
