@@ -109,6 +109,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.50 — lines shown in the text box without a name tag (Mia's voice in episode 2's
+  flashback, and the like) wait with the DS's arrow at the right of the box, as every other page
+  does; they had the original's, pointing down in the box's bottom edge. Savestates from earlier
+  builds keep working.
 * 0.16.49 — lines the English DS centres where the Japanese script does not (29 of them) are
   centred where they belong: Mia's "...Phoenix..." in episode 2's flashback, and the other
   voices and sounds shown without a name tag ("...*CRASH*...", "...click..."), were drawn in the

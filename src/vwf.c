@@ -1124,6 +1124,7 @@ static void box_leftovers(void) {
 
 static void q_frame(void);
 static void frame_body(void);
+static void page_arrow(void);
 static void cursor_ahead(int on);
 void vwf_frame(void) {
     frame_body();
@@ -1137,7 +1138,11 @@ static void frame_body(void) {
     if (vs.overlay) { labels_hide(); return; }
     record_lend();
     if (vs.resume) resume_frame();
-    if (vs.lbl_row0 >= 0 && vs.lbl_caption) { labels_oam(); return; }
+    if (vs.lbl_row0 >= 0 && vs.lbl_caption) {
+        labels_oam();
+        if (box_open()) page_arrow();
+        return;
+    }
     if (fullscreen_box()) {
         if (vs.mapped) choice_frame();
         return;
@@ -1173,13 +1178,21 @@ static void frame_body(void) {
         return;
     }
     if (!vs.mapped && vs.mode != 2) return;
-    /* the engine's arrow is BG tiles in row 19, columns 14-15, bobbing through the tile pairs
-       0x20/0x21 .. 0x26/0x27 (each a row lower; 0x09 is the plain bottom edge): ours is a sprite
-       at the right that bobs with it, and those cells show the box's bottom edge */
+    if (vs.mapped && (BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+    page_arrow();
+    if (vs.mapped) canvas_check();
+}
+
+/* The engine's arrow is BG tiles in row 19, columns 14-15, bobbing through the tile pairs
+   0x20/0x21 .. 0x26/0x27 (each a row lower; 0x09 is the plain bottom edge): ours is a sprite at
+   the right that bobs with it, and those cells show the box's bottom edge.  Run while the box is
+   open with a page in it, or a caption (command 0x42 0) shown in the box: before 0.16.50 a
+   caption's wait showed the original's arrow, pointing down in the bottom edge (Mia's voice in
+   episode 2's flashback). */
+static void page_arrow(void) {
     u32 e = BG1MAP[BOX_BOTTOM * 32 + 14] & 0x3ff;
     if (e >= 0x20 && e <= 0x27) { vs.arrow_on = 1; vs.arrow_y = (e - 0x20) >> 1; }
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;
-    if (vs.mapped && (BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
     if (e >= 0x20 && e <= 0x27) {
         BG1MAP[BOX_BOTTOM * 32 + 14] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 14];
         BG1MAP[BOX_BOTTOM * 32 + 15] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 15];
@@ -1194,7 +1207,6 @@ static void frame_body(void) {
         OAMBUF[ARROW_OBJ * 4 + 1] = (x & 0x1ff) | (1 << 14);  /* x, size 1 -> 16x16 */
         OAMBUF[ARROW_OBJ * 4 + 2] = ARROW_TILE | (0 << 10) | (0 << 12);   /* palette 0 */
     } else vs.arrow_t = 0;
-    if (vs.mapped) canvas_check();
 }
 
 /* ---------------------------------------------------------------- the question on BG0 */
