@@ -109,6 +109,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.54 — after a game over the courtroom doors close before the title screen again, as on the
+  Japanese GBA and the DS: the English script went from the Judge's gavel to a black screen. The
+  DS closes the doors from its own code, so its script has no commands for them and the
+  conversion lost the GBA's; they are back in all 15 game-over scenes, frame for frame as in the
+  Japanese game. Savestates from earlier builds keep working.
 * 0.16.53 — a soft lock when the penalty bar ran out in the second part of a chapter (Godot's
   coffee mug in episode 3, for one): instead of the Judge's guilty verdict the game stopped on an
   empty text box. A chapter too long for one script bank continues in a second one, and the

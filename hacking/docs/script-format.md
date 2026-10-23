@@ -255,6 +255,13 @@ Two commands differ between the versions:
   twice in a row, in five places of episode 1's trial). Six in all, with the pan over the first
   picture at the end (`0x1d 0x201`), which the DS has no use for. `0x1b bg` waits until the
   background is up; `0x4d bg n` only asks for it (and sets bit 0 of `SYS+0x3d` when `n` is 0).
+* The doors closing after a game over (0.16.54, fix level 6, `GBA_DOORS`): every game-over
+  section of the GBA (one per trial chapter, from the table at `0x08045bf2`, 15 in all) ends with
+  `{6b 0 0 0}{69 62 12f}{69 62 212}` after the wait that follows the Judge's gavel, and the
+  courtroom doors close before the title screen. The DS closes the same doors from its own code,
+  with no such commands in its script, so the conversion lost them and the game went from the
+  gavel to a black screen and the title. The three are put back where the GBA has them; the
+  doors play frame for frame as in the Japanese game.
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is
@@ -266,7 +273,8 @@ Two commands differ between the versions:
   english=True)` (`hacking/tools/gs3_script.py` does), and show an old version as the end of the
   section before it. Other GBA-only commands are
   left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own
-  `0x69`/`0x6b` (screen movement) where the DS has its own instead. The 13 `0x41` all end a
+  `0x69`/`0x6b` (screen movement) where the DS has its own instead (the game-over doors, above,
+  excepted). The 13 `0x41` all end a
   Psyche-Lock conversation, after the unlock sequence: the game goes back to the investigation
   without them (the sequence's last step sets `SYS+8` to `0x104` itself and `0x5b` brings up the
   talk menu, as with them).

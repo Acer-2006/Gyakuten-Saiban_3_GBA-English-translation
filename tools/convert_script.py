@@ -80,7 +80,13 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     middle of the screen, above the box it belongs in (Mia's "...Phoenix..." over an empty box,
 #     where the Japanese GBA has it in the box).  They keep the DS's {5d 1} now, as the 332 lines
 #     both DS scripts centre do; only the argument changes.
-FIX_LEVEL = 5
+#   6 (0.16.54): the courtroom doors closing after a game over.  The GBA's game-over sections (one
+#     per trial chapter, 0x08045bf2) end with {6b 0 0 0}{69 62 12f}{69 62 212}: the doors close
+#     before the title screen.  The DS shows the same doors from its own code and has no such
+#     commands in its script, so the conversion lost them and the game went from the Judge's gavel
+#     straight to a black screen and the title.  Those three are put back where the GBA has them,
+#     after the wait that follows the gavel (15 sections).
+FIX_LEVEL = 6
 POSE_CMD = 0x1e
 # GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
 # frames, checked frame by frame and cell by cell against the DS's; the fix level)
@@ -89,6 +95,7 @@ DS_IDLES = {(0x1e, 0x2894, 0x2894): (0x1b5, 0x2288, 3),
             (0x11, 0x72d0, 0x72d0): (0x125, 0x7614, 4)}
 GBA_BACKGROUND = 0x1b
 GBA_PAN = 0x1d
+GBA_DOORS = [(0x6b, (0, 0, 0)), (0x69, (0x62, 0x12f)), (0x69, (0x62, 0x212))]   # fix level 6
 LEVEL1_RESTORED = {GBA_BACKGROUND, GBA_PAN}
 
 def tok(ws, tab):
@@ -316,7 +323,22 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
     j_bg = [k for k, ji in enumerate(j) if ji[0] == 'c' and ji[1] in bg_cmds and k not in gj and k in j_e]
     bg_pos = {gk: epos[j_e[jk]] for gk, jk in zip(reversed(g_bg), reversed(j_bg))
               if j_e[jk] in epos and map_args(j[jk][1], j[jk][2], argmap)[:1] != g[gk][2][:1]}
+    # the doors closing after a game over, which the DS shows from its own code (fix level 6)
+    doors = set()
+    if level >= 6:
+        for k in range(len(g) - len(GBA_DOORS) + 1):
+            run = range(k, k + len(GBA_DOORS))
+            if all(g[n][0] == 'c' and (g[n][1], g[n][2]) == GBA_DOORS[n - k] and n not in matched and
+                   n not in g_moved for n in run):
+                doors.update(run)
     for gk, gi in enumerate(g):
+        if gk in doors:
+            prev = max((k for k in g_e if k < gk), default=None)
+            ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
+            inserts.append((0 if ek is None else epos[ek] + 1, gi))
+            if info is not None: info.setdefault('fixes', set()).add(6)
+            if stats is not None: stats['gba_doors'] += 1
+            continue
         if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS | LEVEL1_RESTORED or gk in matched or gk in g_moved: continue
         if gi[1] in SOUND_CMDS and ds_sounds[(gi[1], gi[2])]:
             ds_sounds[(gi[1], gi[2])] -= 1; continue
