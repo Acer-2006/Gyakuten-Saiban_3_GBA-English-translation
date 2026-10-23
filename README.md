@@ -109,6 +109,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.55 — the page arrow no longer runs into the text: a third line long enough to reach it
+  (about 300 pages; the DS's box is 16 pixels wider, so the same lines end well clear of its
+  arrow) closes up by the few pixels it needs, spread over its letter gaps, and ends just before
+  the arrow, which stays where the DS has it. Other lines are as they were. Savestates from
+  earlier builds keep working.
 * 0.16.54 — after a game over the courtroom doors close before the title screen again, as on the
   Japanese GBA and the DS: the English script went from the Judge's gavel to a black screen. The
   DS closes the doors from its own code, so its script has no commands for them and the

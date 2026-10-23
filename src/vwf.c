@@ -41,6 +41,11 @@
 #define ARROW_TILE  0xf8
 #define ARROW_X     229       /* at rest: the tip 2 pixels inside the box's right edge, as the DS's */
 #define ARROW_Y     139       /* 10 px above the box's bottom border, as the DS's */
+/* The arrow is on the third line's row and slides 2 px left of ARROW_X.  The DS's box is 16 px
+   wider, so a third line the DS ends well clear of its arrow can run under ours: such a line
+   closes up just enough, the pixels spread over its letter gaps, that it ends before L3_END
+   (its pen; the last letter's ink a pixel or two before), clear of the arrow wherever it is. */
+#define L3_END      (ARROW_X - 2 - 1)
 
 /* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00-0xbf.  The
    original's two lines take 0x00-0x7f and the item shown in court 0x80-0xbf: patches/icons.py
@@ -135,6 +140,8 @@ struct vwf_ext {
     u8 cur_ahead;       /* the choice cursor is in OAM CURSOR_AHEAD (cursor_ahead) */
     u8 lo_rows;         /* box_leftovers: the pair of rows it looks at this frame (0-4) */
     u8 lbl_sq;          /* a choice's options: pixels taken out of every letter gap (line_done) */
+    u8 cut_r, cut_g, cut_acc;   /* the line under the page arrow: pixels taken out over its letter
+                                   gaps (box_glyph), the gaps, the running sum spreading them */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 
@@ -395,7 +402,20 @@ static void canvas_check(void) {
     vs.lost = 1;
 }
 
-/* Measure the rest of the current line (from the script pointer) in pixels. */
+/* Measure the rest of the current line (from the script pointer) in pixels; `glyphs`, if given,
+   gets the number of characters in it. */
+static int measure_line_n(const u16* p, int* glyphs) {
+    int w = 0, g = 0;
+    for (int n = 0; n < 512; n++) {
+        u32 t = *p++;
+        if (t >= 0x80) { w += font_w[glyph_index(t)]; g++; continue; }
+        if (t == 0x00 || t == 0x01 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a ||
+            t == 0x0d || t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) break;
+        p += cmd_args[t];
+    }
+    if (glyphs) *glyphs = g;
+    return w;
+}
 static int measure_line(const u16* p) {
     int w = 0;
     for (int n = 0; n < 512; n++) {
@@ -799,6 +819,19 @@ static int page_is_statement(const u16* p) {
     return 0;
 }
 
+/* Does the page end waiting for the A Button (0x02, 0x2d), the page arrow up? */
+static int page_waits(const u16* p) {
+    for (int n = 0; n < 1024; n++) {
+        u32 t = *p++;
+        if (t >= 0x80) continue;
+        if (t == 0x02 || t == 0x2d) return 1;
+        if (t == 0x00 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d || t == 0x15 ||
+            t == 0x2c || t == 0x2e || t == 0x35 || t == 0x36) return 0;
+        p += cmd_args[t];
+    }
+    return 0;
+}
+
 /* One character onto the canvas at the pen (the script pointer is just after it); with `blit`
    0 only into the glyph log. */
 static void canvas_glyph(u32 code, u32 col, int blit) {
@@ -850,12 +883,24 @@ static void box_glyph(u32 code, u32 col) {
     int gi = glyph_index(code);
     if (vs.pen_x == 0) {
         if (vs.line == 0) vs.inset = page_is_statement((const u16*)TXT_PTR);
-        int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
+        int gaps;
+        int w = font_w[gi] + measure_line_n((const u16*)TXT_PTR, &gaps);
         int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
         vs.squeeze = 0;
         if (w > maxw) vs.squeeze = 1;
         if (w - 24 > maxw) vs.squeeze = 2;
         vs.line_x0 = (TXT_ALIGN & 1) && w < maxw ? (BOX_W - w) / 2 - (vs.inset ? STMT_X0 : TEXT_X0) : 0;
+        /* the line under the page arrow (see L3_END): a centred one moves left, any other closes
+           up by the pixels it runs over, spread evenly over its letter gaps (from 0.16.55) */
+        vx.cut_r = 0;
+        if (vs.line == MAX_LINES - 1 && !vs.inset && gaps > 0 && page_waits((const u16*)TXT_PTR)) {
+            int over = TEXT_X0 + vs.line_x0 + w - vs.squeeze * gaps - L3_END;
+            if (over > 0 && vs.line_x0 >= over) vs.line_x0 -= over;
+            else if (over > 0) {
+                if (vs.line_x0) { over -= vs.line_x0; vs.line_x0 = 0; }
+                vx.cut_r = over > 255 ? 255 : over; vx.cut_g = gaps > 255 ? 255 : gaps; vx.cut_acc = vx.cut_g / 2;
+            }
+        }
     }
     int L = vs.line;
     if (L >= MAX_LINES) L = MAX_LINES - 1;
@@ -883,6 +928,11 @@ static void box_glyph(u32 code, u32 col) {
         if (right > vs.lbl_width[L]) vs.lbl_width[L] = right;
     }
     int adv = font_w[gi] - vs.squeeze;
+    if (vx.cut_r && vs.line == MAX_LINES - 1) {
+        u32 acc = vx.cut_acc + vx.cut_r;
+        while (acc >= vx.cut_g) { acc -= vx.cut_g; adv--; }
+        vx.cut_acc = acc;
+    }
     if (adv < 1) adv = 1;
     vs.pen_x += adv;
 }

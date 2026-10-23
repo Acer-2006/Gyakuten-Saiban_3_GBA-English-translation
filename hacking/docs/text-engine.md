@@ -187,6 +187,21 @@ the English build lays a page that ends in `0x15` out from x 10 and up to 220 pi
 of from x 8 and up to 230 pixels (the DS's margin: its lines start 8 pixels inside its 256-wide
 box; measured on the DS, "No one's asking how you feel!" is 221 pixels on both).
 
+## The page arrow and the third line
+
+The page arrow (OAM 2, a 16×16 sprite at x 229, y 139, sliding 2 pixels left and 1 right of it;
+the DS's, measured frame by frame) sits on the third line's row at the right of the box, as on the
+DS. The DS's box is 16 pixels wider, so a third line it ends well clear of its arrow can run on
+under ours: on a page that ends waiting for the A Button (`0x02`, `0x2d`), a third line whose pen
+would end past `L3_END` (x 226, a pixel before the arrow's leftmost column) closes up by exactly
+the pixels it runs over, spread evenly over its letter gaps (`box_glyph`, `vx.cut_r`); a centred
+one moves left instead. Since 0.16.55: about 300 pages, 1 to 12 pixels each (5 for the median
+page), the letters otherwise where they were. Lines over 230 pixels already close up a whole
+pixel a gap and end clear of it; statements (`0x15`), choices' questions and captions have no page
+arrow on their third line, or none that long, and are left as they are. On the DS a few of its
+widest third lines (236 to 239 pixels; seen in DeSmuME) touch its arrow with their last letter
+("...this much meat.").
+
 ## Fading lines
 
 Command `0x5d 5` sets bit 5 of `TXT+0x22`: the cell draw then greys the text out by column, using
