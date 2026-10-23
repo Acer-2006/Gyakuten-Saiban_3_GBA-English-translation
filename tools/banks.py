@@ -6,8 +6,10 @@ sections (section n = entry n), but two other kinds of entry exist:
 
 * A *partial bank* (one loaded through the loader's literal pool rather than the chapter table,
   with the same entry count as the chapter's main bank) only carries some of the chapter's
-  sections.  Its other entries are copies of the main bank's offsets and are never used while the
-  partial bank is loaded; we call them *stale* and keep them verbatim.
+  sections.  Its other entries are copies of the main bank's offsets; we call them *stale* and keep
+  them verbatim.  The Japanese game reaches the ones past the partial bank's own data (the
+  chapter's game-over section) in the main bank's data left in the buffer; the English build points
+  them at the main bank's sections in ROM (patches/script.py).
 * A *label entry* is `{u16 byte offset, u16 section}`, the target of command 0x36 (its argument is
   the entry index).  The three in the game sit after the last section of their bank.
 

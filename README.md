@@ -109,6 +109,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.53 — a soft lock when the penalty bar ran out in the second part of a chapter (Godot's
+  coffee mug in episode 3, for one): instead of the Judge's guilty verdict the game stopped on an
+  empty text box. A chapter too long for one script bank continues in a second one, and the
+  Japanese game reaches the chapter's game-over scene, kept in the first, through what is left of
+  that bank in memory; the English banks stay in the cartridge, where that look-up landed in the
+  next bank's script. The second banks now point at the first's scenes: the game over plays to the
+  end and back to the title screen in all ten such banks, as in the Japanese game. Saves and
+  savestates from earlier builds keep working (one already stuck stays stuck).
 * 0.16.52 — every Objection!, Hold it! and Take that! bubble shows in the middle of the screen,
   whoever shouts, as on the DS (checked against the US DS release running in DeSmuME), where the
   defence's sat towards the left and the prosecution's towards the right.

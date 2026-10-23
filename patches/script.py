@@ -2,6 +2,7 @@
 import os, sys, json, struct
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 from rom import compile_c
+import banks as bk
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 LOADER_CALLS = [0x0801ef04, 0x0801ef24, 0x0801ef44, 0x0801ef94, 0x0801efb0, 0x0801efd0, 0x0801fb0c]
@@ -60,6 +61,30 @@ def apply(rom, ctx):
         bank_addr[b] = place(rom, en[b], slots[str(b)], f'en bank {b}')
     common = place(rom, en['common'], slots['common'], 'en common bank')
     print(f"  English banks at {bank_addr[0]:#x}.., common at {common:#x}; ext used {rom.regions['ext'].used/1e6:.2f} MB")
+    # 1b. a partial bank's stale entries (sections of its chapter that it does not carry) point at
+    # those sections in its main bank.  The Japanese game decompresses every bank to one buffer, so
+    # while a partial bank (shorter than its main bank) is loaded, an entry copied from the main
+    # bank's past the partial bank's own data still finds the main bank's section there, left over
+    # from when that bank was loaded: the chapter's game-over section (the penalty bar running out,
+    # 0x08045bf2), always its main bank's last, is reached that way in every partial bank.  The
+    # English banks stay in ROM, and those entries led past the partial bank into the next one's
+    # data (a soft lock after the bar ran out in the second part of a chapter).  An entry here is
+    # an offset from the partial bank's base: the engine adds the two as 32-bit numbers, so one
+    # that wraps round reaches a main bank placed before it.  Label entries (command 0x36) stay.
+    linked = 0
+    for b in range(42):
+        m = bk.main_bank_of(b)
+        if m == b: continue
+        G = bk.parse_bank(ctx.gba_banks[b], ctx.gba_banks[m])
+        main_labels = bk.parse_bank(ctx.gba_banks[m])['labels']
+        me, pe = bk.entries(en[m]), bk.entries(en[b])
+        for i in G['stale']:
+            # label entries, and bank 5's unused one at its end (not a section offset)
+            if i in main_labels or not 4 + 4 * len(me) <= me[i] < len(en[m]): continue
+            assert pe[i] == me[i], (b, i, hex(pe[i]), hex(me[i]))
+            rom.w32(bank_addr[b] + 4 + 4 * i, (bank_addr[m] + me[i] - bank_addr[b]) & 0xffffffff)
+            linked += 1
+    print(f"  {linked} sections of partial banks linked to their main banks")
     entries = []
     for b in range(44):
         if b in bank_addr: entries.append((bank_addr[b], len(en[b])))

@@ -71,7 +71,16 @@ Two kinds of entry are not section offsets:
   in the chapter table) and one or more partial banks loaded through the literal pool (command
   `0x6a n` switches to block `n`). A partial bank has the *same entry count* as its main bank; the
   entries of the sections it carries are real offsets, the others are copies of the main bank's
-  offsets and are never used while the partial bank is loaded. The partial banks are 2 (of 1),
+  offsets. Every bank is decompressed to the same buffer (`0x02011fc0`) and a partial bank is
+  shorter than its main bank, so while it is loaded a copied entry that lies past its own data
+  still finds the main bank's section there, left over from when that bank was loaded: the
+  chapter's game-over section (the penalty bar running out, from the table at `0x08045bf2`), always
+  the main bank's last, is reached that way in every partial bank. The English build keeps its
+  banks in ROM; since 0.16.53 (`patches/script.py`) a partial bank's copied entries point at the
+  main bank's sections (an offset from the partial bank's base that wraps round when the main bank
+  comes first: the engine adds the two as 32-bit numbers). Before, they led past the partial bank
+  into the next bank's data, and the bar running out in the second part of a chapter soft-locked
+  the game. The partial banks are 2 (of 1),
   6 (of 5), 12 (of 11), 16 (of 15), 22 (of 21), 24 (of 23), 26 (of 25), 37 (of 36), 40 and
   41 (of 39). The other literal-pool banks (4, 8, 9, 14, 18, 19, 29, 33, 35) are ordinary banks
   with their own section space.
