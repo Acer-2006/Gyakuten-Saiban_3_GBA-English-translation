@@ -120,7 +120,7 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
   conversion lost the GBA's; they are back in all 15 game-over scenes, frame for frame as in the
   Japanese game. Savestates from earlier builds keep working.
 * 0.16.53 — a soft lock when the penalty bar ran out in the second part of a chapter (Godot's
-  coffee mug in episode 3, for one): instead of the Judge's guilty verdict the game stopped on an
+  coffee mug in episode 2's second trial day, for one): instead of the Judge's guilty verdict the game stopped on an
   empty text box. A chapter too long for one script bank continues in a second one, and the
   Japanese game reaches the chapter's game-over scene, kept in the first, through what is left of
   that bank in memory; the English banks stay in the cartridge, where that look-up landed in the
