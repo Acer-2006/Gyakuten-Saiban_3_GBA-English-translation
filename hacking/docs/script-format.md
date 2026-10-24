@@ -50,8 +50,11 @@ elsewhere and have the pointer above updated (`gs3_script.py insert` does both).
 **English build.** The build replaces the loader (`src/script.c`): a bank whose pointer is at or
 above `0x08800000` is used *uncompressed, in place*, with no size limit. It also writes a bank
 directory at `0x08800000` for tools: `'GS3E'`, `u32 1`, `u32 45`, then `{u32 address, u32 length}`
-for banks 0–43 and the common bank (length 0 = still LZ-compressed at that address).
-`gs3_script.py` reads it, so dumping and editing the English text works the same way.
+for banks 0–43 and the common bank (length 0 = still LZ-compressed at that address), then a
+pointer to the table of section versions kept outside their bank's slot (0.16.56; `0xffffffff`
+before): `u32 count`, then `{u32 bank (44: common), u32 section index, u32 address, u32 length}`.
+`gs3_script.py` reads it, putting such sections back at the end of their bank, so dumping and
+editing the English text works the same way.
 
 ## Bank layout
 
@@ -262,6 +265,35 @@ Two commands differ between the versions:
   with no such commands in its script, so the conversion lost them and the game went from the
   gavel to a black screen and the title. The three are put back where the GBA has them; the
   doors play frame for frame as in the Japanese game.
+* GBA commands the game plays differently without (0.16.56, fix level 7, `RESTORE7`), found by
+  comparing every section's commands with the Japanese GBA script's and following the
+  differences in the engine. Each is put back where the GBA has it, after the command it follows
+  there; `RESTORE7` names the sections and the commands, so nothing else changes:
+  * the life bar with two choices whose wrong answer costs 16 (bank 15 section `0xa6`, bank 24
+    `0xa0`): `{54 0 1}{54 2 10}` sit inside the choice block on the GBA, and the converter wrote
+    only the options' labels there. `54 2 n` sets the penalty (`SYS+0xaa`) that `54 0 3` takes
+    off the bar (`SYS+0xa6`, `0x0801dcf4`), so a wrong answer cost whatever was set last (none,
+    after a right answer). The GBA's commands in a choice block now go after `0x07`, before
+    the labels (the only two such blocks).
+  * `{52 2}` before the two maps the player points at (`0x3f`; 28 `0xcd`, 35 `0xf9`), where the DS
+    waits a second instead. `0x52 n` sets `SYS+0x256 |= n` and slides the hints in
+    (`0x0801a920`): bit 0 is "Present R" (R, `0x08011ce0`), bit 1 "L Stop" (L, `0x08011d24`:
+    sound `0x2c`, then the court's state machine at step 8). Backing out plays the section the
+    `0x4f` before names (28 `0xd6`, 35 `0x161`: the speaker thinks it over), which the English
+    text has; without `0x52 2` the hint was missing and L did nothing.
+  * `{6b 0 0 1}{69 49e 102}` at the end of the 11 finds of the search with Gumshoe's metal
+    detector (35 `0x13d`-`0x147`, before `{0c 1}{1c 3}{15}{0d}`): the detector's animation
+    again, which hands the game back to the search; the DS does it with `{6d 2}{26 n}` of its
+    own. Without it the game stopped for good on the `0x15` after the first find.
+  * `{1c 0}` (the box opened) at the start of 35 `0x148`, after the search: the English DS
+    script dropped it, and its first lines ran with the box shut, unseen.
+  * `{1c 1}` (the box hidden at once, `0x080220b0` case 1) before the Judge's reaction to a
+    wrong piece of evidence (6 `0x91`, 11 `0xa7`, 12 `0x94`, 13 `0x9a`, 36 `0xa5`) and before a
+    fade in bank 3 `0x83`; `{14}` (the evidence picture put away, `0x08022004`) in 15 `0xca` and
+    35 `0x12f`; the music's fade `{22 0 8c}` at the end of a part in bank 22 (`0x8e`: the DS
+    fades a moment earlier, and the two did not line up, so neither was kept); the newspaper in
+    the rack of the restaurant in episode 3 (14 `0xe0`, `{2f ce 1}`, object `0xce` of the table
+    at `0x08046b30`: on the DS the room is one picture).
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is
@@ -269,7 +301,12 @@ Two commands differ between the versions:
   changes gets its new version after the bank's sections, level by level
   (`banks.build_bank_layered`), with its entry pointing there. A savestate inside the old version
   carries on in it; nothing else moves. A fix that only changes arguments, every word staying
-  where it was, changes the section in place instead (0.16.41). The tools read such a bank with `parse_bank(...,
+  where it was, changes the section in place instead (0.16.41), also when a later fix then
+  moves it (0.16.56). A version that does not fit in its bank's slot (`data/bank_slots.json`)
+  goes to the region at `0x08f80000`, after the versions of earlier levels (level by level, then
+  bank by bank, so that they keep their place too), and its entry is an offset from the bank's
+  base to there: the engine adds the two as 32-bit numbers (0.16.56: bank 15's `0xca` and bank
+  35's `0x141`-`0x148`). The tools read such a bank with `parse_bank(...,
   english=True)` (`hacking/tools/gs3_script.py` does), and show an old version as the end of the
   section before it. Other GBA-only commands are
   left out as before, notably 13 of `0x41` (sets up four sprites) and the GBA's own

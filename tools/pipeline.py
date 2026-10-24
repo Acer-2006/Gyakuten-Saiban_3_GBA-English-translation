@@ -51,11 +51,12 @@ class BuildContext:
             self.gba_banks[t['idx']] = dec
         self.gba_common = self.gba[GBA_COMMON_BANK:GBA_COMMON_BANK + GBA_COMMON_SIZE]
         self.en_banks = None      # filled by convert()
+        self.en_layout = {}       # the banks' later section versions (convert_script.run_mem)
 
     def convert(self):
         """Three-way script merge -> English banks (dict idx -> bytes, 'common' -> bytes)."""
         import convert_script
         self.log('converting the script (this takes a minute)...')
-        self.en_banks, stats = convert_script.run_mem(self)
+        self.en_banks, stats, self.en_layout = convert_script.run_mem(self)
         self.log('  ' + ', '.join(f'{k} {v}' for k, v in sorted(stats.items())))
         return self.en_banks

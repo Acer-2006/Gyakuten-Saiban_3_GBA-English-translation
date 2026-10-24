@@ -21,7 +21,9 @@ def build(gba_path, nds_path, out_path, voices_dir=None):
     rom = Rom(ctx.gba, 0x1000000)
     # free regions: the old Japanese font (within Thumb BL range of the engine) and the expansion area
     rom.region('font', 0x1f31cc, 0x2231cc)
-    rom.region('ext', 0x800000, 0x1000000)
+    rom.region('ext', 0x800000, 0xf80000)
+    # script fixes that do not fit their bank's slot, at a fixed place (patches/script.py)
+    rom.region('fixes', 0xf80000, 0x1000000)
     from patches import apply_all
     apply_all(rom, ctx)
     if voices_dir and os.path.isdir(voices_dir): voices.apply(rom, ctx, voices_dir)

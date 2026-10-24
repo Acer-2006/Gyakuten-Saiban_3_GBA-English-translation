@@ -29,7 +29,8 @@ gs3_script.py table  mytable.tsv --table jp
   place; otherwise it is written to free space (the ROM grows to 16 MB if needed) and every
   pointer to the old bank is updated. On a ROM made by the English build the banks are stored
   uncompressed and the tool keeps it that way (it reads and updates the bank directory at
-  `0x08800000`), so the same commands edit the English text.
+  `0x08800000`, and puts the sections a script fix moved out of a bank's slot back into the
+  bank), so the same commands edit the English text.
 * Tables: `en` is the English build's font layout, `jp` the Japanese font (Latin, kana and
   punctuation; kanji stay as `[hex]` until you add them). Write your own with `table` as a
   starting point; the font sheet from `gs3_font.py` gives you the code of every glyph.

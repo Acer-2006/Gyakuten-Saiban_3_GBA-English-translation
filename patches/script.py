@@ -40,6 +40,13 @@ DIRECTORY = 0x08800000               # bank directory written for tools: 'GS3E',
 # and one made with an earlier build then still finds its script.  A bank that outgrows its slot
 # stops the build; raising the slot moves every bank after it (and breaks save states once).
 SLOTS = os.path.join(ROOT, 'data', 'bank_slots.json')
+# A section's later version (a script fix, convert_script.FIX_LEVEL) that does not fit in its bank's
+# slot goes to the 'fixes' region at the top of the ROM instead (build.py), level by level and bank
+# by bank, so that one fix's versions keep their place when a later fix adds more; the section's
+# entry is then an offset from the bank's base to there (the engine adds the two as 32-bit numbers).
+# The directory's last word points to a table of them for the tools: u32 count, then
+# {u32 bank (44: common), u32 section index, u32 address, u32 length} each.
+OVERFLOW_PTR = DIRECTORY + 12 + 45 * 8
 
 def place(rom, data, size, note):
     if len(data) > size:
@@ -49,18 +56,42 @@ def place(rom, data, size, note):
     rom.write(a, data, note)
     return a
 
+def split_slot(data, layout, size):
+    """The part of a bank that goes in its slot, and its later versions that go to the 'fixes'
+    region: from the first one that does not fit on (they follow one another level by level)."""
+    if len(data) <= size: return data, []
+    for k, (lv, i, off, ln) in enumerate(layout):
+        if off + ln > size:
+            return data[:off], layout[k:]
+    return data, []
+
 def apply(rom, ctx):
     table = ctx.gba_table
     en = ctx.en_banks if ctx.en_banks is not None else ctx.convert()
+    layout = getattr(ctx, 'en_layout', None) or {}
     # 1. place English banks in the expansion area, after the bank directory
     dir_addr = rom.alloc(16 + 45 * 8, 'ext', 4)
     assert dir_addr == DIRECTORY, hex(dir_addr)
-    bank_addr = {}
+    bank_addr = {}; in_slot = {}; overflow = []
     slots = json.load(open(SLOTS))
-    for b in range(42):
-        bank_addr[b] = place(rom, en[b], slots[str(b)], f'en bank {b}')
-    common = place(rom, en['common'], slots['common'], 'en common bank')
-    print(f"  English banks at {bank_addr[0]:#x}.., common at {common:#x}; ext used {rom.regions['ext'].used/1e6:.2f} MB")
+    for b in list(range(42)) + ['common']:
+        data, rest = split_slot(en[b], layout.get(b, []), slots[str(b)])
+        bank_addr[b] = place(rom, data, slots[str(b)], f'en bank {b}' if b != 'common' else 'en common bank')
+        in_slot[b] = len(data)
+        overflow += [(lv, 44 if b == 'common' else b, i, en[b][off:off + ln]) for lv, i, off, ln in rest]
+    common = bank_addr.pop('common')
+    # the versions that did not fit, and their entries (a section's last version is the one it uses)
+    moved = {}
+    for lv, b, i, blob in sorted(overflow, key=lambda x: x[:3]):
+        moved[(b, i)] = (rom.store(blob, 'fixes', 4, f'bank {b} section {i:#x}, fix level {lv}'), len(blob))
+    for (b, i), (a, ln) in moved.items():
+        base = common if b == 44 else bank_addr[b]
+        rom.w32(base + 4 + 4 * i, (a - base) & 0xffffffff)
+    print(f"  English banks at {bank_addr[0]:#x}.., common at {common:#x}; ext used {rom.regions['ext'].used/1e6:.2f} MB; "
+          f"{len(overflow)} section versions in the fixes region ({rom.regions['fixes'].used} bytes)")
+    def section_addr(b, i, off):
+        """where section i of bank b (entry `off` in the converted bank) is"""
+        return moved[(b, i)][0] if (b, i) in moved else bank_addr[b] + off
     # 1b. a partial bank's stale entries (sections of its chapter that it does not carry) point at
     # those sections in its main bank.  The Japanese game decompresses every bank to one buffer, so
     # while a partial bank (shorter than its main bank) is loaded, an entry copied from the main
@@ -82,15 +113,17 @@ def apply(rom, ctx):
             # label entries, and bank 5's unused one at its end (not a section offset)
             if i in main_labels or not 4 + 4 * len(me) <= me[i] < len(en[m]): continue
             assert pe[i] == me[i], (b, i, hex(pe[i]), hex(me[i]))
-            rom.w32(bank_addr[b] + 4 + 4 * i, (bank_addr[m] + me[i] - bank_addr[b]) & 0xffffffff)
+            rom.w32(bank_addr[b] + 4 + 4 * i, (section_addr(m, i, me[i]) - bank_addr[b]) & 0xffffffff)
             linked += 1
     print(f"  {linked} sections of partial banks linked to their main banks")
     entries = []
     for b in range(44):
-        if b in bank_addr: entries.append((bank_addr[b], len(en[b])))
+        if b in bank_addr: entries.append((bank_addr[b], in_slot[b]))
         else: entries.append((0x08000000 + [t for t in table if t['idx'] == b][0]['rom_off'], 0))
-    entries.append((common, len(en['common'])))
+    entries.append((common, in_slot['common']))
     rom.write(dir_addr, b'GS3E' + struct.pack('<II', 1, 45) + b''.join(struct.pack('<II', a, l) for a, l in entries), 'bank directory')
+    ovf = struct.pack('<I', len(moved)) + b''.join(struct.pack('<IIII', b, i, a, ln) for (b, i), (a, ln) in sorted(moved.items()))
+    rom.w32(OVERFLOW_PTR, rom.store(ovf, 'fixes', 4, 'moved section versions (for the tools)') if moved else 0)
 
     # 2. compile script.c
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)

@@ -43,7 +43,8 @@ expansion. The English build pads the ROM to 16 MB and uses `0x08800000`–`0x08
 bank directory (`0x08800000`, see script-format.md), the English script banks (each in a slot
 of a fixed size from `data/bank_slots.json`, so that a change to one bank moves no other and an
 emulator savestate, which holds script addresses, survives a newer build), graphics and
-samples; a 16 MB ROM is fine for the GBA and every emulator. The hacking tools put new data
+samples, and keeps `0x08f80000`–`0x08ffffff` for the versions of script sections a fix changed
+that do not fit in their bank's slot; a 16 MB ROM is fine for the GBA and every emulator. The hacking tools put new data
 after the last used byte, growing the ROM when needed.
 Keep in mind that Thumb `bl` only reaches ±4 MB, so new *code* that is called from the original
 code must sit within that range of the caller (the font area is a good spot; the English build

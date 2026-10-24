@@ -100,13 +100,15 @@ def build_bank(n, sections, labels=None, stale=None):
         else: raise ValueError(f'entry {i} undefined')
     return struct.pack('<I', n) + b''.join(struct.pack('<I', e) for e in ents) + body
 
-def build_bank_layered(n, versions, labels=None, stale=None):
+def build_bank_layered(n, versions, labels=None, stale=None, layout=None):
     """versions: {index: {fix level: bytes}} (tools/convert_script.py, FIX_LEVEL).  Every section's
     level-0 version goes where build_bank puts it, so the bank keeps the layout it had before the
     fixes; a version a later fix made goes after them, level by level, and the section's entry
     points to its last one.  A savestate holds the script pointer as an address: one made inside
     any section stays in a copy of the script it was made in (the old version is still there,
-    though nothing jumps to it any more), and the sections after a changed one do not move."""
+    though nothing jumps to it any more), and the sections after a changed one do not move.
+    layout (optional list) gets (fix level, index, offset, length) for each later version, in the
+    order they follow one another (patches/script.py moves those that do not fit the bank's slot)."""
     labels = labels or {}; stale = stale or {}
     base = {i: v[0] for i, v in versions.items()}
     data = build_bank(n, base, labels, stale)
@@ -117,6 +119,7 @@ def build_bank_layered(n, versions, labels=None, stale=None):
     for lv in sorted({lv for v in versions.values() for lv in v if lv}):
         for i in sorted(versions):
             if lv in versions[i]:
+                if layout is not None: layout.append((lv, i, len(body), len(versions[i][lv])))
                 ents[i] = len(body); body += versions[i][lv]
     struct.pack_into('<%dI' % n, body, 4, *ents)
     return bytes(body)

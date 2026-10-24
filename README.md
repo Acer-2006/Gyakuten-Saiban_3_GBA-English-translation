@@ -32,8 +32,9 @@ and a newer build finds that place in its own script. Saves made with 0.11.6 or 
 by their position, which is right unless that part of the script changed in between. Emulator
 savestates hold the script's addresses: from 0.16.27 every script bank has a fixed slot in the
 ROM (`data/bank_slots.json`), and from 0.16.38 a script fix leaves every section where it was (a
-section a fix changes gets its new version after the other sections of its bank, and keeps the
-old one in its place), so a savestate made with 0.16.27 or later keeps working in later builds.
+section a fix changes gets its new version after the other sections of its bank, or at a fixed
+place at the end of the ROM when the bank's slot is full, and keeps the old one in its place), so
+a savestate made with 0.16.27 or later keeps working in later builds.
 One made with 0.16.26 or older finds its script moved in 0.16.27 and can freeze or show garbage;
 load an in-game save instead.
 
@@ -109,6 +110,20 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.56 — the script checked command by command against the Japanese GBA one, and what the
+  English game lost put back. A soft lock in episode 5: after anything Gumshoe's metal detector
+  found, the game stopped for good, because the commands that hand the game back to the search
+  were missing (the DS does that its own way); and the first lines after the search ran with the
+  text box shut. Two choices whose wrong answer costs 16 of the life bar (episodes 3 and 4)
+  showed no risk on the bar and took off whatever amount was set last, usually none. Pointing at
+  the map in episode 5's trials has its "L Stop" again, to back out of the question. Smaller
+  things as the Japanese game has them: the box hidden before the Judge reacts to a wrong piece
+  of evidence, the evidence picture put away in two scenes, the music fading at the end of a
+  part of episode 3, a newspaper in the restaurant's rack. Checked as well and found right: every
+  conditional jump (308) lands where the Japanese one does, and every choice, label and
+  next-part jump goes to the same scene. Savestates from earlier builds keep working: the
+  changed scenes that no longer fit in their bank's space go to a fixed place at the end of the
+  ROM, and nothing else moves.
 * 0.16.55 — the page arrow no longer runs into the text: a third line long enough to reach it
   (about 300 pages; the DS's box is 16 pixels wider, so the same lines end well clear of its
   arrow) closes up by the few pixels it needs, spread over its letter gaps, and ends just before

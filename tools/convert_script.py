@@ -86,7 +86,31 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     commands in its script, so the conversion lost them and the game went from the Judge's gavel
 #     straight to a black screen and the title.  Those three are put back where the GBA has them,
 #     after the wait that follows the gavel (15 sections).
-FIX_LEVEL = 6
+#   7 (0.16.56): GBA commands the DS does without, in places where the game plays differently
+#     without them (found by comparing every section's commands with the Japanese GBA script's):
+#     the life bar and its risk with two choices whose wrong answer costs 16 (bank 15 section
+#     0xa6, bank 24 0xa0: {54 0 1}{54 2 10} inside the choice block, where only the labels were
+#     written: the penalty was whatever amount was set last, usually none); "L: Stop" on the two
+#     maps the player points at (28 0xcd, 35 0xf9: {52 2}, the way back to the question); the
+#     scene's animation put back after each of the 11 answers of the examination in bank 35
+#     (0x13d-0x147, {6b 0 0 1}{69 49e 102}); the music's fade at the end of episode 4's first part
+#     (22 0x8e, {22 0 8c}: the DS fades it in another place, and the two did not line up); the box
+#     hidden before the Judge's reaction to a wrong piece of evidence (5 sections, {1c 1}) and
+#     before the fade at the end of episode 2's first part (3 0x83); the evidence picture put
+#     away where the GBA puts it away (15 0xca, 35 0x12f, {14}); the box opened before the text
+#     after the examination in bank 35 (0x148, {1c 0}); the newspaper in the restaurant's rack, on
+#     the right of the room, when episode 3 first goes there (14 0xe0, {2f ce 1}: on the DS the room
+#     is one picture).  RESTORE7 lists them by section.
+FIX_LEVEL = 7
+# fix level 7: section (bank, GBA number) -> the GBA's commands put back there, where the GBA has
+# them (each one the GBA has and the conversion did not keep)
+RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
+            **{(35, s): {(0x6b, (0, 0, 1)), (0x69, (0x49e, 0x102))} for s in range(0x13d, 0x148)},
+            (22, 0x8e): {(0x22, (0, 0x8c))},
+            **{(b, s): {(0x1c, (1,))} for b, s in ((3, 0x83), (6, 0x91), (11, 0xa7), (12, 0x94), (13, 0x9a), (36, 0xa5))},
+            (15, 0xca): {(0x14, ())}, (35, 0x12f): {(0x14, ())},
+            (35, 0x148): {(0x1c, (0,))},
+            (14, 0xe0): {(0x2f, (0xce, 1))}}
 POSE_CMD = 0x1e
 # GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
 # frames, checked frame by frame and cell by cell against the DS's; the fix level)
@@ -168,10 +192,11 @@ def map_args(cmd, args, argmap):
         else: res.append(a)
     return tuple(res)
 
-def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=FIX_LEVEL, info=None):
+def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=FIX_LEVEL, info=None,
+                    restore=None):
     """emap (optional dict) receives E item index -> output item index, for label entries.
     level: the script fixes applied (FIX_LEVEL); info (optional dict) gets 'fixes', the levels of
-    the fixes that changed this section."""
+    the fixes that changed this section.  restore: the section's RESTORE7 entry."""
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
     # the GBA's commands that line up with none of the DS's, by (command, arguments): one the DS
@@ -207,6 +232,12 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                     glabels.append(g[k]); k += 1
                 term = g[k] if k < len(g) else None
                 if labels is not None:
+                    # the GBA's commands in the block (the life bar and its risk, fix level 7)
+                    gcmds = [x for x in glabels if x[0] == 'c' and x[1] != 0x01]
+                    if level >= 7 and gcmds:
+                        out.extend(gcmds)
+                        if info is not None: info.setdefault('fixes', set()).add(7)
+                        if stats is not None: stats['gba_choice_cmds'] += len(gcmds)
                     for n, lab in enumerate(labels):
                         if n: out.append(('c', 0x01, ()))
                         out.extend(('t', ch, ()) for ch in lab)
@@ -332,12 +363,16 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                    n not in g_moved for n in run):
                 doors.update(run)
     for gk, gi in enumerate(g):
-        if gk in doors:
+        # fix level 7: one the output lacks (lined up with none of the DS's, or with a command of
+        # the Japanese DS's that its English script dropped)
+        if gk in doors or (level >= 7 and restore and gi[0] == 'c' and (gi[1], gi[2]) in restore and
+                           gk not in g_e and gk not in g_moved):
             prev = max((k for k in g_e if k < gk), default=None)
             ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
             inserts.append((0 if ek is None else epos[ek] + 1, gi))
-            if info is not None: info.setdefault('fixes', set()).add(6)
-            if stats is not None: stats['gba_doors'] += 1
+            lv = 6 if gk in doors else 7
+            if info is not None: info.setdefault('fixes', set()).add(lv)
+            if stats is not None: stats['gba_doors' if lv == 6 else 'gba_restored7'] += 1
             continue
         if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS | LEVEL1_RESTORED or gk in matched or gk in g_moved: continue
         if gi[1] in SOUND_CMDS and ds_sounds[(gi[1], gi[2])]:
@@ -499,7 +534,9 @@ def layered(s, conv, fixes, convert_at, layers):
     section as 0.16.37 had it, and one entry for each later fix level that changed it.  A fix that
     only changes arguments (every word where it was) changes the section in place instead: a
     savestate in it finds its place all the same.  So does a later fix that only changes arguments
-    in a section an earlier one moved: it changes that version in place (fix level 4 in bank 41)."""
+    in a section an earlier one moved: it changes that version in place (fix level 4 in bank 41),
+    and one made before any fix moved the section changes the level-0 version in place (bank 15's
+    sections 0xa6 and 0xca: Godot's idles, fix level 4, then fix level 7)."""
     v = {0: pack(items_to_words(conv))}
     if fixes:
         base = convert_at(0)
@@ -511,14 +548,15 @@ def layered(s, conv, fixes, convert_at, layers):
         for lv, it in enumerate(levels, 1):
             cur = pack(items_to_words(it))
             if cur != prev:
-                if last and same_shape(prev_items, it): v[last] = cur
+                if same_shape(prev_items, it): v[last] = cur
                 else: v[lv] = cur; last = lv
             prev = cur; prev_items = it
         if len(v) > 1: layers.append(s)
     return v
 
 def run_mem(ctx):
-    """Convert using data from a BuildContext; returns ({bank idx: bytes, 'common': bytes}, stats)."""
+    """Convert using data from a BuildContext; returns ({bank idx: bytes, 'common': bytes}, stats,
+    {bank idx or 'common': [(fix level, section index, offset, length) of each later version]})."""
     from labels_en import menu_labels
     import banks as bk
     pairs = []
@@ -550,6 +588,7 @@ def run_mem(ctx):
     labels = menu_labels(ctx.arm9, gba_menus)
     out = {}
     layers = []
+    layout = {}     # bank -> where its later versions are (banks.build_bank_layered)
     for b in range(42):
         G, J, E = parsed[b]
         secs = {}; emaps = {}
@@ -560,7 +599,7 @@ def run_mem(ctx):
                 emap = {}; info = {}
                 conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
                                        e_items, argmap, labels=labels.get((b, s)), stats=st, emap=emap,
-                                       level=level, info=info)
+                                       level=level, info=info, restore=RESTORE7.get((b, s + 0x80)))
                 wmap = {}
                 reworded = gba_wording(conv, st, wmap)
                 if reworded != conv and s in label_secs:
@@ -586,7 +625,7 @@ def run_mem(ctx):
         # a partial bank's unused entries stay copies of its (already converted) main bank's
         m = bk.main_bank_of(b)
         stale = {i: bk.entries(out[m])[i] for i in G['stale']} if m != b and len(bk.entries(out[m])) == G['n'] else G['stale']
-        out[b] = bk.build_bank_layered(G['n'], secs, new_labels, stale)
+        out[b] = bk.build_bank_layered(G['n'], secs, new_labels, stale, layout=layout.setdefault(b, []))
     secs = {}
     for s in Graw['present']:   # GBA numbering (see COMMON_DS_ONLY)
         d = ds_common_section(s)
@@ -599,15 +638,16 @@ def run_mem(ctx):
             return section_jumps(gba_wording(conv, st, wmap), e_items, emap, wmap, st), info.get('fixes', set())
         conv, fixes = convert(FIX_LEVEL, stats)
         secs[s] = layered(s, conv, fixes, lambda lv: convert(lv, Counter())[0], layers)
-    out['common'] = bk.build_bank_layered(Graw['n'], secs, Graw['labels'], Graw['stale'])
+    out['common'] = bk.build_bank_layered(Graw['n'], secs, Graw['labels'], Graw['stale'],
+                                          layout=layout.setdefault('common', []))
     stats['sections_moved'] = len(layers)
-    return out, dict(stats)
+    return out, dict(stats), layout
 
 def run(out_dir):
     """Development helper: convert from the extracted files and write extract/en/*."""
     import pipeline
     ctx = pipeline.BuildContext(os.path.join(ROOT, 'roms/gs3_jp.gba'), os.path.join(ROOT, 'roms/tt_us.nds'))
-    out, stats = run_mem(ctx)
+    out, stats, _ = run_mem(ctx)
     os.makedirs(out_dir, exist_ok=True)
     sizes = {}
     for k, v in out.items():

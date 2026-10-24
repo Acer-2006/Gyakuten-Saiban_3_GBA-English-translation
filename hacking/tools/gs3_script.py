@@ -52,18 +52,39 @@ def directory(rom):
         return [struct.unpack_from('<II', rom, o + 12 + 8 * i) for i in range(n)]
     return None
 
+def moved_sections(rom):
+    """The English build's section versions that did not fit in their bank's slot (a script fix,
+    patches/script.py): [(bank (44: common), section index, address, length)], from the table the
+    directory's last word points to (none in builds before 0.16.56)."""
+    o = rom_off(DIRECTORY) + 12 + 45 * 8
+    if len(rom) < o + 4 or rom[rom_off(DIRECTORY):rom_off(DIRECTORY) + 4] != b'GS3E': return []
+    p = struct.unpack_from('<I', rom, o)[0]
+    if not 0x08000000 <= p < 0x08000000 + len(rom): return []
+    n = struct.unpack_from('<I', rom, rom_off(p))[0]
+    return [struct.unpack_from('<IIII', rom, rom_off(p) + 4 + 16 * k) for k in range(n)]
+
+def with_moved(rom, idx, data):
+    """An English bank as one piece: its slot, with its sections that are elsewhere put back at the
+    end and their entries pointing there."""
+    d = bytearray(data)
+    for b, i, a, ln in moved_sections(rom):
+        if b == idx:
+            struct.pack_into('<I', d, 4 + 4 * i, len(d)); d += rom[rom_off(a):rom_off(a) + ln]
+    return bytes(d)
+
 def locate(rom, bank):
     """Where bank `bank` (0..43 or 'common') currently is: dict(addr, data, comp_size or None, ref)."""
     d = directory(rom)
     if bank == 'common':
         ref = COMMON_REFS[0]; addr = struct.unpack_from('<I', rom, rom_off(ref))[0]
         size = d[44][1] if d else COMMON_SIZE
-        return {'addr': addr, 'data': rom[rom_off(addr):rom_off(addr) + size], 'comp_size': None, 'ref': ref}
+        data = rom[rom_off(addr):rom_off(addr) + size]
+        return {'addr': addr, 'data': with_moved(rom, 44, data) if d else data, 'comp_size': None, 'ref': ref}
     b = int(bank); ref = BANK_REFS[b]
     addr = struct.unpack_from('<I', rom, rom_off(ref))[0]
     if addr >= UNCOMPRESSED or (d and d[b][1]):
         if not d or d[b][0] != addr: sys.exit(f'bank {b}: uncompressed bank at {addr:#x} without a matching directory entry')
-        return {'addr': addr, 'data': rom[rom_off(addr):rom_off(addr) + d[b][1]], 'comp_size': None, 'ref': ref}
+        return {'addr': addr, 'data': with_moved(rom, b, rom[rom_off(addr):rom_off(addr) + d[b][1]]), 'comp_size': None, 'ref': ref}
     dec, used = lz.decompress(rom, rom_off(addr))
     return {'addr': addr, 'data': dec, 'comp_size': used, 'ref': ref}
 
@@ -258,8 +279,9 @@ def cmd_insert(a):
     d = directory(rom)
     old = loc['addr']
     if loc['comp_size'] is None:
-        # uncompressed bank (common bank, or any bank of the English build)
-        slot = len(loc['data'])
+        # uncompressed bank (common bank, or any bank of the English build); its slot (sections
+        # moved to the fixes region are written back into the bank)
+        slot = d[44 if a.bank == 'common' else int(a.bank)][1] if d else len(loc['data'])
         if len(data) <= slot and a.at is None:
             rom[rom_off(old):rom_off(old) + slot] = data + b'\0' * (slot - len(data))
             new = old
@@ -273,6 +295,11 @@ def cmd_insert(a):
         if d is not None:
             i = 44 if a.bank == 'common' else int(a.bank)
             struct.pack_into('<II', rom, rom_off(DIRECTORY) + 12 + 8 * i, new, len(data))
+            # the bank carries its moved sections itself now
+            keep = [r for r in moved_sections(rom) if r[0] != i]
+            if len(keep) != len(moved_sections(rom)):
+                t = rom_off(struct.unpack_from('<I', rom, rom_off(DIRECTORY) + 12 + 45 * 8)[0])
+                rom[t:t + 4 + 16 * len(keep)] = struct.pack('<I', len(keep)) + b''.join(struct.pack('<IIII', *r) for r in keep)
     else:
         if len(data) > BANK_BUFFER:
             print(f'warning: bank is {len(data):#x} bytes, more than the {BANK_BUFFER:#x}-byte EWRAM buffer', file=sys.stderr)
