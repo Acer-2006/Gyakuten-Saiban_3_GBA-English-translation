@@ -106,7 +106,12 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     a transition) before the zoom out, and the DS shows the view as part of the animation that
 #     follows, so the conversion dropped it and the zoom ran over whatever was in video memory, a
 #     black screen with broken tiles.  The command goes back where the GBA has it (RESTORE8).
-FIX_LEVEL = 8
+#   9 (0.16.58): Valerie's picture in Dahlia's testimony in episode 4 (bank 25 section 0xac):
+#     after "...a raw diamond." the GBA (and the Japanese DS) fade the old photo to Valerie on the
+#     bridge ({6b 6d 2 0}{69 307 200}); the English DS rewrote that stretch of the line (its pauses
+#     too) and lost the fade.  It goes after the English line's pause after "diamond." ({0c 10}),
+#     so Valerie comes into focus with "My sister, Valerie, brought it to the bridge" (RESTORE9).
+FIX_LEVEL = 9
 # fix level 7: section (bank, GBA number) -> the GBA's commands put back there, where the GBA has
 # them (each one the GBA has and the conversion did not keep)
 RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
@@ -118,11 +123,16 @@ RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
             (14, 0xe0): {(0x2f, (0xce, 1))}}
 # fix level 8, the same way
 RESTORE8 = {(36, 0xa7): {(0x55, (6, 4))}}
+# fix level 9: {(bank, section): {(command, arguments): the English DS command after which it goes}}:
+# where the English text is laid out differently, the place a command of the GBA's belongs in it
+RESTORE9 = {(25, 0xac): {(0x6b, (0x6d, 2, 0)): (0x0c, (0x10,)), (0x69, (0x307, 0x200)): (0x0c, (0x10,))}}
 def restore_for(b, s):
-    """(bank, GBA section number) -> {(command, arguments): the fix level that puts it back}"""
+    """(bank, GBA section number) -> {(command, arguments): (the fix level that puts it back, the
+    English DS command it goes after, or None for after the command it follows on the GBA)}"""
     out = {}
-    for lv, table in ((8, RESTORE8), (7, RESTORE7)):
-        for it in table.get((b, s), ()): out[it] = lv
+    for lv, table in ((9, RESTORE9), (8, RESTORE8), (7, RESTORE7)):
+        t = table.get((b, s), ())
+        for it in t: out[it] = (lv, t[it] if isinstance(t, dict) else None)
     return out
 POSE_CMD = 0x1e
 # GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
@@ -378,11 +388,14 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
     for gk, gi in enumerate(g):
         # fix levels 7 and 8: one the output lacks (lined up with none of the DS's, or with a
         # command of the Japanese DS's that its English script dropped)
-        lv_r = restore.get((gi[1], gi[2])) if restore and gi[0] == 'c' else None
+        lv_r, after = restore.get((gi[1], gi[2]), (None, None)) if restore and gi[0] == 'c' else (None, None)
         if gk in doors or (lv_r is not None and level >= lv_r and gk not in g_e and gk not in g_moved):
             prev = max((k for k in g_e if k < gk), default=None)
             ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
-            inserts.append((0 if ek is None else epos[ek] + 1, gi))
+            pos = 0 if ek is None else epos[ek] + 1
+            if after is not None:
+                pos = next(k for k in range(pos, len(out)) if out[k][0] == 'c' and (out[k][1], out[k][2]) == after) + 1
+            inserts.append((pos, gi))
             lv = 6 if gk in doors else lv_r
             if info is not None: info.setdefault('fixes', set()).add(lv)
             if stats is not None: stats['gba_doors' if lv == 6 else f'gba_restored{lv}'] += 1

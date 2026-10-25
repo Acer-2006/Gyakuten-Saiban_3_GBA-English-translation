@@ -305,6 +305,13 @@ Two commands differ between the versions:
   (a step of the flashback's film scratches in 25 `0x80` and 38 `0x9d`, one of the shakes as
   Larry shouts in 27 `0x96`), which change nothing visible, and a second `{55 3 4}` in 38 `0x9d`
   (the same background again: the next line starts a few frames later, nothing else).
+* Valerie's picture in Dahlia's testimony in episode 4 (0.16.58, fix level 9, `RESTORE9`; bank 25
+  section `0xac`): after "...a raw diamond." the GBA and the Japanese DS fade the old photo to
+  Valerie on the bridge (`{6b 6d 2 0}{69 307 200}`, then two pauses). The English DS rewrote that
+  stretch of the line, its pauses with it, and the fade went too, so the picture stayed on the man
+  for the whole statement. A command of `RESTORE9` names the English DS command it goes after,
+  for where the English text is laid out differently: here the line's pause after "diamond."
+  (`{0c 10}`), so Valerie comes into focus with "My sister, Valerie, brought it to the bridge".
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is

@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.58 — in Dahlia's testimony in episode 4, the old photo fades to Valerie on the bridge again
+  as Dahlia says her sister brought the diamond there, as on the Japanese GBA and the Japanese DS;
+  the English DS script lost that fade when it rewrote the line, and the picture stayed on the man.
+  Savestates from earlier builds keep working.
 * 0.16.57 — the wide view of the courtroom when Iris screams in episode 5's last trial showed a
   black screen with broken tiles: the background change that comes with it on the GBA was lost
   (the DS draws that view its own way). It shows the courtroom again, as in the Japanese game and
