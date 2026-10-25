@@ -355,15 +355,22 @@ Two commands differ between the versions:
   `0x03003ade`) by the step, keeps its low 5 bits, and ends the fade when it lands on the target.
   The scripts use steps of 0 (at once), 1 and 8; a flash is a fade that starts on its target and
   goes once round, `12 301 8 1f` from 0: 24, 16, 8, 0. The dispatcher does not run the script
-  while a fade is under way unless bit 1 of `TXT+0x1c` is set. Effect 1 of `0x69` sets it at the
-  start of episode 1 and leaves it set, effect `0x62 3d` sets it and `0x62 3e` clears it, effects
-  1, 3 and `0xc` clear it in some of their steps, and the save keeps it (the DS has the same rule,
-  with bit 16 of its text flags). With the bit set, a fade can start while another is under way,
-  and one whose step never lands on its target from there goes round for good. In Ron's "night
-  of the crime" (bank 7 section `0xa8`) a fade in from white of 32 frames (`12 302 1 1f`) runs
-  under a wait of 15 (`0c f`), the flash after it starts at 9, and the screen flashed every four
-  frames for several pages, until the next fade. The Japanese game does the same from the same
-  state. The English build plays such a place as the game does with the bit clear (0.16.40):
+  while a fade is under way unless bit 1 of `TXT+0x1c` is set. The game sets it in two scenes
+  and clears it again before each ends: episode 1's opening (bank 0 section `0x80`: effect 1 of
+  `0x69`, whose steps 0 and 2 set it with bit 5 and step 1 clears both; a later step of the
+  opening clears it for good) and `0x69 62 23d` … `0x69 62 23e` (bank 22 section `0x8a`).
+  Effects 3 and `0xc` also clear it in some of their steps, and the save keeps it. The DS has the
+  same rule, with bit 16 of its text flags (the word at `0x020bedb4`, the script pointer at
+  `+0xc`; the dispatcher's test at `0x02023548`), and the same two scenes. Outside them the bit
+  is clear in both. With the bit set, a fade can start while another is under way, and one
+  whose step never lands on its target from there goes round for good, and the commands after a
+  fade run while it is under way: a background change or a grey scene (`5f 7`) halfway down a
+  fade to black. Builds up to 0.16.58 set it by mistake at date and place cards (the centring
+  count, text-engine.md), and kept it until an effect cleared it. In Ron's "night of the crime"
+  (bank 7 section `0xa8`, after such a card) a fade in from white of 32 frames (`12 302 1 1f`)
+  runs under a wait of 15 (`0c f`), the flash after it starts at 9, and the screen flashed every
+  four frames for several pages, until the next fade. The Japanese game does the same with the
+  bit set. The English build plays such a place as the game does with the bit clear (0.16.40):
   the dispatcher's test (`0x0801f86e`) calls `fade_hold` (`src/script.c`), which keeps the
   game's rule and, with the bit set, looks past the commands just ahead that take no time
   (`0x05`, `0x06`, `0x0e`, `0x1c`) and at most one wait (`0x0c`; one under way has `0x0c` in
@@ -376,4 +383,7 @@ Two commands differ between the versions:
   not land all the same (with none, it starts from the level below that it can land from), and
   the step in the main loop (`0x08000c26`, `0x08000dfc` down, `0x08000d98`, `0x08000e70` up)
   stops on the target where it would go past it from the near side, so a fade already going
-  round (in a savestate) ends too. With the bit clear, nothing changes.
+  round (in a savestate) ends too. With the bit clear, nothing changes. Since 0.16.59 the
+  centring count no longer reaches the flags, and a section jump or a bank load
+  (`jump_section`, `script_load`) clears a stray bit 1 that a save or a savestate from an
+  earlier build carries; neither comes inside the two scenes that set it.

@@ -110,6 +110,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.59 — a date and place card no longer switches on the game's "keep going while the screen
+  fades" mode. The engine counts the characters of a centred line into a spot meant for two rows,
+  and with the English box's third row the count landed on the text flags. With that mode on,
+  scenes went on under their fades: talking to Maggey about herself in the detention center, the
+  grey flashback came up in the middle of the fade to black (Maya in colour over a dark grey
+  room), and Ron's "night of the crime" strobed (0.16.40 worked round that one). Neither the
+  Japanese GBA nor the DS has this; both fade to black there. Saves and savestates that carry the
+  mode lose it at the next section or chapter load. Savestates from earlier builds keep working.
 * 0.16.58 — in Dahlia's testimony in episode 4, the old photo fades to Valerie on the bridge again
   as Dahlia says her sister brought the diamond there, as on the Japanese GBA and the Japanese DS;
   the English DS script lost that fade when it rewrote the line, and the picture stayed on the man.

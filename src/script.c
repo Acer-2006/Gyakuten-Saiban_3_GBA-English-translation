@@ -23,8 +23,17 @@ static inline void lz77_wram(u32 src, u32 dst) {
     __asm__ volatile("swi 0x11" : : "r"(r0), "r"(r1) : "r2", "r3", "memory");
 }
 
+/* Bit 1 of TXT+0x1c lets the script run on while the screen fades (see "brightness fades"
+ * below).  The game turns it on in two scenes only, and off again before each ends: episode 1's
+ * opening (effect 1 of 0x69) and bank 22 section 0x8a (0x69 62 23d, then 23e), with no section
+ * jump or bank load in between.  Builds up to 0.16.58 also turned it on by mistake at a date and
+ * place card (the centring count, patches/text.py 5a), and a save or a savestate keeps it: a
+ * section jump or a bank load turns such a stray bit off. */
+static inline void fade_flag_off(void) { TXT_FLAGS &= ~2; }
+
 /* Replaces `bl 0x803a048` at the 7 script-loader call sites. */
 void script_load(u32 src, u32 dst) {
+    fade_flag_off();
     if (src >= 0x08800000u) { bank_base = src; return; }
     bank_base = RAM_BANK;
     lz77_wram(src, dst);
@@ -40,6 +49,7 @@ static inline u32 common_base(void) { return COMMON_BANK_ADDR; }
 /* 0x0801fcd8: jump to section `sec` (sections >= 0x80 live in the chapter bank). */
 void jump_section(u32 sec) {
     volatile u8* sys = SYS;
+    fade_flag_off();
     if ((*(volatile u32*)(sys + 0x2d0) & 8) && sec > 0x7f && *(volatile u16*)(TXT + 0xc) > 0x7f)
         sec = *(volatile u16*)(TXT + 0xc) + 1;
     if ((sys[8] == 4 || sys[0xc] == 4) && sys[9] != 0xa) {
@@ -199,11 +209,11 @@ u32 psyche_end(void) {
  * the frame counter.  The main loop (0x08000b6c) moves BLDY by the step, keeps its low 5 bits and
  * stops when it lands on the target; a flash is a fade that starts on its target and goes once
  * round (12 301 8 1f: 0, 24, 16, 8, 0).  The script waits while a fade runs unless bit 1 of
- * TXT+0x1c is set (effect 1 of 0x69 sets it, at the start of episode 1, as does effect 0x62 3d;
- * the save keeps it), and then a fade can start while another is under way, from a level its
- * step never lands on the target from: the screen strobes every four frames until the next fade
- * (Ron's "night of the crime": a fade in from white of 32 frames under a wait of 15, then a flash
- * from 9; the Japanese game does the same with the bit set).
+ * TXT+0x1c is set (in two scenes, see fade_flag_off; the save keeps it), and then a fade can
+ * start while another is under way, from a level its step never lands on the target from: the
+ * screen strobes every four frames until the next fade (Ron's "night of the crime": a fade in
+ * from white of 32 frames under a wait of 15, then a flash from 9; the Japanese game does the
+ * same with the bit set, which in Ron's scene only the English build's centring count had set).
  *
  * The English build plays such a place as the game does with the bit clear.  fade_hold, asked by
  * the dispatcher before each command while a fade runs, looks past the sounds, name tag, box and
@@ -211,7 +221,7 @@ u32 psyche_end(void) {
  * could not land from the level the fade under way will be at by then, it clears the bit and the
  * script waits for the fade, the wait and the flash coming after it as they would with the bit
  * clear.  It never stops a fade that lands, so the places that set the bit on purpose (episode 1's
- * opening, 0x62 3d) play as before.  Should a fade that cannot land start all the same (text in
+ * opening, 0x69 62 23d) play as before.  Should a fade that cannot land start all the same (text in
  * between), fade_start first finishes the one under way (or, with none, starts from the level
  * below that it can land from); and a fade already going round (in a savestate) is stopped by the
  * step in the main loop (patches/script.py). */

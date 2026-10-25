@@ -33,6 +33,7 @@ newline — `0x0802172d`).
 | +0x12 | u16 | property bits of the current command (`0x08049834[cmd] | 0x0804991c[cmd]`) |
 | +0x14 | u16 | property bits of the previous command |
 | +0x16 | u16 | text blips: 0 = the typewriter (command `0x30 2`, and every text reset), 2 after a name tag (command `0x0e`); the original counts 2, 1 in it to blip on every other letter |
+| +0x18 | u16 × 2 | centred text: 16 less the characters left on rows 0 and 1, for the engine's sprite cells (`0x0801f014`, see "Alignment"); `+0x1a` is also set to 1 when row 0 ends in a newline (or `0x2e`) |
 | +0x1c | u16 | flags. Bit 1 lets the script run while the screen fades (`0x12`, see script-format.md); bit 2 selects the "free sprite slot" text path (used for text drawn outside the dialogue box); bit 15 is cleared on every command except `0x0c`. The bit is *not* a reliable "choice menu" indicator — it stays set after caption screens |
 | +0x22 | u8 | alignment (command `0x5d`): low nibble non-zero = centred; bit 5 enables colour-by-column (thresholds: the 5 words at `0x08049c1c`) |
 | +0x24 | u8 | speaker (command `0x0e`, high byte): the name tag, and the blip from the table at `0x08049af2` (0 the low blip, sound `0x2d`; 1 the high one, `0x2e`) |
@@ -257,7 +258,17 @@ the GBA raises where the DS centres them): a line in the box lost its centring a
 (`0x42 0`) was drawn in the middle of the screen, above the box the original puts it in. They
 keep the DS's 1 now (fix level 5). The
 engine itself only uses the alignment for its sprite cells (`0x0801f014`: the offsets at
-`TXT+0x18`), which the English build does not draw.
+`TXT+0x18`), which the English build does not draw. `0x0801f014` counts the characters left on
+the row (up to a page end, a newline or a choice) and keeps 16 less that many at
+`TXT+0x18 + 2 × row`, for rows 0 to 2 (`cmp r1, #2` at `0x0801f024`); command `0x5d` calls it,
+and so do the newline, the page ends, `0x09` and `0x2e` while the text is centred. There is
+room for two: row 2's value lands on `TXT+0x1c`, the text flags. The Japanese box has two rows,
+so the row counter stays below 2. The English box has three, and `0x5d 1` (a date and place
+card, a testimony title) runs with the counter where the page before left it: after a page that
+ended on its third row, or at a card's own third line, up to 0.16.58 the count went over the
+flags (6 for "October 13", 16 less its 10 characters), which turned on bit 1, the script
+running on while the screen fades (see script-format.md, `0x12`), and others. Since 0.16.59 the
+count keeps rows 0 and 1 only (`cmp r1, #1`).
 
 ## Captions and choices
 

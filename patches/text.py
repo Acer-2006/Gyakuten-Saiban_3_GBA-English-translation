@@ -33,6 +33,7 @@ SAVE_BACK_CALL  = 0x080201e4
 PACE_RELOAD     = 0x0801f960   # ldrb r2, [r2]; adds r0, r2, r0  (wait = TXT+0x26, the speed)
 BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x0801f858 (no blip)
 TEXT_LOOP       = 0x0801f858
+CENTRE_ROWS     = 0x0801f024   # cmp r1, #2: the rows the centring count (0x0801f014) keeps a value for
 
 # The text colours of commands {03 1}, {03 2} and {03 3} (orange, light blue, green) are the
 # values the Japanese sprite text keeps in OBJ palette 0 (entries 6, 9 and 12), which the DS uses
@@ -226,6 +227,17 @@ def apply(rom, ctx):
     for site, after, setup in BOX_CLEARS:
         assert rom.u16(after) == 0x2001, hex(after)          # movs r0, #1
         rom.thumb(site, f'{setup}\n bl #{syms["vwf_boxclear"] & ~1:#x}\n b #{after:#x}', 'box clear')
+
+    # 5a. the centring count (0x0801f014): at command 0x5d, and at newlines and page ends while the
+    # text is centred, the engine counts the characters left on the row and keeps 16 less that
+    # many at TXT+0x18 + 2 * row, rows 0 to 2, for its sprite cells.  There is room for two: row
+    # 2's lands on TXT+0x1c, the text flags.  The Japanese box has two rows; the English box has
+    # three, and a date and place card (0x5d 1) after a page that ended on its third row, or the
+    # card's own third line, had the count go over the flags, turning on bit 1 (the script runs
+    # on while the screen fades) and others.  The English build does not draw those cells: row 2
+    # is left out.
+    assert rom.read(CENTRE_ROWS, 2) == rom.asm_thumb(CENTRE_ROWS, 'cmp r1, #2'), 'centring count'
+    rom.thumb(CENTRE_ROWS, 'cmp r1, #1', 'centring count: rows 0 and 1')
 
     # 5b. the DS English version's pace and text blips (see text_pace and text_blip): the wait
     # before each character, and the blip after it on every row of the box
