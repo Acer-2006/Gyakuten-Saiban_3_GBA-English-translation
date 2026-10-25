@@ -294,6 +294,17 @@ Two commands differ between the versions:
     fades a moment earlier, and the two did not line up, so neither was kept); the newspaper in
     the rack of the restaurant in episode 3 (14 `0xe0`, `{2f ce 1}`, object `0xce` of the table
     at `0x08046b30`: on the DS the room is one picture).
+* The wide view of the courtroom when Iris screams in episode 5's last trial (0.16.57, fix level
+  8, `RESTORE8`; bank 36 section `0xa7`): the GBA changes to that background with `{55 6 4}` (the
+  background change of `0x1b` with a transition, `SYS+0x258`) before Iris's pose for the view
+  (`1a 0 1000 21 3278`); the DS draws the view as part of its own animation and has no such
+  command, so the conversion dropped it, and the zoom out ran over what was left in video memory:
+  a black screen with broken tiles and the gallery's heads. Put back where the GBA has it; the
+  scene plays frame for frame as in the Japanese game. Checked at the same time against the
+  Japanese GBA and the DS, and left as the DS has them: the other GBA animations the DS dropped
+  (a step of the flashback's film scratches in 25 `0x80` and 38 `0x9d`, one of the shakes as
+  Larry shouts in 27 `0x96`), which change nothing visible, and a second `{55 3 4}` in 38 `0x9d`
+  (the same background again: the next line starts a few frames later, nothing else).
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is

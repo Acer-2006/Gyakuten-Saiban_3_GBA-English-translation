@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.57 — the wide view of the courtroom when Iris screams in episode 5's last trial showed a
+  black screen with broken tiles: the background change that comes with it on the GBA was lost
+  (the DS draws that view its own way). It shows the courtroom again, as in the Japanese game and
+  on the DS. Savestates from earlier builds keep working.
 * 0.16.56 — the script checked command by command against the Japanese GBA one, and what the
   English game lost put back. A soft lock in episode 5: after anything Gumshoe's metal detector
   found, the game stopped for good, because the commands that hand the game back to the search

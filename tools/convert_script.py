@@ -101,7 +101,12 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     after the examination in bank 35 (0x148, {1c 0}); the newspaper in the restaurant's rack, on
 #     the right of the room, when episode 3 first goes there (14 0xe0, {2f ce 1}: on the DS the room
 #     is one picture).  RESTORE7 lists them by section.
-FIX_LEVEL = 7
+#   8 (0.16.57): the wide view of the courtroom when Iris screams in episode 5's last trial (bank
+#     36 section 0xa7): the GBA changes to that background with {55 6 4} (a background change with
+#     a transition) before the zoom out, and the DS shows the view as part of the animation that
+#     follows, so the conversion dropped it and the zoom ran over whatever was in video memory, a
+#     black screen with broken tiles.  The command goes back where the GBA has it (RESTORE8).
+FIX_LEVEL = 8
 # fix level 7: section (bank, GBA number) -> the GBA's commands put back there, where the GBA has
 # them (each one the GBA has and the conversion did not keep)
 RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
@@ -111,6 +116,14 @@ RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
             (15, 0xca): {(0x14, ())}, (35, 0x12f): {(0x14, ())},
             (35, 0x148): {(0x1c, (0,))},
             (14, 0xe0): {(0x2f, (0xce, 1))}}
+# fix level 8, the same way
+RESTORE8 = {(36, 0xa7): {(0x55, (6, 4))}}
+def restore_for(b, s):
+    """(bank, GBA section number) -> {(command, arguments): the fix level that puts it back}"""
+    out = {}
+    for lv, table in ((8, RESTORE8), (7, RESTORE7)):
+        for it in table.get((b, s), ()): out[it] = lv
+    return out
 POSE_CMD = 0x1e
 # GBA pose -> (the idle the DS gives it, in its own numbering; the GBA animation that is the same
 # frames, checked frame by frame and cell by cell against the DS's; the fix level)
@@ -196,7 +209,7 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                     restore=None):
     """emap (optional dict) receives E item index -> output item index, for label entries.
     level: the script fixes applied (FIX_LEVEL); info (optional dict) gets 'fixes', the levels of
-    the fixes that changed this section.  restore: the section's RESTORE7 entry."""
+    the fixes that changed this section.  restore: restore_for(the section)."""
     je = align(j, e, True)          # e index -> j index
     gj = align(g, j, False)         # j index -> g index
     # the GBA's commands that line up with none of the DS's, by (command, arguments): one the DS
@@ -363,16 +376,16 @@ def convert_section(g, j, e, argmap, labels=None, stats=None, emap=None, level=F
                    n not in g_moved for n in run):
                 doors.update(run)
     for gk, gi in enumerate(g):
-        # fix level 7: one the output lacks (lined up with none of the DS's, or with a command of
-        # the Japanese DS's that its English script dropped)
-        if gk in doors or (level >= 7 and restore and gi[0] == 'c' and (gi[1], gi[2]) in restore and
-                           gk not in g_e and gk not in g_moved):
+        # fix levels 7 and 8: one the output lacks (lined up with none of the DS's, or with a
+        # command of the Japanese DS's that its English script dropped)
+        lv_r = restore.get((gi[1], gi[2])) if restore and gi[0] == 'c' else None
+        if gk in doors or (lv_r is not None and level >= lv_r and gk not in g_e and gk not in g_moved):
             prev = max((k for k in g_e if k < gk), default=None)
             ek = None if prev is None else max((k for k in epos if k <= g_e[prev]), default=None)
             inserts.append((0 if ek is None else epos[ek] + 1, gi))
-            lv = 6 if gk in doors else 7
+            lv = 6 if gk in doors else lv_r
             if info is not None: info.setdefault('fixes', set()).add(lv)
-            if stats is not None: stats['gba_doors' if lv == 6 else 'gba_restored7'] += 1
+            if stats is not None: stats['gba_doors' if lv == 6 else f'gba_restored{lv}'] += 1
             continue
         if gi[0] != 'c' or gi[1] not in SOUND_CMDS | MARKER_CMDS | LEVEL1_RESTORED or gk in matched or gk in g_moved: continue
         if gi[1] in SOUND_CMDS and ds_sounds[(gi[1], gi[2])]:
@@ -599,7 +612,7 @@ def run_mem(ctx):
                 emap = {}; info = {}
                 conv = convert_section(tok(words(G['sections'][s]), A), tok(words(J['sections'][s]), ADS),
                                        e_items, argmap, labels=labels.get((b, s)), stats=st, emap=emap,
-                                       level=level, info=info, restore=RESTORE7.get((b, s + 0x80)))
+                                       level=level, info=info, restore=restore_for(b, s + 0x80))
                 wmap = {}
                 reworded = gba_wording(conv, st, wmap)
                 if reworded != conv and s in label_secs:
