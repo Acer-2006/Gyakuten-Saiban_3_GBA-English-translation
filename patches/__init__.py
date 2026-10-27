@@ -17,3 +17,4 @@ def apply_all(rom, ctx):
     pictures.apply(rom, ctx)
     datascreen.apply(rom, ctx)
     voices.apply(rom, ctx)
+    icons.apply_bar(rom)

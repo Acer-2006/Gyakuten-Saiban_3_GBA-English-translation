@@ -109,10 +109,20 @@ drawn into BG1 rows 12–13 above the dialogue box.
 ## Map markers
 
 The script marks places on maps and diagrams with small sprites: command `0x39 n` loads object
-`n >> 8` (removes it when bit 0 is clear), `0x3a n xy` puts it at x = `xy >> 8`, y = `xy & 0xff`,
+`n >> 8` (hides it when bit 0 is clear), `0x3a n xy` puts it at x = `xy >> 8`, y = `xy & 0xff`,
 and `0x3c n` shows it. The objects are listed at `0x08049c50`, 12 bytes each: `{u32 tiles, u16
 bytes, u16 attr0, u16 attr1}`, the tiles raw 4bpp (from `0x0823de08`), the palette `0x0823dde8`
-(OBJ palette 6), OAM entries from 57 on. Three of the 16×16 circles have a kanji in them: 目
+(OBJ palette 6), OAM entries from 57 on. A marker on screen has one of eight 20-byte records at
+`0x03003af0` (`+0` the object, `0xff` = free; `+5` bit 2 hidden; `+8`, `+0xa`, `+0xc` its OAM
+attributes; `+0xe` its OAM entry; `+0x10` its tiles in VRAM, OBJ tile `0xc0` on). `0x39` with
+bit 0 set takes a record and copies the picture the first time, and only shows the marker again
+after that; with bit 0 clear it hides it and keeps the record. The records are freed by a
+section jump other than to the next section (`0x0801fb98`), so the markers of a map shown
+before a testimony stay taken, hidden, through it; the Court Record closing and a continued save
+copy every taken marker's picture again (`0x080215a0`). While any record is taken the life bar
+moves off its tiles (`0xc4`–`0xdf`, which the markers share) to `0x84`–`0x9f` (see "Effects");
+the English build counts only a shown marker (0.16.60), since `0x84`–`0x9f` are its third line of
+text, and copies a marker's picture again when `0x39` shows it again. Three of the 16×16 circles have a kanji in them: 目
 (object 0, green: the witness), 被 (1, blue: the victim) and 犯 (4, red: the killer); the others
 are lines, dots, cars and snowmobiles. `data.bin` has the same markers at `0x60980`, each
 Japanese one followed by the English one (W, V, K), and the English build copies those over
@@ -450,7 +460,9 @@ Phoenix's and Godot's); until 0.16.52 the anchors at x 45 / 190 moved in to 64 /
 The sprite count must not go above the original's seven. The animation renderer (`0x08017cc8`)
 gives every animation on screen OAM entries from 127 downwards, with no lower limit, while the
 life bar writes fixed entries 61–70 (`0x0801d610`: the fill, affine, at OBJ tile `0xc4`, the frame
-at `0xd0`–`0xdf`); the cells of a busy scene (a witness, her effects, a bubble) come to about 53
+at `0xd0`–`0xdf`; its 28 tiles are copied every frame it is up, by `0x0801d324`, to `0xc4`, to
+`0x84` while a map marker is taken, see "Map markers", and to `0x280` in the free-slot text mode
+and during a choice); the cells of a busy scene (a witness, her effects, a bubble) come to about 53
 in the original, ending at entry 75. An earlier English bubble, 144×108 covered with as few
 sprites as fit the 216 tiles, took 16–24 sprites and ran down to entry 64: while it was up the
 bar lost its frame and its end. The build refuses a bubble with more sprites than the

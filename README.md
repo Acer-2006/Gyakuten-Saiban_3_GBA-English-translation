@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.60 — the third line of text no longer turns into coloured stripes while the life bar is up
+  after a map was shown (Gumshoe's cross-examination in episode 3's second trial, after the
+  restaurant's floor plan). The map's markers stay set aside, hidden, through the testimony, and
+  while they do the original moves the life bar's pictures into tiles that only its two lines of
+  text left free, where our third line is. The bar now moves only while a marker is actually on
+  screen, and a marker shown again gets its picture back. Savestates from earlier builds keep
+  working (a page already striped is fixed from the next page on).
 * 0.16.59 — a date and place card no longer switches on the game's "keep going while the screen
   fades" mode. The engine counts the characters of a centred line into a spot meant for two rows,
   and with the English box's third row the count landed on the text flags. With that mode on,

@@ -86,6 +86,22 @@ ITEM_TILE = 0x1e0
 ANIM_TABLE = 0x08046b30
 MOVED_EFFECTS = {0x45: 0x310, 0xdd: 0x1a0}
 
+# The life bar (28 OBJ tiles, DMA'd every frame it is up) sits at 0xc4-0xdf, and moves to
+# 0x84-0x9f while any of the eight map-marker records at 0x03003af0 is taken (commands 0x39-0x3d;
+# 20 bytes each, +0 the marker, 0xff = free; +5 bit 2 hidden; +0x10 its VRAM, from 0xc0): the
+# markers' pictures are at 0xc0 on.  A marker that is hidden (0x39 with bit 0 clear) keeps its
+# record until a section jump other than to the next section, so in a testimony, whose sections
+# follow one another, a map's markers from before it stay taken, and the bar stayed at 0x84 for
+# the whole cross-examination, over the third line's sprite text (episode 3's second trial, after
+# the restaurant's floor plan).  The three places that pick the bar's tiles (the copy at
+# 0x0801d324, 0x0801d3ec, the sprites at 0x0801d868) now count a marker only while it is shown:
+# with every marker hidden the bar keeps its own tiles, as with none.  A hidden marker shown again
+# (0x39 with bit 0 set, at 0x080228ae, without copying its picture) gets its picture copied from
+# the marker table again, since the bar may have been over it meanwhile.
+BAR_MARKER_TESTS = (0x0801d33e, 0x0801d458, 0x0801d8be)   # ldrb r0, [r0]; cmp r0, #0xff (then beq)
+MARKER_RESHOW = 0x080228ae          # movs r0, #0xfb; ldrb r1, [r5, #5]: a marker shown again
+MARKER_TABLE = 0x08049c50           # 12 bytes a marker: u32 picture, u16 bytes, ...
+
 # The item's box on BG1 (its frame is drawn from map row 1, column 1, around the 64x64 picture
 # at y 16) ended on row 10 with the 64-pixel text box, the name tag's top row, and cut the tag
 # in half.  Box and picture move up a row: the frame from row 0, the sprite at y 8.
@@ -140,3 +156,54 @@ def apply(rom, ctx):
     if unmatched: raise SystemExit(f'icons: DS pairs {unmatched} match no GBA icon')
     print(f"  icons: {len(replaced)} from the DS English pictures ({', '.join(map(str, replaced))}); "
           f"{len(same)} pairs the same in both languages")
+
+def apply_bar(rom):
+    """The life bar's tiles and the map markers (see BAR_MARKER_TESTS).  Applied after every other
+    patch, so that its code follows theirs in the free space and moves none of it (a savestate
+    holds return addresses into that code)."""
+    # a map marker counts only while shown (Z set: free or hidden)
+    shown = rom.thumb_code('''
+        push {r1}
+        ldrb r1, [r0]
+        cmp r1, #0xff
+        beq done
+        ldrb r1, [r0, #5]
+        lsrs r1, r1, #3
+        sbcs r0, r0
+    done:
+        pop {r1}
+        bx lr
+    ''', note='marker shown test')
+    for site in BAR_MARKER_TESTS:
+        assert rom.read(site, 4) == rom.asm_thumb(site, 'ldrb r0, [r0]\n cmp r0, #0xff'), hex(site)
+        assert rom.u16(site + 4) & 0xff00 == 0xd000, hex(site)        # beq
+        rom.thumb(site, f'bl #{shown & ~1:#x}', 'life bar: shown markers only')
+    # a marker shown again: its picture again (as a new one gets it), then the replaced code
+    assert rom.read(MARKER_RESHOW, 4) == rom.asm_thumb(MARKER_RESHOW, 'movs r0, #0xfb\n ldrb r1, [r5, #5]')
+    reshow = rom.thumb_code(f'''
+        push {{r2, r3, lr}}
+        ldrb r0, [r5]
+        lsls r1, r0, #1
+        adds r1, r1, r0
+        lsls r1, r1, #2
+        ldr r0, [pc, #32]
+        adds r1, r1, r0
+        ldr r2, [pc, #32]
+        ldr r0, [r1]
+        str r0, [r2]
+        ldr r0, [r5, #0x10]
+        str r0, [r2, #4]
+        ldrh r0, [r1, #4]
+        lsrs r0, r0, #1
+        movs r3, #1
+        lsls r3, r3, #31
+        orrs r0, r3
+        str r0, [r2, #8]
+        ldr r0, [r2, #8]
+        movs r0, #0xfb
+        ldrb r1, [r5, #5]
+        pop {{r2, r3, pc}}
+        .word {MARKER_TABLE:#x}
+        .word 0x040000d4
+    ''', note='marker shown again')
+    rom.thumb(MARKER_RESHOW, f'bl #{reshow & ~1:#x}', 'marker shown again')
