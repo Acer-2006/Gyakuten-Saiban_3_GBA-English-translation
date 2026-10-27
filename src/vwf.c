@@ -1135,8 +1135,13 @@ static void resume_frame(void) {
        box has grown for the options if the save was made at them, but not if it was made while
        the question waited at its 0x07 for the A Button, or before the question was finished.
        Before 0.16.47 that question came back as sprite text in the box, which the options then
-       took the place of: the question was gone and the box with it. */
-    resume_replay(full || page_has_choice((const u16*)vs.resume_page));
+       took the place of: the question was gone and the box with it.  The look ahead also starts
+       where the engine stopped: a page that begins with a conditional jump (0x35, where the
+       look ahead stops) still has its choice after it (episode 3's "Leave it / Press harder",
+       the save screen opened while the question waited; until 0.16.62). */
+    u32 at = *(const u16*)vs.resume_cur;
+    resume_replay(full || (at >= 0x08 && at <= 0x0a) || page_has_choice((const u16*)vs.resume_cur) ||
+                  page_has_choice((const u16*)vs.resume_page));
 }
 
 /* Per frame (before the BG map / OAM DMA). */

@@ -207,3 +207,20 @@ def apply_bar(rom):
         .word 0x040000d4
     ''', note='marker shown again')
     rom.thumb(MARKER_RESHOW, f'bl #{reshow & ~1:#x}', 'marker shown again')
+
+
+# The choice cursor (the white pointing hand, 16x16, 128 bytes) is a picture at 0x081fa2cc, inside
+# the Japanese font, which the English build fills with its code (the 'font' region from
+# 0x081f31cc): once that code passed 0x7100 bytes the cursor showed a scrap of it.
+# The two routines that copy it to OBJ tile 0xfc (a menu's end, 0x08021a6c's pool, and the one at
+# 0x0800dfd4's) get a copy of the original, kept after the code.
+CURSOR_PICTURE = 0x081fa2cc
+CURSOR_LITS = (0x0800dfd4, 0x08021a6c)
+
+def keep_cursor(rom, ctx):
+    """Applied last, after apply_bar, so that nothing before it moves."""
+    pic = ctx.gba[CURSOR_PICTURE - 0x08000000: CURSOR_PICTURE - 0x08000000 + 0x80]
+    addr = rom.store(pic, 'font', 4, 'choice cursor picture')
+    for lit in CURSOR_LITS:
+        assert rom.u32(lit) == CURSOR_PICTURE, hex(lit)
+        rom.w32(lit, addr)

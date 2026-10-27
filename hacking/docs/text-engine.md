@@ -169,7 +169,10 @@ stopped on again from the records. Two things change in the English build:
   with the question's colours set. A save made while the question waited at its `0x07` for the
   A Button (the box not grown yet) is such a page too: before 0.16.47 it was judged by the box
   alone and came back as sprite text, which the options then replaced when they came up, the
-  question gone (and with it, sometimes, the box). A caption (`0x42 0`) is left to the engine,
+  question gone (and with it, sometimes, the box). The look ahead starts both at the page's start and where the
+  engine stopped (or the engine stopped on a menu's end): a page that begins with a conditional
+  jump (`0x35`), where the look ahead from its start stops, came back as sprite text until 0.16.62
+  (episode 3's "Leave it / Press harder" after the save screen was opened at the question). A caption (`0x42 0`) is left to the engine,
   which draws it again every frame.
   A save carries the box's map rows; one made with the 56-pixel box of builds before 0.16.8
   puts the box back a row lower than this build's, which `box_open` never saw: `box_rows_fix`
@@ -310,7 +313,10 @@ count keeps rows 0 and 1 only (`cmp r1, #1`).
   that does not fit closes its letters up a pixel (`box_glyph`), `page_scan` works out the
   smallest gap cut (`vx.lbl_sq`, at most 2; 1 does for all of them) that fits the menu's widest
   option, and every option of that menu is drawn with it, so that they keep the same spacing.
-  The engine's cursor is OAM 57 (a 16×16 hand, OBJ tiles `0xfc`–`0xff`, priority 1), after the defence
+  The engine's cursor is OAM 57 (a 16×16 hand, OBJ tiles `0xfc`–`0xff`, priority 1; its picture, copied
+  there when a menu comes up, is at `0x081fa2cc`, inside the Japanese font, which the English build's code
+  took over, and the build keeps a copy of it after its code: until 0.16.62 the cursor was a scrap of that
+  code), after the defence
   bench's sprites (48–51, priority 3, from y 128). The hardware draws an earlier, lower-priority sprite that
   overlaps a later, higher-priority one with the latter's priority, so where the cursor met the bench a
   square of the bench came up over the box; a three-line question puts the options a row lower than the

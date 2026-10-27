@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.62 — the hand that points at the options of a choice is back: its picture sat in the part
+  of the cartridge where the Japanese font was, which this build fills with its own code, and once
+  that code grew past it every choice's cursor showed a scrap of it. And a choice whose page starts
+  with a branch in the script (episode 3's "Leave it / Press harder") no longer loses its question
+  if the save screen is opened while the question waits: the options came up on their own, at
+  the left of an empty screen.
 * 0.16.61 — the same stripes, the other way round: in episode 4 the Judge asks where Melissa
   Foster was with the bridge's map and its markers on screen and the life bar up, and there the
   bar has to take the third line's tiles (as in the original, which has no third line). The third

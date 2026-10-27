@@ -18,3 +18,4 @@ def apply_all(rom, ctx):
     datascreen.apply(rom, ctx)
     voices.apply(rom, ctx)
     icons.apply_bar(rom)
+    icons.keep_cursor(rom, ctx)

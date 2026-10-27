@@ -48,7 +48,9 @@ that do not fit in their bank's slot; a 16 MB ROM is fine for the GBA and every 
 after the last used byte, growing the ROM when needed.
 Keep in mind that Thumb `bl` only reaches ±4 MB, so new *code* that is called from the original
 code must sit within that range of the caller (the font area is a good spot; the English build
-puts all of its code there), while data can go anywhere.
+puts all of its code there), while data can go anywhere. The font area is not all font: the
+choice cursor's picture is at `0x081fa2cc` in it (the build keeps a copy and points the game's two
+references at it, `patches/icons.py`).
 
 ## Script loader buffers (EWRAM)
 
