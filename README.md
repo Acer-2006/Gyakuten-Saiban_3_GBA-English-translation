@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.65 — no name in the Court Record touches its description any more: the brackets of the
+  ages reach a row less far down, and where a letter of the name line (the tail of a y or a g)
+  would still touch the first line of the description, the name line moves a little off the
+  centre until it does not (22 panels, 20 of them by 1 or 2 pixels; "Magazine Clipping" by 10).
+  The descriptions are laid out as they were before the ages.
 * 0.16.64 — Dahlia Hawthorne's three "deceased" profiles get their "(deceased)" too: her name and
   it are set in the narrower letters the DS uses for its own long names (Franziska von Karma's),
   which fit the panel. The letters of the ages that the DS's name font has are now taken from the

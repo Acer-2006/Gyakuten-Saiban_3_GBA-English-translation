@@ -221,7 +221,13 @@ beside her name at the normal width; there the name and the age are set again in
 letters (`LONG_NAMES`), as the DS does with its long names: 149 columns of the 152. (The DS
 itself shows the age only on the info panel, under the name: "Age: deceased".) The panels with
 ages are stored by `add_ages`, the last step of the build, and the item table points at them;
-the ones without stay where they were, so that nothing after them moves.
+the ones without stay where they were, so that nothing after them moves. Since 0.16.65 no letter
+of a name line touches its description (8 ways): the brackets cover rows 2–13, and `add_ages`
+also makes again every panel whose name touched its first line (14 evidence panels did before
+the ages, from the tails of g, p and y over a four-line description, which starts at row 14);
+the description keeps the lines chosen against the name alone, and the name line moves off the
+centre (`NUDGES`, nearest first, up to 12 columns) until none touches: 22 panels, 20 of them by 1
+or 2 columns, "Kane's Autopsy Report" by 7, "Magazine Clipping" by 10.
 
 ## Talk topics and Move destinations
 

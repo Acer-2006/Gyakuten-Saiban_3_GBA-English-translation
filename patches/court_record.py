@@ -73,8 +73,8 @@ DRAWN = {
     '7': (3, ['#######', '#.....#', '.....#.', '.....#.', '....#..', '....#..', '...#...', '...#...', '...#...', '...#...']),
     '8': (3, ['..###..', '.#...#.', '#.....#', '.#...#.', '..###..', '.#...#.', '#.....#', '#.....#', '.#...#.', '..###..']),
     '9': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '.#...##', '..###.#', '......#', '......#', '.#...#.', '..###..']),
-    '(': (2, ['..#', '.#.', '.#.', '#..', '#..', '#..', '#..', '#..', '#..', '#..', '.#.', '.#.', '..#']),
-    ')': (2, ['#..', '.#.', '.#.', '..#', '..#', '..#', '..#', '..#', '..#', '..#', '.#.', '.#.', '#..']),
+    '(': (2, ['..#', '.#.', '.#.', '#..', '#..', '#..', '#..', '#..', '#..', '.#.', '.#.', '..#']),
+    ')': (2, ['#..', '.#.', '.#.', '..#', '..#', '..#', '..#', '..#', '..#', '.#.', '.#.', '#..']),
 }
 NARROW_DRAWN = {
     'w': (6, ['#..##..#', '#..##..#', '#..##..#', '#.#..#.#', '#.#..#.#', '.#....#.', '.#....#.']),
@@ -182,25 +182,66 @@ def join_lines(lines):
             out = (out + ' ' + ln) if out else ln
     return out
 
-def panel(name_px, text, font, age=None, names=None, long_name=None):
+# how far the name line may move from the centre (columns), nearest first, when its letters would
+# touch the description's (the tail of a y on the top of a capital below it): 22 panels move, 20
+# of them by 1 or 2 columns, "Kane's Autopsy Report" by 7 and "Magazine Clipping" by 10 (its g's)
+NUDGES = (0,) + tuple(d for k in range(1, 13) for d in (-k, k))
+
+def touching(img):
+    """True if a pixel of the name is on or next to (8 ways) a pixel of the description."""
+    for y in range(H):
+        for x in range(W):
+            if img[y][x] != TITLE: continue
+            for yy in range(max(0, y - 1), min(H, y + 2)):
+                for xx in range(max(0, x - 1), min(W, x + 2)):
+                    if img[yy][xx] == BODY: return True
+    return False
+
+def name_offset(img):
+    """How many columns the name line is right of the centre."""
+    xs = [x for x in range(W_USE) if any(img[y][x] == TITLE for y in range(16))]
+    return xs[0] - (W_USE - (xs[-1] - xs[0] + 1)) // 2 if xs else 0
+
+def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False):
     """name_px: 16 rows of the DS name texture (text = index 2); age: the profile's age, put after
-    the name in the NameFont `names` (long_name: see name_columns).  -> (64 rows x 160 indices, the
-    word gap narrowing), or (None, None) when the text (or the name with the age) does not fit."""
-    img = [[BG] * W_USE + [CLEAR] * (W - W_USE) for _ in range(H)]
+    the name in the NameFont `names` (long_name: see name_columns).  The description's lines are
+    chosen against the name line, centred.  nudge: the lines are the ones chosen against the name
+    alone (as before the ages), and the name line (with the age) moves off the centre (NUDGES)
+    until no letter of it touches them; only if that cannot be done are the lines chosen again
+    for each place of the name line.  -> (64 rows x 160 indices, the word gap narrowing), or
+    (None, None) when the text (or the name with the age) does not fit."""
     cols = name_columns(name_px, age, names, long_name)
     if cols is None: return None, None
-    x0 = (W_USE - len(cols)) // 2
-    for x, m in enumerate(cols):
-        for y in range(16):
-            if m >> y & 1 and 0 <= x0 + x < W_USE: img[y][x0 + x] = TITLE
-    name = [sum(1 << y for y in range(H) if img[y][x] == TITLE) for x in range(W)]
-    lines, tops, cut = dsdesc.choose(font, text, TEXT_W, name, TEXT_X, LINES)
-    if lines is None: return None, None
-    for line, top in zip(lines, tops):
-        for x, m in enumerate(font.masks(line, TEXT_X, W_USE, cut)):
-            for k in range(16):
-                if m >> k & 1 and 0 <= top + k < H: img[top + k][x] = BODY
-    return img, cut
+    def ink(line, dx):
+        x0 = (W_USE - len(line)) // 2 + dx
+        if x0 < 0 or x0 + len(line) > W_USE: return None
+        img = [[BG] * W_USE + [CLEAR] * (W - W_USE) for _ in range(H)]
+        for x, m in enumerate(line):
+            for y in range(16):
+                if m >> y & 1: img[y][x0 + x] = TITLE
+        return img
+    def lay(img):
+        return dsdesc.choose(font, text, TEXT_W, [sum(1 << y for y in range(H) if img[y][x] == TITLE)
+                                                  for x in range(W)], TEXT_X, LINES)
+    def draw(dx, layout=None):
+        img = ink(cols, dx)
+        if img is None: return None
+        lines, tops, cut = layout or lay(img)
+        if lines is None: return None
+        for line, top in zip(lines, tops):
+            for x, m in enumerate(font.masks(line, TEXT_X, W_USE, cut)):
+                for k in range(16):
+                    if m >> k & 1 and 0 <= top + k < H: img[top + k][x] = BODY
+        return img, cut
+    if not nudge:
+        return draw(0) or (None, None)
+    base = lay(ink(name_columns(name_px), 0))
+    for layout in (base, None):
+        if layout is not None and layout[0] is None: continue
+        for dx in NUDGES:
+            drawn = draw(dx, layout)
+            if drawn and not touching(drawn[0]): return drawn
+    return draw(0, base if base[0] is not None else None) or (None, None)
 
 def cells(img):
     """64x160 -> 5120 bytes: 32x32 cells 5 across, 2 down, each 4x4 tiles row-major, 4bpp."""
@@ -232,7 +273,7 @@ def apply(rom, ctx):
     orig = [rom.u32(GBA_ITEMS + 8 * i) for i in range(COUNT)]
     texts, stored, new = {}, {}, {}
     unread, tight = [], []
-    profiles = ctx.court_profiles = {}         # for add_ages
+    inputs = ctx.court_inputs = {}             # for add_ages: every item's name picture and text
     for i, r in enumerate(recs):
         if r[4] not in texts:
             px, w, h, _ = dsimgtext.texture(d, db + r[4] * dsz)
@@ -246,7 +287,7 @@ def apply(rom, ctx):
         img, cut = panel(name_px, text, font)
         if img is None:
             unread.append(i); continue
-        if i in AGES: profiles[i] = (name_px, text)
+        inputs[i] = (name_px, text)
         if cut: tight.append(i)
         data = lz.compress(cells(img))
         if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i}')
@@ -267,24 +308,39 @@ def apply(rom, ctx):
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'court record label ' + text)
 
 def add_ages(rom, ctx):
-    """The profiles again with the age after the name (AGES).  Applied last (0.16.63), so that the
-    pictures stored before them, and everything after them in the ROM, keep their addresses: the
-    panels made by apply() stay where they are, unused."""
+    """The panels made again in the last step of the build: the profiles with the age after the
+    name (AGES, 0.16.63), and every panel whose name touches its description.  In both the name
+    line moves off the centre until no letter of it touches the description (NUDGES, 0.16.65),
+    which keeps the lines chosen against the name alone, as before the ages.  Applied last so that
+    the pictures stored before them, and everything after them in the ROM, keep their addresses:
+    the panels made by apply() stay where they are, unused."""
     d, arm9 = ctx.data, ctx.arm9
     font = dsdesc.Font(d, arm9)
     recs = ds_items(arm9)
     nb = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[NAME_BASE]
     nsz = dsimgtext.texture_size(d, nb)
     names = NameFont(lambda i: dsimgtext.texture(d, nb + recs[i][1] * nsz)[0])
-    stored, done, wide, narrow = {}, 0, [], []
-    for i, (name_px, text) in sorted(ctx.court_profiles.items()):
-        img, cut = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i))
-        if i in LONG_NAMES and img is not None: narrow.append(i)
-        if img is None:
-            wide.append(i); continue
+    stored, ages, moved, still, wide, narrow = {}, 0, [], [], [], []
+    for i, (name_px, text) in sorted(ctx.court_inputs.items()):
+        if i in AGES:
+            centred, _ = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i))
+            img, cut = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i), nudge=True)
+            if img is None:
+                wide.append(i); continue
+            if i in LONG_NAMES: narrow.append(i)
+            ages += 1
+        else:
+            centred, _ = panel(name_px, text, font)
+            if centred is None or not touching(centred): continue
+            img, cut = panel(name_px, text, font, nudge=True)
+        off = name_offset(img)
+        if off: moved.append((i, off))
+        if touching(img): still.append(i)
         data = lz.compress(cells(img))
-        if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} with the age')
-        rom.w32(GBA_ITEMS + 8 * i, stored[data]); done += 1
-    print(f"  court record: ages after {done} of {len(ctx.court_profiles)} profile names ({len(stored)} pictures)" +
+        if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} (age, name line)')
+        rom.w32(GBA_ITEMS + 8 * i, stored[data])
+    print(f"  court record: ages after {ages} of {sum(1 for i in ctx.court_inputs if i in AGES)} profile names" +
           (f", in the narrow letters for {narrow}" if narrow else '') +
-          (f"; no room for the age of {wide}" if wide else ''))
+          (f"; no room for the age of {wide}" if wide else '') +
+          f"; name line moved (item, columns) {moved} ({len(stored)} pictures)" +
+          (f"; still touching: {still}" if still else ''))
