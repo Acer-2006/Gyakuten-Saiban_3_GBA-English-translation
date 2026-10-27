@@ -15,6 +15,7 @@ tools/dsimgtext.py) and set again in the same font, the DS's letters with the DS
 they fit the GBA panel (tools/dsdesc.py).
 """
 import os, re, struct, sys
+from collections import Counter
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 import lz, dsdesc, dsimgtext, textgfx
 
@@ -51,12 +52,20 @@ AGES = {0: '61', 1: '49', 2: '21', 3: '22', 4: '20', 16: '???', 17: '26', 18: 'd
         161: '26', 162: '19', 163: '19', 164: '26', 165: '???', 166: '???', 167: 'deceased',
         194: 'deceased', 207: '25', 209: '25'}
 # The DS names are pictures in a font of their own (1-pixel strokes, capitals and digits on rows
-# 3-12, the x-height from row 6), which has none of the digits but 1, 2 and a narrow 0, and no
-# brackets: these are drawn for the build in its style.  (first row, rows)
-AGE_GLYPHS = {
+# 3-12, the x-height from row 6, a space of 8 columns), and the DS sets a name too long for its
+# 128 columns in a narrower version of it (letters 1 column apart, 2 beside an i, a space of 4;
+# "Franziska von Karma").  The build takes the letters it needs from DS names whose text it knows
+# (the most common picture of each letter in them), and draws what the font does not have: the
+# digits but 1 and 2, the brackets, and a narrow w.  (first row, rows)
+NAME_TEXTS = {7: 'Crime Photo 1', 8: 'Crime Photo 2', 166: '??????', 126: 'Diego Armando',
+              78: 'Victor Kudo', 129: 'Melissa Foster', 4: 'Dahlia Hawthorne'}
+NARROW_TEXTS = {6: "Doug's Autopsy Report", 34: 'Treasure Exhibit Poster', 35: "Ami Fey's Golden Statue",
+                48: 'Security Camera Photo', 55: 'CEO Office Key Card', 60: "Kane's Autopsy Report",
+                97: "Jean's Loan Contract", 100: "Glen's Autopsy Report", 104: 'Trés Bien Floor Plans',
+                110: "Gumshoe's Lunchbox", 123: 'Aromatherapy Bottle', 162: 'Franziska von Karma',
+                171: 'Hazakura Temple Map', 183: "Elise's Autopsy Report"}
+DRAWN = {
     '0': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '#.....#', '#.....#', '#.....#', '#.....#', '.#...#.', '..###..']),
-    '1': (3, ['.#.', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '###']),
-    '2': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '.....#.', '..###..', '.#.....', '#......', '#......', '#######']),
     '3': (3, ['..###..', '.#...#.', '#.....#', '......#', '....##.', '......#', '......#', '#.....#', '.#...#.', '..###..']),
     '4': (3, ['....#..', '...##..', '..#.#..', '..#.#..', '.#..#..', '#...#..', '#######', '....#..', '....#..', '....#..']),
     '5': (3, ['#######', '#......', '#......', '#.###..', '##...#.', '......#', '......#', '#.....#', '.#...#.', '..###..']),
@@ -64,40 +73,82 @@ AGE_GLYPHS = {
     '7': (3, ['#######', '#.....#', '.....#.', '.....#.', '....#..', '....#..', '...#...', '...#...', '...#...', '...#...']),
     '8': (3, ['..###..', '.#...#.', '#.....#', '.#...#.', '..###..', '.#...#.', '#.....#', '#.....#', '.#...#.', '..###..']),
     '9': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '.#...##', '..###.#', '......#', '......#', '.#...#.', '..###..']),
-    '?': (3, ['.####.', '#....#', '#....#', '.....#', '....#.', '...#..', '..#...', '......', '......', '..#...']),
     '(': (2, ['..#', '.#.', '.#.', '#..', '#..', '#..', '#..', '#..', '#..', '#..', '.#.', '.#.', '..#']),
     ')': (2, ['#..', '.#.', '.#.', '..#', '..#', '..#', '..#', '..#', '..#', '..#', '.#.', '.#.', '#..']),
-    'd': (3, ['.....#', '.....#', '.....#', '..##.#', '.#..##', '#....#', '#....#', '#....#', '.#..##', '..##.#']),
-    'e': (6, ['..###.', '.#...#', '#....#', '######', '#.....', '.#...#', '..###.']),
-    'c': (6, ['..###.', '.#...#', '#.....', '#.....', '#.....', '.#...#', '..###.']),
-    'a': (6, ['.####..', '#....#.', '...###.', '.##..#.', '#....#.', '#...##.', '.###.##']),
-    's': (6, ['.####.', '#....#', '#.....', '.####.', '.....#', '#....#', '.####.']),
 }
+NARROW_DRAWN = {
+    'w': (6, ['#..##..#', '#..##..#', '#..##..#', '#.#..#.#', '#.#..#.#', '.#....#.', '.#....#.']),
+}
+# names whose age does not fit after them at the normal width: the name and the age are set again
+# in the narrow letters, as the DS sets its long names ("Dahlia Hawthorne (deceased)")
+LONG_NAMES = {132: 'Dahlia Hawthorne', 133: 'Dahlia Hawthorne', 167: 'Dahlia Hawthorne'}
 
-def age_columns(age, space, gap):
-    """' (age)' as 16-bit column masks: `space` blank columns, then the bracketed age, its letters
-    `gap` apart (1 inside the brackets)."""
-    text = '(' + age + ')'
-    out = [0] * space
-    for k, ch in enumerate(text):
-        if k: out += [0] * (1 if ch == ')' or text[k - 1] == '(' else gap)
-        top, rows = AGE_GLYPHS[ch]
-        out += [sum(1 << (top + y) for y in range(len(rows)) if rows[y][x] == '#') for x in range(len(rows[0]))]
+def drawn(table):
+    return {ch: tuple(sum(1 << (top + y) for y in range(len(rows)) if rows[y][x] == '#') for x in range(len(rows[0])))
+            for ch, (top, rows) in table.items()}
+
+def ink_runs(px):
+    """The ink (index 2) of a DS name picture as runs of column masks, one per letter."""
+    cols = [sum(1 << y for y, row in enumerate(px) if row[x] == 2) for x in range(len(px[0]))]
+    out, cur = [], []
+    for m in cols + [0]:
+        if m: cur.append(m)
+        elif cur: out.append(tuple(cur)); cur = []
     return out
+
+def letters_of(name_px_of, texts):
+    """{char: column masks}: each letter's most common picture in the DS names `texts` (item: text)."""
+    seen = {}
+    for i, text in texts.items():
+        runs, chars = ink_runs(name_px_of(i)), [c for c in text if c != ' ']
+        if len(runs) != len(chars):
+            raise SystemExit(f'court record: the DS name of item {i} is not "{text}"')
+        for ch, run in zip(chars, runs): seen.setdefault(ch, Counter())[run] += 1
+    return {ch: c.most_common(1)[0][0] for ch, c in seen.items()}
+
+class NameFont:
+    """The DS name font's letters (normal and narrow), with the drawn ones."""
+    def __init__(self, name_px_of):
+        self.normal = {**drawn(DRAWN), **letters_of(name_px_of, NAME_TEXTS)}
+        self.narrow = {**drawn(DRAWN), **letters_of(name_px_of, NARROW_TEXTS), **drawn(NARROW_DRAWN)}
+
+    def age(self, age, space, gap):
+        """' (age)' as column masks: `space` blank columns, then the bracketed age, its letters `gap`
+        apart (1 inside the brackets)."""
+        text = '(' + age + ')'
+        out = [0] * space
+        for k, ch in enumerate(text):
+            if k: out += [0] * (1 if ch == ')' or text[k - 1] == '(' else gap)
+            out += self.normal[ch]
+        return out
+
+    def narrow_line(self, text):
+        """text in the narrow letters, spaced as the DS spaces them."""
+        out, prev = [], None
+        for ch in text:
+            if ch == ' ': prev = ' '; continue
+            if prev is not None:
+                out += [0] * (4 if prev == ' ' else 2 if 'i' in (prev, ch) else 1)
+            out += self.narrow[ch]; prev = ch
+        return out
 
 # (space, gap) for the age, widest first: the space before the bracket narrows to 4, then the
 # letters go 1 apart, and only then the space goes down to 3
 AGE_SPACING = ((6, 2), (5, 2), (4, 2), (5, 1), (4, 1), (3, 2), (3, 1))
 
-def name_columns(name_px, age=None):
+def name_columns(name_px, age=None, font=None, long_name=None):
     """The DS name's ink (index 2) as column masks, and the age after it at the widest spacing that
-    fits the panel (AGE_SPACING); None if it cannot."""
+    fits the panel (AGE_SPACING), or the name and the age in the narrow letters (long_name: the
+    name's text); None if neither fits."""
     xs = [x for x in range(len(name_px[0])) if any(row[x] == 2 for row in name_px)]
     if not xs: return []
     cols = [sum(1 << y for y, row in enumerate(name_px) if row[x] == 2) for x in range(xs[0], xs[-1] + 1)]
     if age is None: return cols
     for space, gap in AGE_SPACING:
-        out = cols + age_columns(age, space, gap)
+        out = cols + font.age(age, space, gap)
+        if len(out) <= W_USE: return out
+    if long_name:
+        out = font.narrow_line(f'{long_name} ({age})')
         if len(out) <= W_USE: return out
     return None
 
@@ -131,12 +182,12 @@ def join_lines(lines):
             out = (out + ' ' + ln) if out else ln
     return out
 
-def panel(name_px, text, font, age=None):
+def panel(name_px, text, font, age=None, names=None, long_name=None):
     """name_px: 16 rows of the DS name texture (text = index 2); age: the profile's age, put after
-    the name.  -> (64 rows x 160 indices, the word gap narrowing), or (None, None) when the text
-    (or the name with the age) does not fit."""
+    the name in the NameFont `names` (long_name: see name_columns).  -> (64 rows x 160 indices, the
+    word gap narrowing), or (None, None) when the text (or the name with the age) does not fit."""
     img = [[BG] * W_USE + [CLEAR] * (W - W_USE) for _ in range(H)]
-    cols = name_columns(name_px, age)
+    cols = name_columns(name_px, age, names, long_name)
     if cols is None: return None, None
     x0 = (W_USE - len(cols)) // 2
     for x, m in enumerate(cols):
@@ -219,14 +270,21 @@ def add_ages(rom, ctx):
     """The profiles again with the age after the name (AGES).  Applied last (0.16.63), so that the
     pictures stored before them, and everything after them in the ROM, keep their addresses: the
     panels made by apply() stay where they are, unused."""
-    font = dsdesc.Font(ctx.data, ctx.arm9)
-    stored, done, wide = {}, 0, []
+    d, arm9 = ctx.data, ctx.arm9
+    font = dsdesc.Font(d, arm9)
+    recs = ds_items(arm9)
+    nb = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[NAME_BASE]
+    nsz = dsimgtext.texture_size(d, nb)
+    names = NameFont(lambda i: dsimgtext.texture(d, nb + recs[i][1] * nsz)[0])
+    stored, done, wide, narrow = {}, 0, [], []
     for i, (name_px, text) in sorted(ctx.court_profiles.items()):
-        img, cut = panel(name_px, text, font, AGES[i])
+        img, cut = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i))
+        if i in LONG_NAMES and img is not None: narrow.append(i)
         if img is None:
             wide.append(i); continue
         data = lz.compress(cells(img))
         if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} with the age')
         rom.w32(GBA_ITEMS + 8 * i, stored[data]); done += 1
     print(f"  court record: ages after {done} of {len(ctx.court_profiles)} profile names ({len(stored)} pictures)" +
+          (f", in the narrow letters for {narrow}" if narrow else '') +
           (f"; no room for the age of {wide}" if wide else ''))

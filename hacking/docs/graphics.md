@@ -208,14 +208,20 @@ and are not used as such; the 68 profiles' ages were read from them once (`AGES`
 `patches/court_record.py`: a number, `???` or `deceased`, the same as the Japanese GBA's
 "（21）", "（？？）", "（故人）" in every one). Since 0.16.63 the profile panels have the age after
 the name, as the Japanese GBA has it. The DS name pictures are in a font of their own, not the
-dialogue font (1-pixel strokes, capitals on rows 3–12, a space of 8 columns; a long name has
-narrower letters), which has only the digits 1, 2 and a narrow 0 and no brackets, so the build
-draws those in its style (`AGE_GLYPHS`) and puts " (age)" after the name's ink: a space of 6
-columns and the letters 2 apart, narrowed (`AGE_SPACING`) for the three longest names; Dahlia
-Hawthorne's "(deceased)" does not fit beside her name in 152 columns and is left out (items 132,
-133, 167). The panels with ages are stored by `add_ages`, the last step of the build, and the
-item table points at them; the ones without stay where they were, so that nothing after them
-moves.
+dialogue font (1-pixel strokes, capitals on rows 3–12, a space of 8 columns), and a name too long
+for the DS's 128 columns is set in a narrower version of it (19 names, "Franziska von Karma" the
+one profile: "a" 5 columns for 7, "o" 6 for 7, letters 1 column apart, 2 beside an "i", a space
+of 4; two names, "Losing Horse Racing Tickets" and "Kurain Master's Talisman", are narrower
+still). The build takes the letters it needs from DS names whose text it knows (`NAME_TEXTS`,
+`NARROW_TEXTS`: each letter's most common picture there), and draws what the font does not have:
+the digits but 1 and 2, the brackets (`DRAWN`) and a narrow "w" (`NARROW_DRAWN`). " (age)" goes
+after the name's ink, a space of 6 columns and the letters 2 apart, narrowed (`AGE_SPACING`) for
+the three longest names. Dahlia Hawthorne's "(deceased)" (items 132, 133, 167) does not fit
+beside her name at the normal width; there the name and the age are set again in the narrow
+letters (`LONG_NAMES`), as the DS does with its long names: 149 columns of the 152. (The DS
+itself shows the age only on the info panel, under the name: "Age: deceased".) The panels with
+ages are stored by `add_ages`, the last step of the build, and the item table points at them;
+the ones without stay where they were, so that nothing after them moves.
 
 ## Talk topics and Move destinations
 

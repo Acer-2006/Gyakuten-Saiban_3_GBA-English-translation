@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.64 — Dahlia Hawthorne's three "deceased" profiles get their "(deceased)" too: her name and
+  it are set in the narrower letters the DS uses for its own long names (Franziska von Karma's),
+  which fit the panel. The letters of the ages that the DS's name font has are now taken from the
+  DS names at build time; only the ones it lacks are drawn.
 * 0.16.63 — the profiles in the Court Record give the person's age after the name again, as the
   Japanese original does ("Maya Fey (19)", "Godot (???)", "Mia Fey (deceased)"): the DS keeps
   ages on a panel of its own, which this build had left out. The ages are the US DS's (the same
