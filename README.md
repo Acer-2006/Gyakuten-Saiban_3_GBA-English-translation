@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.61 — the same stripes, the other way round: in episode 4 the Judge asks where Melissa
+  Foster was with the bridge's map and its markers on screen and the life bar up, and there the
+  bar has to take the third line's tiles (as in the original, which has no third line). The third
+  line now moves to spare tiles for as long as that lasts, as it already did under the Court
+  Record's picture. Found by running every scene that shows map markers; that was the only one
+  with the bar up at the same time.
 * 0.16.60 — the third line of text no longer turns into coloured stripes while the life bar is up
   after a map was shown (Gumshoe's cross-examination in episode 3's second trial, after the
   restaurant's floor plan). The map's markers stay set aside, hidden, through the testimony, and

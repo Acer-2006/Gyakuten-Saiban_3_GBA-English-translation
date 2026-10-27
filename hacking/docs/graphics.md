@@ -122,7 +122,9 @@ before a testimony stay taken, hidden, through it; the Court Record closing and 
 copy every taken marker's picture again (`0x080215a0`). While any record is taken the life bar
 moves off its tiles (`0xc4`–`0xdf`, which the markers share) to `0x84`–`0x9f` (see "Effects");
 the English build counts only a shown marker (0.16.60), since `0x84`–`0x9f` are its third line of
-text, and copies a marker's picture again when `0x39` shows it again. Three of the 16×16 circles have a kanji in them: 目
+text, and copies a marker's picture again when `0x39` shows it again. With a marker on screen and
+the bar up (the Judge's question on the bridge's map in episode 4) the bar still goes there, and
+the third line moves out of its way (0.16.61; text-engine.md, "Where sprite text goes"). Three of the 16×16 circles have a kanji in them: 目
 (object 0, green: the witness), 被 (1, blue: the victim) and 犯 (4, red: the killer); the others
 are lines, dots, cars and snowmobiles. `data.bin` has the same markers at `0x60980`, each
 Japanese one followed by the English one (W, V, K), and the English build copies those over

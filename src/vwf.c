@@ -109,7 +109,7 @@ struct vwf_state {
     u8 arrow_t;         /* frames the DS-style arrow has been up (its slide) */
     u8 overlay;         /* the save screen is up over the game: nothing of the page is shown */
     volatile u32* ds_cell;   /* the data screen: tiles of the 16x16 sprite being drawn into */
-    u8 l3_lent;         /* the Court Record has put its picture in line 3's tiles (record_borrows) */
+    u8 l3_lent;         /* the Court Record's picture or the life bar is in line 3's tiles (record_lend) */
 };
 static struct vwf_state vs;
 
@@ -593,22 +593,37 @@ static void l3_give_back(void) {
     vx.l3_tile = 0;
 }
 
+/* The life bar (OAM 61-70, its 28 tiles copied every frame it is drawn) goes to 0x84-0x9f, the
+   third line's, while a map marker is on screen (graphics.md, "Map markers"; patches/icons.py,
+   apply_bar): the Judge's questions on a map with the bar up (episode 4's bridge).  The third line
+   moves out then too, from the page's start when the bar is already there, so that nothing is
+   drawn again. */
+#define MARKERS ((volatile u8*)0x03003af0)   /* 8 records of 20 bytes: +0 0xff free, +5 bit 2 hidden */
+static int bar_borrows(void) {
+    u32 a0 = OAMBUF[61 * 4], t = OAMBUF[61 * 4 + 2] & 0x3ff;
+    if ((a0 & 0x300) == 0x200 || (t != 0x84 && t != 0xc4)) return 0;
+    for (int i = 0; i < 8; i++)
+        if (MARKERS[20 * i] != 0xff && !(MARKERS[20 * i + 5] & 4)) return 1;
+    return 0;
+}
+
 static void record_lend(void) {
-    if (record_borrows()) {
-        if (vs.l3_lent || !vs.lbl_width[2]) return;
+    int bar = bar_borrows();
+    if (bar || record_borrows()) {
+        if (vs.l3_lent || (!bar && !vs.lbl_width[2])) return;
         vs.l3_lent = 1;
         u32 base = l3_block();
         if (!base) return;                           /* the third line waits, hidden */
         volatile u32* v = (volatile u32*)(0x06010000 + base * 32);
         dma32(v, L3_BACKUP, 64 * 8, 0);
         vx.l3_tile = base;
-        vwf_resume();                                /* the page again, its third line there */
+        if (vs.lbl_width[2]) vwf_resume();           /* the page again, its third line there */
         return;
     }
     if (!vs.l3_lent || SYS[8] == MODE_RECORD) return;
     vs.l3_lent = 0;
     l3_give_back();
-    vwf_resume();
+    if (vs.lbl_width[2]) vwf_resume();
 }
 
 static void labels_oam(void) {
