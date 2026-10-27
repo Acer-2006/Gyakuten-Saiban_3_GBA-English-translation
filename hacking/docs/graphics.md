@@ -483,6 +483,16 @@ frame data for each bubble with the original timing: four sprites (two 64×64 ov
 as the DS shows them all, whoever shouts (checked against the US release in DeSmuME with
 Phoenix's and Godot's); until 0.16.52 the anchors at x 45 / 190 moved in to 64 / 176.
 
+The bubbles shake as they come up (`0x0801914c`, the update of effects 1–9 in the table at
+`0x08161a48`): for 30 frames x goes back and forth by 1–4 pixels about the x it started at (kept
+at slot + `0x2e`), and y takes a random step of −4..3 a frame, held to 70–90; then the counter
+at slot + `0x2b` is set to 40 (`0x080191b2`) and the bubble stays where the last step left it, up
+to 4 pixels left of its place and 10 above or below it, a different place every time. The DS
+shakes its bubbles by a fixed pattern (27 frames) that ends where it began. At the screen's edge
+the original's bubbles hid it; the English ones in the middle did not, so since 0.16.66
+(`patches/shouts.py`, `settle`, a last build step) the bubble goes back to where it started, x
+from slot + `0x2e` and y 80, when the shake stops.
+
 The sprite count must not go above the original's seven. The animation renderer (`0x08017cc8`)
 gives every animation on screen OAM entries from 127 downwards, with no lower limit, while the
 life bar writes fixed entries 61–70 (`0x0801d610`: the fill, affine, at OBJ tile `0xc4`, the frame

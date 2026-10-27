@@ -21,6 +21,9 @@ with more sprites than that runs into the bar, which loses its frame and its end
 bubble is up.  An earlier 144x108 bubble covered with as few sprites as fit the 216 tiles took
 16-24 sprites and did exactly that; the build now refuses a bubble with more sprites than the
 original's.
+
+After the shake (30 frames of random steps) the bubble goes back to where it started (settle,
+applied last), as the DS's does: the original leaves it where the last step put it.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -100,3 +103,27 @@ def apply(rom, ctx):
         if x != CENTRE[0]:
             rom.w16(e + 12, CENTRE[0]); moved += 1
     print(f"  shouts: the DS bubbles for {len(entries)} effects ({len(archive)} bytes), {moved} moved to the middle")
+
+# The shake (0x0801914c, the update of effects 1-9 in the table at 0x08161a48): for 30 frames x
+# goes back and forth by 1-4 pixels about the x it started at (kept at slot + 0x2e) and y takes a
+# random step of -4..3 a frame, held to 70-90; then it stops (counter at slot + 0x2b set to 40,
+# 0x080191b2) and the bubble stays where the last step left it, up to 4 pixels left of its place
+# and 10 above or below it.  The DS shakes its bubbles by a fixed pattern that ends where it began.
+# The original's bubbles at the screen's edge hid it; the English ones in the middle showed a
+# different place after every shake, so the build puts the bubble back where it started when the
+# shake stops (applied last, so that nothing before it moves).
+SHAKE_STOP = 0x080191b2
+
+def settle(rom):
+    if rom.read(SHAKE_STOP, 4) != rom.asm_thumb(SHAKE_STOP, 'movs r0, #0x28\n strb r0, [r3]'):
+        raise SystemExit('shouts: unexpected code where the shake stops')
+    back = rom.thumb_code(f'''
+        movs r0, #0x28
+        strb r0, [r3]
+        ldrh r0, [r4, #0x2e]
+        strh r0, [r4, #0x10]
+        movs r0, #{CENTRE[1]}
+        strh r0, [r4, #0x12]
+        bx lr
+    ''', note='shout bubble back in place after the shake')
+    rom.hook_bl(SHAKE_STOP, back, 'shake stop: back in place')

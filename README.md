@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.66 — after a shout's bubble shakes, it settles back where it started, every time: the
+  original leaves it wherever the shake's last random step put it, up to 10 pixels above or
+  below its place, which the original's bubbles at the edge of the screen hid and the English
+  ones in the middle did not. The DS also ends its shake where it began. The shake itself is
+  the original's.
 * 0.16.65 — no name in the Court Record touches its description any more: the brackets of the
   ages reach a row less far down, and where a letter of the name line (the tail of a y or a g)
   would still touch the first line of the description, the name line moves a little off the

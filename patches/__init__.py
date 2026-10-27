@@ -20,3 +20,4 @@ def apply_all(rom, ctx):
     icons.apply_bar(rom)
     icons.keep_cursor(rom, ctx)
     court_record.add_ages(rom, ctx)
+    shouts.settle(rom)

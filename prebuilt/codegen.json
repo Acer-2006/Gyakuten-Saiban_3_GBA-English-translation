@@ -142,6 +142,8 @@
 "thumb:0x8015106:ldr r0, [pc, #0xa4]": "2948",
 "thumb:0x801517a:ldr r1, [pc, #0x30]\n strh r1, [r0, #4]\n adds r0, #8\n strh r2, [r0]\n subs r1, #0xfc": "0c49818008300280fc39",
 "thumb:0x801517a:ldr r3, [pc, #0x30]\n strh r3, [r0, #4]\n adds r0, #8\n strh r2, [r0]\n adds r1, #16": "0c4b8380083002801031",
+"thumb:0x80191b2:bl #0x81fa620": "e1f135fa",
+"thumb:0x80191b2:movs r0, #0x28\n strb r0, [r3]": "28201870",
 "thumb:0x801d33e:bl #0x81fa558": "ddf10bf9",
 "thumb:0x801d33e:ldrb r0, [r0]\n cmp r0, #0xff": "0078ff28",
 "thumb:0x801d458:bl #0x81fa558": "ddf17ef8",
@@ -200,5 +202,6 @@
 "thumb:0x81fa350:\n        push {lr}\n        bl #0x81fa2a0\n        bl #0x81f9ad8\n        pop {pc}\n    ": "00b5fff7a5fffff7bffb00bd",
 "thumb:0x81fa540:\n        push {r0, r1, r2, r3, lr}\n        mov r0, r12\n        push {r0}\n        bl #0x81fa35c\n        pop {r0}\n        mov r12, r0\n        pop {r0, r1, r2, r3}\n        movs r0, #0x80\n lsls r0, r0, #2\n        pop {pc}\n    ": "0fb5604601b4fff709ff01bc84460fbc8020800000bd",
 "thumb:0x81fa558:\n        push {r1}\n        ldrb r1, [r0]\n        cmp r1, #0xff\n        beq done\n        ldrb r1, [r0, #5]\n        lsrs r1, r1, #3\n        sbcs r0, r0\n    done:\n        pop {r1}\n        bx lr\n    ": "02b40178ff2902d04179c908804102bc7047",
-"thumb:0x81fa56c:\n        push {r2, r3, lr}\n        ldrb r0, [r5]\n        lsls r1, r0, #1\n        adds r1, r1, r0\n        lsls r1, r1, #2\n        ldr r0, [pc, #32]\n        adds r1, r1, r0\n        ldr r2, [pc, #32]\n        ldr r0, [r1]\n        str r0, [r2]\n        ldr r0, [r5, #0x10]\n        str r0, [r2, #4]\n        ldrh r0, [r1, #4]\n        lsrs r0, r0, #1\n        movs r3, #1\n        lsls r3, r3, #31\n        orrs r0, r3\n        str r0, [r2, #8]\n        ldr r0, [r2, #8]\n        movs r0, #0xfb\n        ldrb r1, [r5, #5]\n        pop {r2, r3, pc}\n        .word 0x8049c50\n        .word 0x040000d4\n    ": "0cb5287841000918890008480918084a0868106028695060888840080123db07184390609068fb2069790cbd509c0408d4000004"
+"thumb:0x81fa56c:\n        push {r2, r3, lr}\n        ldrb r0, [r5]\n        lsls r1, r0, #1\n        adds r1, r1, r0\n        lsls r1, r1, #2\n        ldr r0, [pc, #32]\n        adds r1, r1, r0\n        ldr r2, [pc, #32]\n        ldr r0, [r1]\n        str r0, [r2]\n        ldr r0, [r5, #0x10]\n        str r0, [r2, #4]\n        ldrh r0, [r1, #4]\n        lsrs r0, r0, #1\n        movs r3, #1\n        lsls r3, r3, #31\n        orrs r0, r3\n        str r0, [r2, #8]\n        ldr r0, [r2, #8]\n        movs r0, #0xfb\n        ldrb r1, [r5, #5]\n        pop {r2, r3, pc}\n        .word 0x8049c50\n        .word 0x040000d4\n    ": "0cb5287841000918890008480918084a0868106028695060888840080123db07184390609068fb2069790cbd509c0408d4000004",
+"thumb:0x81fa620:\n        movs r0, #0x28\n        strb r0, [r3]\n        ldrh r0, [r4, #0x2e]\n        strh r0, [r4, #0x10]\n        movs r0, #80\n        strh r0, [r4, #0x12]\n        bx lr\n    ": "28201870e08d2082502060827047"
 }
