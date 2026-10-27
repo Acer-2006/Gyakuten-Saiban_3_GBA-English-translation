@@ -203,7 +203,19 @@ u32 image offset (0x14), u32 image size, u32 palette offset, u32 palette size
 Names are 128×16 (`0x434` bytes per file; text index 2), descriptions 256×64 (`0x2034`). The
 description pictures were drawn with the dialogue font, so `tools/dsimgtext.py` reads their text
 back exactly (see its docstring for the two quirks of the tool that drew them). The info panels
-("Type: ...", "Age: ...") use a small font that is not in the ROM and are not used.
+(word 6, 128×64: "Type: ...", "Age: ..."/"Gender: ...") use a small font that is not in the ROM
+and are not used as such; the 68 profiles' ages were read from them once (`AGES` in
+`patches/court_record.py`: a number, `???` or `deceased`, the same as the Japanese GBA's
+"（21）", "（？？）", "（故人）" in every one). Since 0.16.63 the profile panels have the age after
+the name, as the Japanese GBA has it. The DS name pictures are in a font of their own, not the
+dialogue font (1-pixel strokes, capitals on rows 3–12, a space of 8 columns; a long name has
+narrower letters), which has only the digits 1, 2 and a narrow 0 and no brackets, so the build
+draws those in its style (`AGE_GLYPHS`) and puts " (age)" after the name's ink: a space of 6
+columns and the letters 2 apart, narrowed (`AGE_SPACING`) for the three longest names; Dahlia
+Hawthorne's "(deceased)" does not fit beside her name in 152 columns and is left out (items 132,
+133, 167). The panels with ages are stored by `add_ages`, the last step of the build, and the
+item table points at them; the ones without stay where they were, so that nothing after them
+moves.
 
 ## Talk topics and Move destinations
 

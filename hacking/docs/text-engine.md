@@ -52,7 +52,7 @@ Other engine data:
 | `0x03002080` | BG1 map shadow, 32×32 `u16`, copied to VRAM `0x0600e800` when the dirty bit is set |
 | `0x03002fa0` | BG0 map shadow |
 | `0x03002ba0` | OAM shadow (128 × 8 bytes) |
-| `0x03003e50` | 64 sprite records of 12 bytes (3 OAM attributes + bookkeeping); bit 15 of the first halfword = slot in use. Records 32–63 are the pool the text engine takes from in the bit-2 mode |
+| `0x03003e50` | 64 sprite records of 12 bytes (3 OAM attributes + bookkeeping); bit 15 of the first halfword = slot in use. Records 32–63 are the pool the text engine takes from in the bit-2 mode. The English build keeps no text in them (none in use in any save seen), and 32–63 hold other data, with bytes `+0xa` set. Six routines draw records' glyphs from the Japanese font area (`0x081f31cc`), which the build's code fills: `0x08020024` (after an overlay screen or a continued save) takes only records in use; `0x080214ac`, the redraw at a page wait (`0x0802187c`, when bit 15 of `TXT+0x12` is set and A is pressed), takes every record with `+0xa` set and is switched off since 0.16.63 (`patches/text.py`, 5a'); `0x0801f4c4` is only reached through command `0x73`, which no script has; `0x0801b574` through game mode 15's state `0x6f` (a debug screen); `0x0801e84c` and `0x0801e92c` from `0x0801ecd4`, which nothing calls |
 | `0x05000200` | OBJ palette (the English build's sprite text uses palette 0, the engine's own sprite-text palette, the same in every scene: white 3, orange 6, blue 9, green 12) |
 | `0x0803b844` | 32×32 byte template of the text box: tile indices per map cell. Row 14 is the top edge (first byte `0x02`), rows 15–18 the interior (`0x06`), row 19 the bottom (`0x04`) |
 

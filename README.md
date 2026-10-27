@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.63 — the profiles in the Court Record give the person's age after the name again, as the
+  Japanese original does ("Maya Fey (19)", "Godot (???)", "Mia Fey (deceased)"): the DS keeps
+  ages on a panel of its own, which this build had left out. The ages are the US DS's (the same
+  as the Japanese ones in all 68 profiles), set in the name's own font; Dahlia Hawthorne's three
+  "deceased" profiles keep the name alone, as there is no room beside it. And a routine of the
+  original that redrew the Japanese text at a page wait, from where the Japanese font was, is
+  switched off (nothing ever ran it).
 * 0.16.62 — the hand that points at the options of a choice is back: its picture sat in the part
   of the cartridge where the Japanese font was, which this build fills with its own code, and once
   that code grew past it every choice's cursor showed a scrap of it. And a choice whose page starts

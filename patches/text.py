@@ -34,6 +34,7 @@ PACE_RELOAD     = 0x0801f960   # ldrb r2, [r2]; adds r0, r2, r0  (wait = TXT+0x2
 BLIP_AT         = 0x0801f9b0   # ldrb r6, [r6]; cmp r6, #1; bls (the blip); b 0x0801f858 (no blip)
 TEXT_LOOP       = 0x0801f858
 CENTRE_ROWS     = 0x0801f024   # cmp r1, #2: the rows the centring count (0x0801f014) keeps a value for
+RECORD_REDRAW   = 0x0802187c   # bl 0x080214ac: the page waits' redraw of the sprite records' glyphs
 
 # The text colours of commands {03 1}, {03 2} and {03 3} (orange, light blue, green) are the
 # values the Japanese sprite text keeps in OBJ palette 0 (entries 6, 9 and 12), which the DS uses
@@ -238,6 +239,14 @@ def apply(rom, ctx):
     # is left out.
     assert rom.read(CENTRE_ROWS, 2) == rom.asm_thumb(CENTRE_ROWS, 'cmp r1, #2'), 'centring count'
     rom.thumb(CENTRE_ROWS, 'cmp r1, #1', 'centring count: rows 0 and 1')
+
+    # 5a'. the page waits (0x02, 0x07, 0x0a, 0x2d: 0x080217d8) redraw every sprite record's glyph
+    # (0x080214ac) when bit 15 of TXT+0x12 is set and A is pressed.  The glyphs come from the
+    # Japanese font area, which our code fills now, and the English build keeps no text in the
+    # records: records 32-63 hold other data there, which this would turn into tiles.  Nothing
+    # sets that bit in the scripts or in play (0.16.63); the call is taken out all the same.
+    assert rom.read(RECORD_REDRAW, 4) == bytes.fromhex('fff716fe'), 'record redraw'
+    rom.write(RECORD_REDRAW, bytes.fromhex('c046c046'), 'record redraw off (nop, nop)')
 
     # 5b. the DS English version's pace and text blips (see text_pace and text_blip): the wait
     # before each character, and the blip after it on every row of the box

@@ -38,6 +38,69 @@ TEXT_X, TEXT_W = 1, 149        # the text's ink in columns 1..149, as the Japane
 # 12 apart, from just under the name to the bottom of the panel
 LINES = {1: (17,), 2: (17, 33), 3: (17, 33, 49), 4: (14, 26, 38, 50)}
 
+# The age after a profile's name, as the Japanese GBA has it ("成歩堂 龍一（21）", "（故人）",
+# "（？？）"), with the US DS's values: its info panels ("Age: 21", a small font of their own that
+# the build does not have) read once by item id.  All 68 agree with the Japanese GBA's.
+AGES = {0: '61', 1: '49', 2: '21', 3: '22', 4: '20', 16: '???', 17: '26', 18: 'deceased', 19: '19',
+        20: '9', 21: '32', 22: '???', 23: '34', 24: '34', 25: '23', 26: '23', 27: '23', 28: '23',
+        29: '25', 30: '25', 31: '48', 68: '24', 74: '23', 75: '28', 76: '28', 77: '28', 78: '68',
+        79: '68', 80: '39', 81: '39', 82: '???', 83: '???', 84: '25', 85: '78', 86: '42', 126: '27',
+        127: '20', 128: '25', 129: '19', 130: '23', 131: '26', 132: 'deceased', 133: 'deceased',
+        145: '???', 146: '19', 147: '19', 148: '9', 149: '9', 150: '48', 151: '48', 152: '48',
+        153: '???', 154: '???', 155: '49', 156: '25', 157: '25', 158: '25', 159: '25', 160: '25',
+        161: '26', 162: '19', 163: '19', 164: '26', 165: '???', 166: '???', 167: 'deceased',
+        194: 'deceased', 207: '25', 209: '25'}
+# The DS names are pictures in a font of their own (1-pixel strokes, capitals and digits on rows
+# 3-12, the x-height from row 6), which has none of the digits but 1, 2 and a narrow 0, and no
+# brackets: these are drawn for the build in its style.  (first row, rows)
+AGE_GLYPHS = {
+    '0': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '#.....#', '#.....#', '#.....#', '#.....#', '.#...#.', '..###..']),
+    '1': (3, ['.#.', '##.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '.#.', '###']),
+    '2': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '.....#.', '..###..', '.#.....', '#......', '#......', '#######']),
+    '3': (3, ['..###..', '.#...#.', '#.....#', '......#', '....##.', '......#', '......#', '#.....#', '.#...#.', '..###..']),
+    '4': (3, ['....#..', '...##..', '..#.#..', '..#.#..', '.#..#..', '#...#..', '#######', '....#..', '....#..', '....#..']),
+    '5': (3, ['#######', '#......', '#......', '#.###..', '##...#.', '......#', '......#', '#.....#', '.#...#.', '..###..']),
+    '6': (3, ['..###..', '.#...#.', '#......', '#......', '#.###..', '##...#.', '#.....#', '#.....#', '.#...#.', '..###..']),
+    '7': (3, ['#######', '#.....#', '.....#.', '.....#.', '....#..', '....#..', '...#...', '...#...', '...#...', '...#...']),
+    '8': (3, ['..###..', '.#...#.', '#.....#', '.#...#.', '..###..', '.#...#.', '#.....#', '#.....#', '.#...#.', '..###..']),
+    '9': (3, ['..###..', '.#...#.', '#.....#', '#.....#', '.#...##', '..###.#', '......#', '......#', '.#...#.', '..###..']),
+    '?': (3, ['.####.', '#....#', '#....#', '.....#', '....#.', '...#..', '..#...', '......', '......', '..#...']),
+    '(': (2, ['..#', '.#.', '.#.', '#..', '#..', '#..', '#..', '#..', '#..', '#..', '.#.', '.#.', '..#']),
+    ')': (2, ['#..', '.#.', '.#.', '..#', '..#', '..#', '..#', '..#', '..#', '..#', '.#.', '.#.', '#..']),
+    'd': (3, ['.....#', '.....#', '.....#', '..##.#', '.#..##', '#....#', '#....#', '#....#', '.#..##', '..##.#']),
+    'e': (6, ['..###.', '.#...#', '#....#', '######', '#.....', '.#...#', '..###.']),
+    'c': (6, ['..###.', '.#...#', '#.....', '#.....', '#.....', '.#...#', '..###.']),
+    'a': (6, ['.####..', '#....#.', '...###.', '.##..#.', '#....#.', '#...##.', '.###.##']),
+    's': (6, ['.####.', '#....#', '#.....', '.####.', '.....#', '#....#', '.####.']),
+}
+
+def age_columns(age, space, gap):
+    """' (age)' as 16-bit column masks: `space` blank columns, then the bracketed age, its letters
+    `gap` apart (1 inside the brackets)."""
+    text = '(' + age + ')'
+    out = [0] * space
+    for k, ch in enumerate(text):
+        if k: out += [0] * (1 if ch == ')' or text[k - 1] == '(' else gap)
+        top, rows = AGE_GLYPHS[ch]
+        out += [sum(1 << (top + y) for y in range(len(rows)) if rows[y][x] == '#') for x in range(len(rows[0]))]
+    return out
+
+# (space, gap) for the age, widest first: the space before the bracket narrows to 4, then the
+# letters go 1 apart, and only then the space goes down to 3
+AGE_SPACING = ((6, 2), (5, 2), (4, 2), (5, 1), (4, 1), (3, 2), (3, 1))
+
+def name_columns(name_px, age=None):
+    """The DS name's ink (index 2) as column masks, and the age after it at the widest spacing that
+    fits the panel (AGE_SPACING); None if it cannot."""
+    xs = [x for x in range(len(name_px[0])) if any(row[x] == 2 for row in name_px)]
+    if not xs: return []
+    cols = [sum(1 << y for y, row in enumerate(name_px) if row[x] == 2) for x in range(xs[0], xs[-1] + 1)]
+    if age is None: return cols
+    for space, gap in AGE_SPACING:
+        out = cols + age_columns(age, space, gap)
+        if len(out) <= W_USE: return out
+    return None
+
 def ds_items(arm9):
     o = DS_ITEMS - DS_ARM9
     return [struct.unpack_from('<12H', arm9, o + 24 * i) for i in range(COUNT)]
@@ -68,16 +131,17 @@ def join_lines(lines):
             out = (out + ' ' + ln) if out else ln
     return out
 
-def panel(name_px, text, font):
-    """name_px: 16 rows of the DS name texture (text = index 2).  -> (64 rows x 160 indices, the
-    word gap narrowing), or (None, None) when the text does not fit."""
+def panel(name_px, text, font, age=None):
+    """name_px: 16 rows of the DS name texture (text = index 2); age: the profile's age, put after
+    the name.  -> (64 rows x 160 indices, the word gap narrowing), or (None, None) when the text
+    (or the name with the age) does not fit."""
     img = [[BG] * W_USE + [CLEAR] * (W - W_USE) for _ in range(H)]
-    xs = [x for x in range(len(name_px[0])) if any(row[x] == 2 for row in name_px)]
-    if xs:
-        dx = (W_USE - (xs[-1] - xs[0] + 1)) // 2 - xs[0]
-        for y, row in enumerate(name_px):
-            for x, v in enumerate(row):
-                if v == 2 and 0 <= x + dx < W_USE: img[y][x + dx] = TITLE
+    cols = name_columns(name_px, age)
+    if cols is None: return None, None
+    x0 = (W_USE - len(cols)) // 2
+    for x, m in enumerate(cols):
+        for y in range(16):
+            if m >> y & 1 and 0 <= x0 + x < W_USE: img[y][x0 + x] = TITLE
     name = [sum(1 << y for y in range(H) if img[y][x] == TITLE) for x in range(W)]
     lines, tops, cut = dsdesc.choose(font, text, TEXT_W, name, TEXT_X, LINES)
     if lines is None: return None, None
@@ -117,6 +181,7 @@ def apply(rom, ctx):
     orig = [rom.u32(GBA_ITEMS + 8 * i) for i in range(COUNT)]
     texts, stored, new = {}, {}, {}
     unread, tight = [], []
+    profiles = ctx.court_profiles = {}         # for add_ages
     for i, r in enumerate(recs):
         if r[4] not in texts:
             px, w, h, _ = dsimgtext.texture(d, db + r[4] * dsz)
@@ -126,9 +191,11 @@ def apply(rom, ctx):
         if any(l is None for l in lines):
             unread.append(i); continue
         name_px, _, _, _ = dsimgtext.texture(d, nb + r[1] * nsz)
-        img, cut = panel(name_px, adapt(join_lines(lines), r[5] != 0), font)
+        text = adapt(join_lines(lines), r[5] != 0)
+        img, cut = panel(name_px, text, font)
         if img is None:
             unread.append(i); continue
+        if i in AGES: profiles[i] = (name_px, text)
         if cut: tight.append(i)
         data = lz.compress(cells(img))
         if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i}')
@@ -147,3 +214,19 @@ def apply(rom, ctx):
     for addr, text in LABELS.items():
         grid = textgfx.render(font, text, 64, 16, fill=12, outline=10, align='left', y0=2)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'court record label ' + text)
+
+def add_ages(rom, ctx):
+    """The profiles again with the age after the name (AGES).  Applied last (0.16.63), so that the
+    pictures stored before them, and everything after them in the ROM, keep their addresses: the
+    panels made by apply() stay where they are, unused."""
+    font = dsdesc.Font(ctx.data, ctx.arm9)
+    stored, done, wide = {}, 0, []
+    for i, (name_px, text) in sorted(ctx.court_profiles.items()):
+        img, cut = panel(name_px, text, font, AGES[i])
+        if img is None:
+            wide.append(i); continue
+        data = lz.compress(cells(img))
+        if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} with the age')
+        rom.w32(GBA_ITEMS + 8 * i, stored[data]); done += 1
+    print(f"  court record: ages after {done} of {len(ctx.court_profiles)} profile names ({len(stored)} pictures)" +
+          (f"; no room for the age of {wide}" if wide else ''))
