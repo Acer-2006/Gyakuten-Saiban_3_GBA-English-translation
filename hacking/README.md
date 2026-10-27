@@ -18,6 +18,7 @@ notes say so.
 | [docs/memory-map.md](docs/memory-map.md) | ROM regions, free space, important RAM and VRAM addresses |
 | [docs/tools.md](docs/tools.md) | how to use the command-line tools and the emulator harness |
 | [docs/port-checklist.md](docs/port-checklist.md) | what the English build must not lose from the GBA game (commands between the words, name tags, the GBA's scenes), and what to check for each case |
+| [docs/plans.md](docs/plans.md) | work agreed on but not started: a shorter text box, Pearl framed as on the DS, translation tools for the trilogy |
 
 ## Tools (`tools/`)
 
