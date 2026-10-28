@@ -25,8 +25,9 @@ CHOICE_END = {0x08, 0x09, 0x0a}
 # music (0x05) and sound effects (0x06): the two games number them the same (but for one DS
 # effect, 0x197, which the argument map turns into the GBA's 0x17c)
 SOUND_CMDS = {0x05, 0x06}
-# Direction the DS added where the GBA has none, kept: screen shakes (0x27), flashes (0x47),
-# sprite animations (0x12), an item shown in court (0x13) and waits (0x4e).  Their arguments
+# Direction the DS added where the GBA has none, kept: screen shakes (0x27), the music's volume
+# (0x47), fades of the screen's brightness, flashes included (0x12), an item shown in court (0x13)
+# and waits (0x4e).  Their arguments
 # mean the same on both (identical wherever the two scripts have the command in the same
 # place), so they go in as they are.  Everything else the DS added is its own plumbing
 # (graphic loads for its assets and top screen, box hide/shows around them, touch flow) and is

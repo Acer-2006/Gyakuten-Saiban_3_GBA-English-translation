@@ -511,10 +511,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
   (the redraw-after-the-Record machinery and its glitches are gone with it). The question of a
   choice is the one page still drawn on the background, so that it can move to the top of the
   full-screen box.
-* 0.15.15 — the direction the DS added is in: its three extra screen shakes, a flash, eleven
-  sprite animations, seven moments an item is shown in court while it is talked about, and ten
+* 0.15.15 — the direction the DS added is in: two extra screen shakes and the end of a third,
+  four fades of the screen to or from black and the music turned down once (all but one fade at
+  the end of episode 5), seven moments an item is shown in court while it is talked about, and ten
   short waits (25 in all; the GBA's own direction was already the backbone, and the sounds are
-  as they were).
+  as they were). (This entry said "a flash" and "eleven sprite animations" until 0.16.76: the
+  commands are `0x47`, the music's volume, and `0x12`, the screen's brightness.)
 * 0.15.14 — the Court Record icons that carry writing (the Coldkiller X bottle, the Ami jar, the
   newspapers, magazines and letters: 18 of them) are the DS English pictures; the name tag was
   half solid, half see-through while an item was shown in court (the window that keeps the

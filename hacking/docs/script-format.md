@@ -136,6 +136,7 @@ DS version of the script.
 | `0x0e n` | 1 | speaker: `(n >> 8) & 0x7f` at `TXT+0x24` (the name tag, and the blip) |
 | `0x0f a b` | 2 | stores `a` at `TXT+0x10` |
 | `0x39 n`, `0x3a n xy`, `0x3c n` | 1, 2, 1 | map markers: load object `n >> 8` (bit 0 clear: hide it; its record stays until a section jump other than to the next section), place it at (`xy >> 8`, `xy & 0xff`), show it (see graphics.md, "Map markers") |
+| `0x47 v n` | 2 | the music's volume: to `v` (`0x100` full, `0x80` half; kept within 4 and 256) over `n` frames, at once when `n` is 0 (`0x08016050`: `m4aMPlayVolumeControl` at `0x08039b78` on the music player, `0x03005f20`; the fade is run from `SYS+0x20`, `+0x2c`, `+0x2e`, bit 3 of `+0x24`). The GBA script mostly uses `47 80 3c` and `47 100 3c`, down to half and back |
 | `0x27 n s` | 2 | shake the screen for `n` frames with strength `s` (`SYS+0x14`, `SYS+0x16`, bit 0 of `SYS+0xe8`; strength 0 moves the screen by up to 1 pixel, 1 by up to 3, 2 by up to 6) |
 | `0x10 f` | 1 | set flag |
 | `0x1b v` | 1 | stores `v` at `TXT+0x12` |
@@ -204,8 +205,10 @@ Two commands differ between the versions:
   handler (`0x080235b9`) clears `SYS+0x256` and calls `0x0801a8b4(2)`. The converter keeps the
   GBA's uses and drops the ones the DS added.
 * What the converter does with a command the DS has where the GBA has none: a sound (`0x05`,
-  `0x06`) is kept, as is a screen shake (`0x27`), a flash (`0x47`), a sprite animation
-  (`0x12`), an item shown in court (`0x13`) or a wait (`0x4e`) — 25 in all, with their arguments
+  `0x06`) is kept, as is a screen shake (`0x27`; 3, one of them `27 0 0`, which ends a shake),
+  a change of the music's volume (`0x47`; 1), a fade of the screen's brightness (`0x12`, which
+  also makes the flashes; 4, fades to and from black), an item shown in court (`0x13`; 7) or a
+  wait (`0x4e`; 10) — 25 in all, with their arguments
   as they are, since the two scripts agree on them wherever both have the command (`DS_EFFECTS`
   in `tools/convert_script.py`). The rest (the DS's graphic loads, `0x69`/`0x6b`, the box
   hide/shows around its top-screen updates, `0x53`, the DS-only `0x74`...) is dropped.
