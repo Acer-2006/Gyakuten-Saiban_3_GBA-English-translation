@@ -15,8 +15,8 @@ between the two words of a name, and lines filled unevenly.  In about two thirds
 descriptions no letters touch.  Since 0.16.73 a last build step (court_record.clear_lines,
 choose_clear) sets the others again: other line breaks, a line spacing of 13 for one or two
 lines (the first line a row higher, or a gap a row wider), word gaps a pixel narrower, or a line
-moved a pixel or two sideways, whichever is cheapest; that leaves two of the 188 with a tail
-touching a letter, in one and three columns.
+moved a pixel or two sideways, whichever is cheapest; that leaves one of the 188 (the second Key
+Card) with a tail touching a letter, in three columns.
 
 A description that does not fit in four lines that way gets its word gaps narrowed (to 4, then 3
 pixels), and then a word hyphenated where HYPHENS allows; with the US DS text, two need the first
@@ -24,6 +24,9 @@ and one (Franziska von Karma's profile) both."""
 import itertools
 import dsfont, dsimgtext
 
+# straight sides facing each other: rows of ink side by side in the last column of one letter
+# and the first of the next (Font(stem_gap))
+STEM_ROWS = 5
 # words that read badly at the end of a line, before the word they go with
 CLINGY = {'a', 'an', 'the', 'to', 'of', 'in', 'on', 'at', 'by', 'for', 'and', 'or', 'with', 'from',
           'as', 'my', 'his', 'her', 'its', 'our', 'your', 'their', 'he', 'she', 'i'}
@@ -36,8 +39,12 @@ HYPHENS = {'prosecutor': 'pros-ecutor'}
 
 class Font:
     """The DS dialogue font as ink columns: {char: (cols, lsb, rsb)}, cols a 16-bit mask per column
-    (bit k = row k), lsb/rsb the blank columns before and after the ink within the advance."""
-    def __init__(self, data, arm9):
+    (bit k = row k), lsb/rsb the blank columns before and after the ink within the advance.
+    stem_gap: two letters whose straight sides face each other (STEM_ROWS rows side by side: the
+    g and l of "amazingly", nn, il) keep the DS's gap, 2 pixels, instead of half of it; 1 pixel
+    apart such strokes read as one thick stroke (court_record.STEM_GAPS)."""
+    def __init__(self, data, arm9, stem_gap=False):
+        self.stem_gap = stem_gap
         self.glyphs = {}
         for code, ch in dsimgtext.CHARS.items():
             self._add(ch, dsimgtext._cols_from_rows(dsfont.glyph_rows(data, code)),
@@ -58,13 +65,16 @@ class Font:
     def layout(self, text, word_cut=0):
         """-> ([(cols, x)], width): each glyph at x = its first ink column; the width of the ink.
         Each gap is half the DS one (rounded up), less word_cut between words."""
-        out, x, prev, spaces = [], 0, None, 0
+        out, x, prev, spaces, edge = [], 0, None, 0, 0
         for ch in text:
             if ch == ' ': spaces += 1; continue
             cols, lsb, rsb = self.glyph(ch)
             if prev is not None:
-                x += (prev + spaces * self.space + lsb + 1) // 2 - (word_cut if spaces else 0)
-            out.append((cols, x)); x += len(cols); prev = rsb; spaces = 0
+                gap = (prev + spaces * self.space + lsb + 1) // 2 - (word_cut if spaces else 0)
+                if self.stem_gap and not spaces and bin(edge & cols[0]).count('1') >= STEM_ROWS:
+                    gap = max(gap, prev + lsb)
+                x += gap
+            out.append((cols, x)); x += len(cols); prev = rsb; spaces = 0; edge = cols[-1]
         return out, x
 
     def width(self, text, word_cut=0):

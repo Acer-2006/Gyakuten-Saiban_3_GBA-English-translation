@@ -348,6 +348,11 @@ def add_ages(rom, ctx):
           f"; name line moved (item, columns) {moved} ({len(stored)} pictures)" +
           (f"; still touching: {still}" if still else ''))
 
+# Descriptions set with the DS's 2-pixel gap between letters whose straight sides face each other
+# (dsdesc.Font(stem_gap)), where 1 pixel made them read as one stroke: Pearl Fey's first profile,
+# the g and l of "amazingly" (0.16.74).  Only there: the others are left as they are.
+STEM_GAPS = {20}
+
 def final_panel(i, name_px, text, font, names, clear=False):
     """The panel apply() and add_ages() leave for item i (clear: see panel)."""
     if i in AGES:
@@ -365,11 +370,13 @@ def clear_lines(rom, ctx):
     next (the lines are chosen to avoid that, dsdesc.cost, but not every text can).  Those are
     set again (dsdesc.choose_clear): other line breaks, a line spacing of 13 instead of 12 (the
     first line a row higher, or a gap a row wider), word gaps a pixel narrower or a line moved a
-    pixel or two sideways, whichever costs least; two (20 and 54) have no such layout and keep a
-    touching column or three.  Applied last, like add_ages(), so that the pictures stored before
-    stay where they are; the other panels are left alone."""
+    pixel or two sideways, whichever costs least; one (54) has no such layout and keeps three
+    touching columns.  The descriptions in STEM_GAPS are set with the wider gap between straight
+    sides (since 0.16.74).  Applied last, like add_ages(), so that the pictures stored before stay
+    where they are; the other panels are left alone."""
     d, arm9 = ctx.data, ctx.arm9
     font = dsdesc.Font(d, arm9)
+    stems = dsdesc.Font(d, arm9, stem_gap=True)
     recs = ds_items(arm9)
     nb = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[NAME_BASE]
     nsz = dsimgtext.texture_size(d, nb)
@@ -384,5 +391,12 @@ def clear_lines(rom, ctx):
         rom.w32(GBA_ITEMS + 8 * i, stored[data])
         changed.append(i)
         if touching(after): still.append(i)
+    # after the others, so that the pictures above keep the addresses they had in 0.16.73 (the
+    # picture of these there stays in its place, unused)
+    for i in sorted(STEM_GAPS):
+        name_px, text = ctx.court_inputs[i]
+        after = final_panel(i, name_px, text, stems, names, clear=True)
+        if after is None: continue
+        rom.w32(GBA_ITEMS + 8 * i, rom.store(lz.compress(cells(after)), 'ext', 4, f'court record {i} (straight sides)'))
     print(f"  court record: the lines of {changed} set again so that fewer letters touch ({len(stored)} pictures)" +
           (f"; name touching: {still}" if still else ''))

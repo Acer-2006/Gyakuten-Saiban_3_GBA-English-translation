@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.74 — Pearl Fey's first profile in the Court Record: the g and l of "amazingly" (and the
+  nn of "channeling") were a pixel apart and read as one thick stroke; letters whose straight
+  sides face each other now have the DS's two pixels between them there, and the description is
+  broken "Maya's cousin, / and channeling prodigy. / ...", no longer touching between lines. Only
+  this profile changes; the others are as they were.
 * 0.16.73 — Court Record descriptions: in 33 of them (all four-line ones, 12 pixels apart) the
   tail of a g, p, y or comma touched a letter on the line below. They are set again with other
   line breaks, a pixel more between two of the lines, word gaps a pixel narrower or, in six, one

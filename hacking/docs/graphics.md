@@ -163,11 +163,21 @@ p, y or comma still touched a letter of the next line; since 0.16.73 a last buil
 (`court_record.clear_lines`, `dsdesc.choose_clear`) sets those again with whichever costs least
 of: other line breaks, one or two of the gaps 13 rows instead of 12 (a gap a row wider, or the
 first line a row higher, kept off the name), word gaps a pixel narrower (three lines then fit
-for some, 16 rows apart), or one line moved a pixel or two sideways (6 of them). Two still touch,
-in one and three columns: Pearl Fey's first profile ("prodigy" over "amazingly") and the second
-Key Card ("Opens" over "CEO's"), for which no such layout exists. The renderer's marks a row lower
-(text-engine.md, "Lines 14 pixels apart") would not help here: 12 rows apart the marks meet the
-tails of the line above either way, and lowering them makes one more description touch.
+for some, 16 rows apart), or one line moved a pixel or two sideways (6 of them). The second Key
+Card ("Opens" over "CEO's") still touches, in three columns: no such layout of its text avoids
+it. The renderer's marks a row lower (text-engine.md, "Lines 14 pixels apart") would not help
+here: 12 rows apart the marks meet the tails of the line above either way, and lowering them
+makes one more description touch.
+
+With every gap halved, two letters whose straight sides face each other (the g and l of
+"amazingly", nn, il, ne: 5 or more rows of ink side by side) are 1 pixel apart and read as one
+thick stroke. Giving all of them the DS's 2 pixels (`dsdesc.Font(stem_gap)`) widens the text
+enough that 13 descriptions would need four lines instead of three, so it is used only where
+asked for (`court_record.STEM_GAPS`, since 0.16.74): Pearl Fey's first profile, which is then
+set "Maya's cousin, / and channeling prodigy. / She has amazingly / powerful spiritual
+abilities.", its second line a pixel to the right, and no letters of two lines touch (in 0.16.73
+the y of "prodigy" still touched "amazingly"). Its picture is stored after the others, which
+keep the addresses they had.
 
 ### Icons
 
