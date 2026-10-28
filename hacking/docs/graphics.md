@@ -163,14 +163,11 @@ the GBA text says "Press L".
 ### Icons
 
 The picture in the Court Record's left box, the item shown in court (top left, kept solid by
-WIN0 while the text box blends: WIN0V's bottom line is the name tag's top, 80 in the English
-build, 100 in the Japanese; the English build also puts the item's box a tile row higher, its
-frame from map row 0 and the sprite at y 8 instead of row 1 and y 16, so that its bottom edge
-stays off the tag's rows above the taller text box; the three routines that draw and erase the
-frame take their row from literals, and the inline clear at `0x0803616a` that takes the box down
-with the scene and the hand-made clear of the smallest box at the end of the closing animation
-(`0x0801555c`, map base + `0x42`, now + `2`) start a row earlier too, `patches/icons.py`; and
-`vwf_frame` clears any frame tiles, `0x30`–`0x38`, left on rows 0–9 with no item box open, as a
+WIN0 while the text box blends: WIN0V's bottom line, 100, is the name tag's top; its box is on
+map rows 1-10 with the sprite at y 16, as in the original (0.16.12-0.16.67 drew both a row higher,
+clear of the tag above that build's taller text box; `vwf_frame` clears that box's old top row,
+`item_row0`, from a save or a save state of those builds); `vwf_frame` also clears any frame tiles,
+`0x30`–`0x38`, left on rows 0–9 with no item box open, as a
 save made before 0.16.17 can carry) and the presenting animation all come from a **table of 123
 pointers at `0x0804660c`**, one LZ picture each: 32 bytes of palette (16 BGR555 colours, index 0
 transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles in rows (2048

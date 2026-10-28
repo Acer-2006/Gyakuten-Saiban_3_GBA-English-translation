@@ -146,7 +146,7 @@ def top_offset(win):
     return round((y0 - 96) * s) - (H - round((y1 - y0) * s)) // 2
 
 ANCHOR_Y = 60      # the GBA banners' anchor (the animation table entries)
-BOX_Y = 96         # the text box's top edge (map row 12), up during a testimony with its title
+BOX_Y = 112        # the text box's top edge (map row 14), up during a testimony with its title
 GAP = 4            # rows of the scene left between the lettering and the box
 
 def clear_of_box(win):

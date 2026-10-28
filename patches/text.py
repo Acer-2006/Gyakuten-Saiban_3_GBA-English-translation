@@ -11,16 +11,13 @@ DRAW_CALL       = 0x0801f986   # bl 0x801f4c4 (cell draw) in the dispatcher
 NEWLINE_HANDLER = 0x0802172d   # command 0x01 handler
 CMD_TABLE       = 0x08163afc   # dispatch table (121 entries)
 BSS_ADDR        = 0x02028000
+VWF_SIZE        = 17424        # bytes kept for src/vwf.c's code (its size in 0.16.67)
 FRAME_TEMPLATE  = 0x0803b844   # 32x32 byte map template of the normal text box
-TAG_ROW14_LIT   = 0x08006678   # literal 0x3002400 (row 14) in the name-tag drawer
-TAG_ROW12_LIT   = 0x0800667c   # literal 0x3002380 (row 12)
-TAG_ERASE_FROM  = 0x0800658c   # movs r4, #0xc0 (<< 1: template entry 0x180, row 12) when there is no tag
 # loops that clear map rows 12-19 (0x100 entries from 0x180): (start, the instruction after the
 # loop, what the replaced instructions set up that is used after it)
 BOX_CLEARS = [(0x08022166, 0x08022186, 'adds r4, r7, #0\n adds r4, #0x23'),   # command 0x1c
               (0x08021c8e, 0x08021caa, 'ldr r5, [pc, #0x4c]')]                # after a choice:
                                                                   # r5 = 0x03002080 (0x08021cdc)
-TAG_ERASE_DST   = 0x08006596   # movs r5, #0xc0 (<< 2: map byte offset 0x300, row 12)
 STMT_ARROW_Y    = (0x0800ebc8, 0x0800ebfe)   # movs r0, #0x80: the statement arrows' y (0x0800ebb0)
 VRAMUPD_HOOK    = 0x08006686   # ldr r3,[pc,#0xc4]; ldr r2,[pc,#0xc4]  (after push {r4,lr})
 IOREG_CALL      = 0x08000422   # bl IOREG_UPDATE, in the main loop's per-frame updates
@@ -73,6 +70,12 @@ def apply(rom, ctx):
     binary, syms, bss = compile_c([os.path.join(ROOT, 'src/vwf.c')], text_addr, BSS_ADDR,
                                   os.path.join(ROOT, 'build/vwf'),
                                   ld_defsyms={'font_rows': rows_addr, 'font_w': w_addr})
+    # The code after the renderer (the hooks' trampolines, src/script.c, ...) stays where it was
+    # in earlier builds: a save state can hold a return address into it.  The renderer is padded
+    # to the size it had in 0.16.67; one that has grown past it has to make room elsewhere.
+    if len(binary) > VWF_SIZE:
+        raise SystemExit(f'text: the renderer is {len(binary)} bytes, more than the {VWF_SIZE} kept for it')
+    binary += bytes(VWF_SIZE - len(binary))
     code_addr = rom.store(binary, 'font', 4, 'vwf code')
     assert code_addr == text_addr
     assert bss <= 0x780, bss                 # vwf.c's fixed state (vx) at 0x02028780, script.c's at 0x02028800
@@ -175,53 +178,19 @@ def apply(rom, ctx):
     ''', note='save screen back trampoline')
     rom.thumb(SAVE_BACK, f'bl #{tramp_sb & ~1:#x}', 'save screen back hook')
 
-    # 5. taller text box: frame rows 12..19 (top edge, 6 interior rows, bottom): 64 pixels, the
-    # DS box's height, with the DS's 60 pixels between the border lines for the three lines
-    t = bytearray(rom.read(FRAME_TEMPLATE, 1024))
-    rows = [bytes(t[r * 32:(r + 1) * 32]) for r in range(32)]
-    assert rows[14][0] == 0x02 and rows[15][0] == 0x06 and rows[19][0] == 0x04, [r[:2].hex() for r in rows[12:20]]
-    new = rows[:12] + [rows[14]] + [rows[15]] * 6 + [rows[19]] + rows[20:]
-    rom.write(FRAME_TEMPLATE, b''.join(new), 'frame template 3 lines')
-    # The episode select draws the short box of the original (top edge at row 16, two interior
-    # rows, bottom at 19: mode 2 of the box routine at 0x0800557c, called only from 0x0800c384):
-    # template rows 0-13 to the map, rows 14-16 cleared, template row 14 (the original's top edge)
-    # to row 16.  With the taller template that would put our top edge at row 12 and interior
-    # rows at 15-16.  Now: template rows 0-11 to the map, rows 12-16 cleared, template rows 11-12
-    # (blank, top edge) to rows 15-16.  (The top edge copy's destination is the cleared rows'
-    # start plus 0x80 bytes, two rows: from row 12 it has to be 0xc0, three, or the top edge
-    # lands on row 15 over an empty row 16, as it did up to 0.16.23.)  src/vwf.c, select_box,
-    # grows the box two rows for the English prompt of two lines.
-    for addr, old, new in ((0x080055fa, 0x20e0, 0x20c0),    # the cleared rows start at row 12
-                           (0x08005600, 0x3080, 0x30c0),    # ... the top edge copy goes to row 15
-                           (0x08005650, 0x1bf, 0x17f),      # ... the plain copy ends at row 11
-                           (0x08005616, 0x22e0, 0x22c0),    # ... entry 0x180
-                           (0x0800562a, 0x22e0, 0x22b0),    # the top edge copy reads from row 11
-                           (0x0800565c, 0x1df, 0x19f)):     # ... to row 12
-        assert rom.u16(addr) == old, hex(addr)
-        rom.w16(addr, new)
-    # partial frame redraw starts at row 12 instead of 14
-    assert rom.u16(0x0800577a) == 0x21e0 and rom.u16(0x08005784) == 0x25e0
-    rom.w16(0x0800577a, 0x21c0); rom.w16(0x08005784, 0x25c0)
-    # name tag two rows up (rows 10-11, joint at row 12)
-    assert rom.u32(TAG_ROW14_LIT) == 0x03002400 and rom.u32(TAG_ROW12_LIT) == 0x03002380
-    rom.w32(TAG_ROW14_LIT, 0x03002380); rom.w32(TAG_ROW12_LIT, 0x03002300)
-    # ... and the window that keeps the evidence shown in court (its box on BG1, top left) out of
-    # the box's blending ends at the tag's new top: WIN0V bottom 100 -> 80 (0x08000eda, in the
-    # display routine at 0x08000ea0; with the tag at rows 10-11 its top 12 lines were solid and
-    # the rest blended)
-    assert rom.u16(0x08000eda) == 0x2064
-    rom.w16(0x08000eda, 0x2050)
-    # ... and a line with no name tag puts the box template back from row 10 instead of 12 (the
-    # loop at 0x0800659c copies template entries 0x180-0x1df to the map from row 12)
-    assert rom.u16(TAG_ERASE_FROM) == 0x24c0 and rom.u16(TAG_ERASE_DST) == 0x25c0
-    rom.w16(TAG_ERASE_FROM, 0x24a0); rom.w16(TAG_ERASE_DST, 0x25a0)
-    # ... and the cross-examination's arrows to the previous and next statement (OAM 0 and 1,
-    # 16x16 at the box's edge columns) sit on the second line, y 118 instead of 128 (the
-    # original's second line; src/vwf.c TEXT_Y0 + 16)
+    # 5. the text box is the original's, BG1 rows 14-19 (48 pixels; src/vwf.c, BOX_TOP): its
+    # template, the name tag on rows 12-13, the item box's window, the episode select's short box
+    # and the box's partial redraw stay as they are.  (0.16.8-0.16.67 drew a 64-pixel box from row
+    # 12, with the tag two rows up and the routines that know those rows moved with it.)  The
+    # cross-examination's arrows to the previous and next statement (OAM 0 and 1, 16x16 at the
+    # box's edge columns) sit on the second line, y 129 instead of 128 (the original's second
+    # line; src/vwf.c TEXT_Y0 + BOX_PITCH)
+    t = rom.read(FRAME_TEMPLATE, 1024)
+    assert t[14 * 32] == 0x02 and t[15 * 32] == 0x06 and t[19 * 32] == 0x04 and t[14 * 32 + 8] == 0x08, 'box template'
     for addr in STMT_ARROW_Y:
         assert rom.u16(addr) == 0x2080, hex(addr)       # movs r0, #0x80
-        rom.w16(addr, 0x2000 | 118)
-    # box clear loops (rows 12-19 -> rows 11-19): replace each loop with a call.  Command 0x1c
+        rom.w16(addr, 0x2000 | 129)
+    # box clear loops (rows 12-19): replaced each with a call (vwf_boxclear).  Command 0x1c
     # (hide the box): the code after the loop sets TXT+0x23 = 1 through r4 = r7 + 0x23, which the
     # loop's first instructions set up
     assert rom.u32(0x08021cdc) == 0x03002080

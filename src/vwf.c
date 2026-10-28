@@ -13,13 +13,23 @@
 #include "gba.h"
 #include "font.h"   /* generated: font_rows[], font_w[], expand_lut[], cmd_args[] */
 
+#define NO_UNROLL  _Pragma("clang loop unroll(disable)")
 #define CV_TILE0   0xe0
 #define CV_COLS    30
 #define CV_ROWS    6
-#define CV_MAPROW  13         /* the box's first interior row: the box is BG1 rows 12-19 */
+/* The box is the original's: BG1 rows 14-19 (top edge, four interior rows, bottom edge), 48
+   pixels, with the name tag on rows 12-13.  From 0.1 to 0.16.7 the English box was a row taller
+   (56 pixels) and from 0.16.8 to 0.16.67 two rows (64, the DS box's height), which hid 8 and 16
+   pixels more of the scene than the original and the DS do.  Three lines fit in it 14 pixels
+   apart (the letters' ink takes 13 rows of their 16), the first 2 pixels under the top border's
+   lines (y 112-113) and the last a pixel over the bottom one's (y 158-159). */
+#define BOX_TOP    14         /* the box's top edge row */
 #define BOX_BOTTOM 19         /* its bottom edge row */
-#define TEXT_Y0    102        /* the page's first line: 4 px below the box's top border, as the DS's */
-#define LINE_H     16
+#define CV_MAPROW  BOX_TOP    /* the question canvas covers the whole box, its edges included */
+#define CV_Y0      3          /* ... its first line's cell from the canvas's top */
+#define TEXT_Y0    115        /* the page's first line (cell top) */
+#define BOX_PITCH  14         /* the page's lines on the screen */
+#define LINE_H     16         /* a line's cell (the sprite surface's rows; the save screen's lines) */
 #define MODE_RECORD 7         /* game mode (SYS+8): the Court Record */
 #define MAX_LINES  3
 /* The DS starts its lines 8 pixels inside the box (its box is 256 wide; the GBA's 240): the same
@@ -40,7 +50,7 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 #define ARROW_X     229       /* at rest: the tip 2 pixels inside the box's right edge, as the DS's */
-#define ARROW_Y     139       /* 10 px above the box's bottom border, as the DS's */
+#define ARROW_Y     (TEXT_Y0 + 2 * BOX_PITCH + 5)   /* beside the third line, as the DS's: y 148-156 */
 /* The arrow is on the third line's row and slides 2 px left of ARROW_X.  The DS's box is 16 px
    wider, so a third line the DS ends well clear of its arrow can run under ours: such a line
    closes up just enough, the pixels spread over its letter gaps, that it ends before L3_END
@@ -65,7 +75,8 @@ static u32 lbl_tile(int L, int cell);
 static const u8 lbl_obj0[LBL_LINES] = {3, 11, 19};
 #define Q_MAPROW   2          /* question canvas rows in choice mode: its first line at y 17, as the
                                  original's question (row 1 put it against the box's top edge) */
-#define Q_DROP     4          /* ... shown this much lower, clear of the penalty gauge (vwf_bgcnt) */
+#define Q_DROP     1          /* ... shown this much lower, clear of the penalty gauge (vwf_bgcnt): with
+                                 CV_Y0 its first line's letters start at y 21, as before 0.16.68 */
 #define CAP_Y0     62         /* caption screen: first row y, 18 px pitch */
 #define CAP_PITCH  18
 #define SYS_Y0     56         /* system messages in the save / continue screen box: first row y */
@@ -142,8 +153,16 @@ struct vwf_ext {
     u8 lbl_sq;          /* a choice's options: pixels taken out of every letter gap (line_done) */
     u8 cut_r, cut_g, cut_acc;   /* the line under the page arrow: pixels taken out over its letter
                                    gaps (box_glyph), the gaps, the running sum spreading them */
+    u8 edges_ok;        /* BOX_EDGES holds the box's top and bottom rows from under the canvas */
+    u8 q_virt;          /* the question is over the box's rows on BG0 alone (q_frame) */
+    u8 layout;          /* LAYOUT once a box made by an earlier build has been looked for (old_layout) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
+/* The box's top and bottom rows as they were when the canvas was mapped over them (the top one
+   carries the name tag's joint), 2 x 30 entries: shown under the question's letters (vwf_bgcnt)
+   and put back when the canvas goes (canvas_unmap).  Free EWRAM after the third line's backup. */
+#define BOX_EDGES ((volatile u16*)0x0202a800)
+#define LAYOUT    48
 
 /* Each line's eight 32x16 cells: OBJ tiles 0x00, 0x40 and 0x80 on, the third line elsewhere
    while the Court Record has its tiles (record_lend). */
@@ -162,7 +181,7 @@ static u32 lbl_tile(int L, int cell) {
 #define UI_13 0x3def
 #define UI_14 0x028c
 #define UI_15 0x03ff
-static void text_colours(int on) {
+static __attribute__((noinline)) void text_colours(int on) {
     if (on) { BGPAL[13] = TEXT_ORANGE; BGPAL[14] = TEXT_BLUE; BGPAL[15] = TEXT_GREEN; }
     else    { BGPAL[13] = UI_13;       BGPAL[14] = UI_14;     BGPAL[15] = UI_15; }
 }
@@ -250,51 +269,39 @@ static void fill_tile(int dst_tile, const u32* src) {
     for (int i = 0; i < 8; i++) d[i] = src[i];
 }
 
+/* The canvas covers the whole box, edges included (the three lines need its 48 rows).  Bare (the
+   letters alone, BG0 showing them over the box: every choice page seen), the box's own rows are
+   on BG1 under them.  Framed (BG1 shows the canvas), its first and last rows carry the box's top
+   and bottom edges, the template's tiles, unless vs.q_noedge: in the full-screen choice box the
+   canvas sits at the top, where those edges would draw lines across the screen. */
 static void canvas_tiles(void) {
     vx.q_bare = vx.q_want;
+    vs.csum_ok = 0;
     if (vx.q_bare) {
         volatile u32 zero = 0;
         dma32(&zero, VRAM + CV_TILE0 * 32, CV_ROWS * CV_COLS * 8, 1);
-        vs.q_noedge = 0;
-        vs.csum_ok = 0;
         return;
     }
     for (int ty = 0; ty < CV_ROWS; ty++) {
+        int edge = vs.q_noedge ? -1 : ty == 0 ? BOX_TOP : ty == CV_ROWS - 1 ? BOX_BOTTOM : -1;
         for (int tx = 0; tx < CV_COLS; tx++) {
-            int src;
-            src = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;   /* the bottom edge is the template's row 19 */
-            fill_tile(CV_TILE0 + ty * CV_COLS + tx, frame_tiles[src]);
+            int src = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;
+            if (edge >= 0) dma32(VRAM + BOX_TEMPLATE[edge * 32 + tx] * 32, VRAM + (CV_TILE0 + ty * CV_COLS + tx) * 32, 8, 0);
+            else fill_tile(CV_TILE0 + ty * CV_COLS + tx, frame_tiles[src]);
         }
     }
-    vs.q_noedge = 0;
-    vs.csum_ok = 0;
 }
 
-/* The canvas's last row carries the box's bottom edge (the last two pixel rows of its tiles, three
-   at the corners).  In the full-screen choice box the question canvas sits at the top, where that
-   edge would draw a line across the screen: frame_bottom(0) turns it into plain interior and side
-   edges, frame_bottom(1) puts it back.  Only frame pixels change (text has colours 8 and up). */
-static void frame_bottom(int on) {
-    if (vx.q_bare) { vs.q_noedge = !on; return; }   /* no frame in the tiles: BG1 has the box */
-    for (int tx = 0; tx < CV_COLS; tx++) {
-        int edge = (tx == 0) ? 1 : (tx == CV_COLS - 1) ? 2 : 6;
-        int side = (tx == 0) ? 3 : (tx == CV_COLS - 1) ? 4 : 0;
-        const u32* from = frame_tiles[on ? side : edge];
-        const u32* to = frame_tiles[on ? edge : side];
-        volatile u32* d = (volatile u32*)(VRAM + (CV_TILE0 + (CV_ROWS - 1) * CV_COLS + tx) * 32);
-        for (int r = 5; r < 8; r++) {
-            u32 v = d[r];
-            for (int k = 0; k < 32; k += 4)
-                if (((v >> k) & 15) == ((from[r] >> k) & 15))
-                    v = (v & ~(15u << k)) | (to[r] & (15u << k));
-            d[r] = v;
-        }
-    }
+static void canvas_redraw(void);
+/* frame_edges(0): the canvas without the box's edges, for the full-screen choice box; (1): with. */
+static void frame_edges(int on) {
+    if (vs.q_noedge == !on) return;
     vs.q_noedge = !on;
-    vs.csum_ok = 0;
+    if (!vx.q_bare) canvas_redraw();     /* bare tiles have no frame: BG1 has the box */
 }
 
 static void canvas_reset(void) {
+    vs.q_noedge = 0;
     canvas_tiles();
     vs.glog_n = 0;
 }
@@ -316,21 +323,18 @@ static const u32 arrow_tiles[32] = {
     0x00000003, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
     0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000,
 };
-static void arrow_load(void) {
+static __attribute__((noinline)) void arrow_load(void) {
     volatile u32* d = (volatile u32*)(0x06010000 + ARROW_TILE * 32);
     if (d[4] == arrow_tiles[4] && d[12] == arrow_tiles[12] && d[16] == arrow_tiles[16] && d[1] == arrow_tiles[1]) return;
     for (int i = 0; i < 32; i++) d[i] = arrow_tiles[i];
 }
 
-/* Choice menus grow the box to the whole screen: its top-left corner tile sits at row 0. */
-static int fullscreen_box(void) {
-    return (BG1MAP[0] & 0x3ff) == 0x06 && (BG1MAP[1] & 0x3ff) == 0x01;
-}
-
-/* Is the (3-line) text box frame currently drawn on BG1?  Top edge at row CV_MAPROW-1. */
-static int box_open(void) {
-    return (BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 &&
-           (BG1MAP[(CV_MAPROW + CV_ROWS - 1) * 32 + 8] & 0x3ff) != 0x00;
+/* Choice menus grow the box to the whole screen: its top-left corner tile sits at row 0 (with the
+   original's template the top edge, as in the Japanese game; 0.16.8-0.16.67's taller template had
+   an interior row there). */
+static __attribute__((noinline)) int fullscreen_box(void) {
+    u32 a = BG1MAP[0] & 0x3ff, b = BG1MAP[1] & 0x3ff;
+    return (a == 0x02 && b == 0x08) || (a == 0x06 && b == 0x01);
 }
 
 static int canvas_tile(u32 e) {
@@ -338,10 +342,53 @@ static int canvas_tile(u32 e) {
     return t >= CV_TILE0 && t < CV_TILE0 + CV_ROWS * CV_COLS;
 }
 
+/* Is the box's top edge on BG1 (or the canvas, mapped over it)? */
+static __attribute__((noinline)) int box_top(void) {
+    u32 e = BG1MAP[BOX_TOP * 32 + 8] & 0x3ff;
+    return e == 0x08 || (vs.mapped && canvas_tile(e));
+}
+
+/* Is the (3-line) text box frame currently drawn on BG1? */
+static __attribute__((noinline)) int box_open(void) {
+    return box_top() && (BG1MAP[BOX_BOTTOM * 32 + 8] & 0x3ff) != 0x00;
+}
+
+/* The box's own entry for row `row`, column tx, where the canvas covers it. */
+static u32 box_entry(int row, int tx) {
+    if (vx.edges_ok && row == BOX_TOP) return BOX_EDGES[tx];
+    if (vx.edges_ok && row == BOX_BOTTOM) return BOX_EDGES[CV_COLS + tx];
+    return BOX_TEMPLATE[row * 32 + tx];
+}
+
+/* In the box the canvas covers the whole box, the box's edges included.  Bare (BG0 free: every
+   choice page seen), BG1 keeps the box as it is and BG0 shows the letters over its rows (q_frame):
+   the engine grows the box for a choice from its own rows, its top edge among them, and moving
+   them over a mapped canvas left copies of it on every row.  Framed, BG1 takes the canvas. */
+static __attribute__((noinline)) int canvas_shown(void) {
+    return vx.q_bare || (BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) == CV_TILE0 + 1;
+}
+
 static void canvas_map(void) {
-    if (vs.q_noedge) frame_bottom(1);
-    for (int ty = 0; ty < CV_ROWS; ty++)
-        for (int tx = 0; tx < CV_COLS; tx++)
+    if (vs.q_noedge) frame_edges(1);
+    if (vx.q_bare) {
+        text_colours(1);
+        arrow_load();
+        vs.mapped = 1;
+        return;
+    }
+    /* keep the box's edge rows from under it (the name tag's joint is on the top one); the
+       engine's arrow cells (row 19, columns 14-15) are the plain edge's */
+    NO_UNROLL for (int k = 0; k < 2; k++) {
+        int row = k ? BOX_BOTTOM : BOX_TOP;
+        NO_UNROLL for (int tx = 0; tx < CV_COLS; tx++) {
+            u32 e = BG1MAP[row * 32 + tx];
+            if ((e & 0x3ff) && !canvas_tile(e) && !(k && (tx == 14 || tx == 15))) BOX_EDGES[k * CV_COLS + tx] = e;
+            else if (!vx.edges_ok) BOX_EDGES[k * CV_COLS + tx] = BOX_TEMPLATE[row * 32 + tx];
+        }
+    }
+    vx.edges_ok = 1;
+    NO_UNROLL for (int ty = 0; ty < CV_ROWS; ty++)
+        NO_UNROLL for (int tx = 0; tx < CV_COLS; tx++)
             BG1MAP[(CV_MAPROW + ty) * 32 + tx] = CV_TILE0 + ty * CV_COLS + tx;
     SYS_BGDIRTY |= 2;
     text_colours(1);
@@ -350,11 +397,16 @@ static void canvas_map(void) {
 }
 
 /* Put the engine's empty box back where the canvas was mapped. */
+static __attribute__((noinline)) void rows_unmap(void) {
+    NO_UNROLL for (int ty = 0; ty < CV_ROWS; ty++) {
+        if (!canvas_tile(BG1MAP[(CV_MAPROW + ty) * 32 + 1])) continue;
+        NO_UNROLL for (int tx = 0; tx < CV_COLS; tx++)
+            BG1MAP[(CV_MAPROW + ty) * 32 + tx] = box_entry(CV_MAPROW + ty, tx);
+        SYS_BGDIRTY |= 2;
+    }
+}
 static void canvas_unmap(void) {
-    for (int ty = 0; ty < CV_ROWS; ty++)
-        for (int tx = 0; tx < CV_COLS; tx++)
-            BG1MAP[(CV_MAPROW + ty) * 32 + tx] = BOX_TEMPLATE[(CV_MAPROW + ty) * 32 + tx];
-    SYS_BGDIRTY |= 2;
+    rows_unmap();
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
 }
@@ -639,7 +691,7 @@ static void labels_oam(void) {
         int x = LBL_X0, y = 18 + 18 * (vs.lbl_base + L);
         if (vs.mode == 2) {
             /* the page in the box: the cells cover its text rows from the left edge */
-            x = 0; y = TEXT_Y0 + L * LINE_H;
+            x = 0; y = TEXT_Y0 + L * BOX_PITCH;
         } else if (vs.lbl_caption) {
             /* As the engine: the box rows (y 116 + 18 * row; with a third English line, the
                three-line box's 112 + 16 * row), 64 px higher for some common-bank sections;
@@ -650,7 +702,7 @@ static void labels_oam(void) {
             /* in the open box, the box's own lines, from the first, as the DS draws them (Mia's
                voice in episode 2's flashback; before 0.16.51 a one- or two-line caption there
                sat on the engine's rows, from the box's second line) */
-            y = (vs.lbl_rows > 2 || box_open()) ? TEXT_Y0 + L * LINE_H : 116 + L * 18;
+            y = (vs.lbl_rows > 2 || box_open()) ? TEXT_Y0 + L * BOX_PITCH : 116 + L * 18;
             if (vs.lbl_free) {
                 /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
                    36 + 18 * row + y offset, and the writer adds 9 to x */
@@ -687,7 +739,7 @@ static void labels_oam(void) {
    box-grow animation become plain interior. */
 static void choice_frame(void) {
     int dirty = 0;
-    if (!vs.q_noedge) frame_bottom(0);
+    if (!vs.q_noedge) frame_edges(0);
     /* rows are written and copied whole: two columns tell a row that is already right (the full
        scan of every cell every frame was a good part of the vertical blank) */
     for (int row = 0; row < 20; row++) {
@@ -755,7 +807,7 @@ static int box_moving(void) {
         for (int tx = 0; tx < CV_COLS; tx++) {
             u32 e = BG1MAP[row * 32 + tx] & 0x3ff;
             if (canvas_tile(e) && (e - CV_TILE0) % CV_COLS == (u32)tx)
-                BG1MAP[row * 32 + tx] = BOX_TEMPLATE[(CV_MAPROW + (e - CV_TILE0) / CV_COLS) * 32 + tx];
+                BG1MAP[row * 32 + tx] = BOX_TEMPLATE[(BOX_TOP + 1) * 32 + tx];
         }
     }
     SYS_BGDIRTY |= 2;
@@ -802,7 +854,7 @@ void vwf_draw_char(u32 code80, u32 col, u32 row) {
         else canvas_reset();
         canvas_map();
     }
-    else if ((BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+    else if (!canvas_shown()) canvas_map();
     canvas_glyph(code, col, 1);
 }
 
@@ -882,8 +934,9 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
         else if (k) c = fade_col[k];
     }
     if (draw) {
-        if (blit) blit_to(gi, x, L * LINE_H, c, canvas_rowptr);
-        if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | (L * LINE_H) << 17 | c << 23;
+        int y = CV_Y0 + L * BOX_PITCH;
+        if (blit) blit_to(gi, x, y, c, canvas_rowptr);
+        if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | y << 17 | c << 23;
         vs.csum_ok = 0;
     }
     int adv = font_w[gi] - vs.squeeze;
@@ -1112,22 +1165,85 @@ static void resume_replay(int choice) {
     else vs.mode = 2;
 }
 
-/* A save carries the box's map rows, and one made by a build with the 56-pixel box (before
-   0.16.8) puts the box back a row lower than this build's (top edge at row 13, name tag at
-   11-12): box_open never saw it, and the page was never drawn again.  Move it up. */
+/* A save carries the box's map rows, and so does a save state: one made by a build with the
+   taller box puts it back where that build drew it, the 64-pixel one of 0.16.8-0.16.67 (top edge
+   on row 12, name tag on 10-11) or the 56-pixel one before it (row 13, tag on 11-12).  box_open
+   would not see it and the page would never be drawn again.  It moves down to the original's
+   rows: the top edge with the tag's joint as it is, the tag drawn again from its tiles, the rest
+   from the template (and see item_row0). */
+/* BG1 map rows: a copy (by DMA, a row at a time, so the rows may overlap as long as they are
+   copied away from the destination's side), the template's */
+static void __attribute__((noinline)) rows_copy(int dst, int src, int n) {
+    int up = dst < src;
+    NO_UNROLL for (int k = 0; k < n; k++) {
+        int i = up ? k : n - 1 - k;
+        dma32(BG1MAP + (src + i) * 32, BG1MAP + (dst + i) * 32, 16, 0);
+    }
+}
+static void __attribute__((noinline)) rows_template(int row, int n) {
+    NO_UNROLL for (int i = row * 32; i < (row + n) * 32; i++) BG1MAP[i] = BOX_TEMPLATE[i];
+}
+
 static void box_rows_fix(void) {
-    if ((BG1MAP[13 * 32 + 8] & 0x3ff) != 0x08 || (BG1MAP[12 * 32 + 8] & 0x3ff) == 0x08) return;
-    for (int r = 10; r < 12; r++)
-        for (int tx = 0; tx < 32; tx++) BG1MAP[r * 32 + tx] = BG1MAP[(r + 1) * 32 + tx];
-    for (int r = 12; r < 20; r++)
-        for (int tx = 0; tx < 32; tx++) BG1MAP[r * 32 + tx] = BOX_TEMPLATE[r * 32 + tx];
+    volatile u16* m = BG1MAP;
+    if ((m[BOX_TOP * 32 + 8] & 0x3ff) == 0x08) return;
+    int t = (m[12 * 32 + 8] & 0x3ff) == 0x08 ? 12 : (m[13 * 32 + 8] & 0x3ff) == 0x08 ? 13 : 0;
+    if (!t || (m[BOX_BOTTOM * 32 + 8] & 0x3ff) != BOX_TEMPLATE[BOX_BOTTOM * 32 + 8]) return;
+    NO_UNROLL for (int r = t + 1; r < BOX_BOTTOM; r++) {    /* interior rows, or the old canvas's */
+        u32 e = m[r * 32] & 0x3ff;
+        if (e != 0x06 && !canvas_tile(e)) return;
+    }
+    /* the tag is always tiles 0x54-0x59 over 0x5a-0x5f in columns 0-5 (graphics.md, "Name tags"),
+       written again from its bottom row: the game may have drawn the item box's bottom edge over
+       its top row already (the item box's routine draws it every frame, at its new rows) */
+    u32 tag = m[(t - 1) * 32], pal = tag & 0xf000;
+    rows_copy(BOX_TOP, t, 1);                            /* the top edge with the tag's joint */
+    NO_UNROLL for (int i = 10 * 32; i < 14 * 32; i++)
+        if (i >= 12 * 32 || (u32)(m[i] & 0x3ff) - 0x54 < 12) m[i] = 0;
+    if ((tag & 0x3ff) == 0x5a)
+        NO_UNROLL for (int k = 0; k < 6; k++) { m[12 * 32 + k] = (0x54 + k) | pal; m[13 * 32 + k] = (0x5a + k) | pal; }
+    rows_template(BOX_TOP + 1, BOX_BOTTOM - BOX_TOP);
+    vx.edges_ok = 0;
     SYS_BGDIRTY |= 2;
+}
+
+/* The item box shown in court is on rows 1-10, as the original's; 0.16.12-0.16.67 drew it a row
+   higher, rows 0-9.  The game draws it every frame it is up, at its own rows, over all of that but
+   the old top row, which a save or a save state from those builds brings back: row 0 never holds
+   the item box's tiles (0x30-0x38) now. */
+static void item_row0(void) {
+    int dirty = 0;
+    NO_UNROLL for (int tx = 0; tx < 32; tx++)
+        if ((u32)(BG1MAP[tx] & 0x3ff) - 0x30 <= 8) { BG1MAP[tx] = 0; dirty = 1; }
+    if (dirty) SYS_BGDIRTY |= 2;
+}
+
+/* Once, in the first frame with a box after the game started or a save state was loaded: a save
+   state from an earlier build has its box (box_rows_fix) and a question's letters (the glyph log,
+   16 pixels apart from the canvas's top) where that build put them. */
+static void old_layout(void) {
+    u32 m = SYS[8];
+    if (vx.layout == LAYOUT || (m != 3 && m != 4 && m != 6 && m != MODE_RECORD)) return;
+    vx.layout = LAYOUT;
+    vx.edges_ok = 0;
+    item_row0();
+    if (!fullscreen_box()) box_rows_fix();
+    int moved = 0;
+    for (int i = 0; i < vs.glog_n; i++) {
+        u32 g = glog[i], y = (g >> 17) & 0x3f;
+        if (y == 0 || y == 16 || y == 32) {
+            glog[i] = (g & ~(0x3fu << 17)) | (u32)(CV_Y0 + (y >> 4) * BOX_PITCH) << 17;
+            moved = 1;
+        }
+    }
+    if (moved && vs.mapped && !vs.lost) canvas_redraw();
 }
 
 static void resume_frame(void) {
     u32 p = TXT_PTR;
     if ((p != vs.resume_cur && p != vs.resume_cur + 2) || (SYS_CAPTION & 4)) { vs.resume = 0; return; }
     int full = fullscreen_box();
+    item_row0();
     if (!full) box_rows_fix();
     if (!full && !box_open()) return;
     vs.resume = 0;
@@ -1153,7 +1269,7 @@ static void resume_frame(void) {
 /* The episode select's box is the original's short one (the box routine's mode 2, 0x080055f0:
    top edge on row 16, two interior rows, bottom on 19; patches/text.py) for its one-line prompts.
    An English prompt of two lines (a newly added episode) is set on the three-line box's second
-   and third rows (y 118, 134, labels_oam): the box grows two rows for it, top edge on row 14, and
+   and third rows (y 129, 143, labels_oam): the box grows two rows for it, top edge on row 14, and
    goes back for a one-line page.  A box left by 0.16.22-0.16.23 (top edge on row 15, row 16
    empty) is put right too. */
 #define MODE_NEW_EPISODE 0x0b
@@ -1169,7 +1285,7 @@ static void select_box(int tall) {
     if (!at || (at == edge && (m[16 * 32] & 0x3ff) == (tall ? 0x06 : 0x02))) return;
     for (int r = 14; r <= 16; r++)
         for (int tx = 0; tx < 32; tx++)
-            m[r * 32 + tx] = r < edge ? 0 : BOX_TEMPLATE[(r == edge ? 12 : 13) * 32 + tx];
+            m[r * 32 + tx] = r < edge ? 0 : BOX_TEMPLATE[(r == edge ? BOX_TOP : BOX_TOP + 1) * 32 + tx];
     SYS_BGDIRTY |= 2;
 }
 
@@ -1206,6 +1322,7 @@ void vwf_frame(void) {
 }
 
 static void frame_body(void) {
+    old_layout();
     box_leftovers();
     if (vs.lbl_shown && vs.lbl_caption) select_box(vs.lbl_rows > 2);
     if (vs.overlay) { labels_hide(); return; }
@@ -1230,7 +1347,7 @@ static void frame_body(void) {
     if (vs.mapped && box_moving()) return;
     if (vs.lost) {
         /* the box is still there (its top edge) and nothing shows the canvas tiles any more */
-        if ((BG1MAP[(CV_MAPROW - 1) * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {
+        if ((BG1MAP[BOX_TOP * 32 + 8] & 0x3ff) == 0x08 && !canvas_in_use()) {
             canvas_redraw(); canvas_map(); vs.lost = 0;
         }
         return;
@@ -1251,7 +1368,7 @@ static void frame_body(void) {
         return;
     }
     if (!vs.mapped && vs.mode != 2) return;
-    if (vs.mapped && (BG1MAP[CV_MAPROW * 32 + 1] & 0x3ff) != CV_TILE0 + 1) canvas_map();
+    if (vs.mapped && !canvas_shown()) canvas_map();
     page_arrow();
     if (vs.mapped) canvas_check();
 }
@@ -1266,9 +1383,12 @@ static void page_arrow(void) {
     u32 e = BG1MAP[BOX_BOTTOM * 32 + 14] & 0x3ff;
     if (e >= 0x20 && e <= 0x27) { vs.arrow_on = 1; vs.arrow_y = (e - 0x20) >> 1; }
     else if (e == 0x09 || e == 0x00) vs.arrow_on = 0;
-    if (e >= 0x20 && e <= 0x27) {
-        BG1MAP[BOX_BOTTOM * 32 + 14] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 14];
-        BG1MAP[BOX_BOTTOM * 32 + 15] = BOX_TEMPLATE[BOX_BOTTOM * 32 + 15];
+    /* the canvas covers the bottom edge row (a question being typed): the engine's cells go back
+       to the canvas's, which hold the third line's lower part there */
+    int framed = vs.mapped && !vx.q_bare, under = framed && !canvas_tile(e);
+    if ((e >= 0x20 && e <= 0x27) || under) {
+        for (int tx = 14; tx < 16; tx++)
+            BG1MAP[BOX_BOTTOM * 32 + tx] = framed ? CV_TILE0 + (CV_ROWS - 1) * CV_COLS + tx : BOX_TEMPLATE[BOX_BOTTOM * 32 + tx];
         SYS_BGDIRTY |= 2;
         arrow_load();
     }
@@ -1317,14 +1437,27 @@ static void q_frame(void) {
        left framed by a save state from 0.16.30 or before showed the box opaque behind the
        question) and BG1 never bare ones. */
     vx.q_want = bg0_free;
+    int full = fullscreen_box();
     if (vx.q_want != vx.q_bare && vs.mapped && !vs.lost) {
         canvas_redraw();
+        if (!full) { if (vx.q_bare) rows_unmap(); else canvas_map(); }   /* in the box: BG1's rows */
     }
-    /* canvas rows are whole rows (canvas_map, choice_frame; the engine copies rows whole) */
+    /* canvas rows are whole rows (choice_frame; the engine copies rows whole); in the box, the
+       box's rows while the box is there and not moving (its top edge on row 14, not above) */
     u32 rows = 0;
-    if (vx.q_bare && vx.q_want && vs.mapped && !vs.lost && !vs.overlay)
-        for (int row = 0; row < 20; row++)
-            if (canvas_tile(BG1MAP[row * 32 + 1])) rows |= 1u << row;
+    vx.q_virt = 0;
+    if (vx.q_bare && vx.q_want && vs.mapped && !vs.lost && !vs.overlay) {
+        if (full) {
+            for (int row = 0; row < 20; row++)
+                if (canvas_tile(BG1MAP[row * 32 + 1])) rows |= 1u << row;
+        } else {
+            u32 above = BG1MAP[(BOX_TOP - 1) * 32 + 8] & 0x3ff, edge = BG1MAP[BOX_TOP * 32 + 1] & 0x3ff;
+            if (box_open() && above != 0x08 && above != 0x01 && edge != 0x01) {
+                rows = ((1u << CV_ROWS) - 1) << CV_MAPROW;
+                vx.q_virt = 1;
+            }
+        }
+    }
     if (!rows) {
         if (vx.q_on) {
             vx.q_on = 0; vx.q_rows = 0;
@@ -1355,9 +1488,13 @@ u32 vwf_bgcnt(u32 v) {
     volatile u32 zero_word = 0;
     u32 rows = vx.q_rows_now, old = vx.q_rows;
     if (vx.q_new) { dma32(&zero_word, BG0VRAM, 32 * 32 / 2, 1); old = 0; }
-    for (int row = 0; row < 20; row++) {
+    NO_UNROLL for (int row = 0; row < 20; row++) {
         u32 bit = 1u << row;
-        if (rows & bit) {
+        if ((rows & bit) && vx.q_virt) {   /* the canvas over the box's rows: BG1 has the box */
+            u32 t0 = CV_TILE0 + (row - CV_MAPROW) * CV_COLS;
+            if (!(old & bit) || BG0VRAM[row * 32 + 1] != t0 + 1)
+                NO_UNROLL for (int tx = 0; tx < 32; tx++) BG0VRAM[row * 32 + tx] = tx < CV_COLS ? t0 + tx : 0;
+        } else if (rows & bit) {
             if (!(old & bit) || BG0VRAM[row * 32 + 1] != BG1MAP[row * 32 + 1])
                 dma32(BG1MAP + row * 32, BG0VRAM + row * 32, 16, 0);
             if (vx.q_bg1 || vx.q_new) dma32(box_row, BG1VRAM + row * 32, CV_COLS / 2, 0);   /* the box's own */
@@ -1415,15 +1552,15 @@ void vwf_restore(void) {
     vs.lbl_caption = 0;
 }
 
-/* Replaces the engine's "clear box rows" loop: rows 10..19 of the BG1 map (the name tag's two
-   rows and the box's eight).  A page of sprite text keeps its lines: command 0x1c can hide the
+/* Replaces the engine's "clear box rows" loop: rows 12..19 of the BG1 map (the name tag's two
+   rows and the box's six), as the original's.  A page of sprite text keeps its lines: command 0x1c can hide the
    box in the middle of a page (14 pages, the same in the Japanese GBA script and the DS's: the
    box goes for an animation, a point or a desk slam, and comes back with the page's text, which
    goes on where it was; the Japanese even goes on in the same line), and the original keeps its
    sprite text through it.  Starting the page over here lost the lines typed before the hide.
    A page that ends, or a new one typed from the first cell, starts over anyway. */
 void vwf_boxclear(void) {
-    for (int i = 10 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
+    for (int i = 12 * 32; i < 20 * 32; i++) BG1MAP[i] = 0;
     if (vs.mapped) text_colours(0);
     vs.mapped = 0;
     if (vs.mode != 2) vs.mode = 0;

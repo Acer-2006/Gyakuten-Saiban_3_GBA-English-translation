@@ -40,9 +40,9 @@ load an in-game save instead.
 
 ## What the English build changes
 
-* Variable-width English font (the DS font) in a three-line text box, with the DS English
-  version's text speed and text blips (every other letter, never on a space, on all three
-  lines).
+* Variable-width English font (the DS font), three lines in the original's text box (it covers
+  the scene exactly as the Japanese GBA's and the DS's boxes do), with the DS English version's
+  text speed and text blips (every other letter, never on a space, on all three lines).
 * The complete DS English script, including the choice-menu options, with its sound effects
   and its centred date and place cards and testimony titles.
 * English name tags from the DS version.
@@ -110,6 +110,17 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.68 — the text box is the original's again: 48 pixels, with the three lines 14 pixels
+  apart (the letters take 13 of them) and the page arrow beside the third line, as on the DS. It
+  hides exactly as much of the scene as the Japanese GBA's and the DS's boxes do; the 64-pixel
+  box of 0.16.8-0.16.67 hid 16 pixels more of every character (Pearl, the shortest, lost her
+  chin) and close-up. The name tag, the item shown in court, the episode select's box, the
+  Court Record's buttons and the full-screen box of a choice are the original's again too; the
+  arrows to the previous and next statement sit on the second line; Witness Testimony / Cross
+  Examination hang at the DS's height, 8 pixels lower than before (they had been raised to
+  clear the taller box). Saves and savestates from earlier builds keep working: a box, name tag
+  or item box they bring back in the old places is moved to the new ones when the game is
+  continued or the state is loaded.
 * 0.16.67 — Godot's Objection! in episode 3's second trial, over the flashback of Kudo at his
   table, no longer comes out as a block of garbage: the figure in that flashback had been moved
   into the bubble's sprite tiles (to keep it off the third line of text), so the two overwrote

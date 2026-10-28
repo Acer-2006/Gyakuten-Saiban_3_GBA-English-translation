@@ -118,23 +118,11 @@ BAR_MARKER_TESTS = (0x0801d33e, 0x0801d458, 0x0801d8be)   # ldrb r0, [r0]; cmp r
 MARKER_RESHOW = 0x080228ae          # movs r0, #0xfb; ldrb r1, [r5, #5]: a marker shown again
 MARKER_TABLE = 0x08049c50           # 12 bytes a marker: u32 picture, u16 bytes, ...
 
-# The item's box on BG1 (its frame is drawn from map row 1, column 1, around the 64x64 picture
-# at y 16) ended on row 10 with the 64-pixel text box, the name tag's top row, and cut the tag
-# in half.  Box and picture move up a row: the frame from row 0, the sprite at y 8.
-ITEM_FRAME_LIT = 0x08015998          # 0x030020c2: map shadow row 1, column 1 (0x080158ac's frame, left)
-ITEM_FRAME_LIT_R = 0x08015a7c        # 0x030020f8: row 1, column 28 (0x0801599c's frame, right, drawn leftward)
-ITEM_ERASE_LIT = 0x08015ab4          # 0x030020c0: the erase (0x08015a80) clears 10 rows from row 1
-ITEM_SPRITE_Y = (0x08015650, 0x080156f2)   # movs r0, #0x10: OAM 65's y while the item is shown (every frame, and once set)
-# A second, inline clear of the box's rows: when the item is taken down with the scene (the
-# routine at 0x08036130, which also hides OAM 65), `ldr r0, =0x03002080; adds r0, #0x40` and a
-# loop of 0x140 halfwords zero rows 1-10.  With the box a row up it has to start at row 0, or
-# the frame's top edge stays on screen.
-ITEM_CLEAR_ADD = 0x0803616e          # adds r0, #0x40 -> nop
-# The last step of the box's closing animation (box state 2, size 0): after the erase it clears
-# the corners of the smallest box by hand, `ldr r0, =0x03002080; adds r0, #0x42` (row 1, column 1)
-# and then offsets from there: columns 1-2 and 27-28 of rows 1 and 2.  With the box a row up those
-# are rows 0 and 1, or the top corners (tiles 0x30, 0x32) stay on row 0 as a short strip.
-ITEM_LAST_CLEAR = 0x08015560         # adds r0, #0x42 -> adds r0, #0x02
+# The item's box on BG1 (its frame drawn from map row 1, column 1, around the 64x64 picture at
+# y 16) is where the original has it, rows 1-10: from 0.16.12 to 0.16.67 it and the picture were a
+# row higher (rows 0-9, y 8; with its erase, the scene's inline clear at 0x0803616e and the last
+# step of the closing animation at 0x08015560 moved with them), because the 64-pixel text box of
+# those builds put the name tag on row 10.  The tag is on rows 12-13 again (src/vwf.c, BOX_TOP).
 
 def apply(rom, ctx):
     d, arm9 = ctx.data, ctx.arm9
@@ -143,16 +131,6 @@ def apply(rom, ctx):
     for a in ITEM_ATTR2:
         assert rom.u16(a) == 0x2084
         rom.w16(a, 0x2000 | ((0x1000 | ITEM_TILE) >> 5))
-    for a, old_lit in ((ITEM_FRAME_LIT, 0x030020c2), (ITEM_FRAME_LIT_R, 0x030020f8), (ITEM_ERASE_LIT, 0x030020c0)):
-        assert rom.u32(a) == old_lit, hex(a)
-        rom.w32(a, old_lit - 0x40)           # one map row up
-    for a in ITEM_SPRITE_Y:
-        assert rom.u16(a) == 0x2010, hex(a)
-        rom.w16(a, 0x2008)
-    assert rom.u16(ITEM_CLEAR_ADD) == 0x3040
-    rom.w16(ITEM_CLEAR_ADD, 0x46c0)          # nop: clear from row 0
-    assert rom.u16(ITEM_LAST_CLEAR) == 0x3042
-    rom.w16(ITEM_LAST_CLEAR, 0x3002)         # the corners from row 0
     for n, tile in MOVED_EFFECTS.items():
         e = ANIM_TABLE + 20 * n
         assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)

@@ -86,8 +86,9 @@ the shift). A line with no name tag puts the template back over the tag's rows (
 `TXT+0x23`, the box state, to 1 through `r4`, which the loop's first instructions set up) and
 `0x08021c8e`–`0x08021caa` (after a choice).
 
-Before a choice the box grows to the full screen a few rows a frame, and shrinks back after it:
-the engine copies the map rows up (or down) one row at a time.
+Before a choice the box grows to the full screen a row a frame, and shrinks back after it: the
+top edge goes a row higher each frame with interior rows under it, until it is on row 0 (the
+box's own rows, so a canvas mapped over them would be copied up with them: see `vwf_frame`).
 
 Page ends reset the text state in four places: `0x08021ab0` (wait for button), `0x08022622`
 (command `0x2e`), `0x0801fc00` (section initialisation) and `0x0801fa6c` (text reset).
@@ -101,9 +102,9 @@ entries 2–33 and the records stay as they are (the episode select clears the b
 episode is picked, with its prompt still on the page). The entries are at priority 1, under
 BG2: the Court Record's panel (priority 0) covers a choice's options while it is open, and the
 English build's sprite text uses the same priority. (The Record's button row, R Profiles, A OK,
-B Back, is sprites at y 96 on the original's name tag; the English page's first line, at y 102,
-is under it while the Record is open: 0.16.18 moved the page 8 px lower meanwhile, and 0.16.21
-put it back.) The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
+B Back, is sprites at y 96 on the name tag; the English page's first line, at y 115 in the original's
+box since 0.16.68, is clear of it (in the taller boxes before, it was under the row while the
+Record was open: 0.16.18 moved the page 8 px lower meanwhile, and 0.16.21 put it back).) The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
 on screen whose sprites start below `0x2c0` (the loader's test at `0x08014dca`; Armando's start at
 `0x284`) to `0x80` (`0x08014ddc`, attribute at `0x08014e9a`): the original's spare tiles of the item
 shown in court, the third line's here. While it is there `vwf_frame` moves the third line to
@@ -134,7 +135,7 @@ captions, the episode-select prompt (common section 2), phone calls and voices o
 screen, "To be continued". Some of these lines are shown with the box open (`0x1c 0`), a
 voice with no name tag: Mia's in episode 2's flashback, Adrian Andrews's "...*CRASH*...". The
 DS draws them on the box's own lines from the first (seen in DeSmuME, the US release), and so
-does the English build since 0.16.51 (`TEXT_Y0` + 16 · row while `box_open`); before, a one- or
+does the English build since 0.16.51 (`TEXT_Y0` + `BOX_PITCH` · row while `box_open`); before, a one- or
 two-line one took the engine's rows above, from the box's second line.
 
 Screens that are opened over the game (the save screen, ...) save the records and the text
@@ -187,16 +188,16 @@ stopped on again from the records. Two things change in the English build:
 A statement is a section of its own whose text ends in command `0x15` instead of a page end: the
 text stays up while the game waits for Press (L), Present (R) or the next statement (A). While
 it waits, two 16×16 sprites show the arrows to the previous and next statement: OAM entries 0
-and 1 at (0, 128) and (224, 128), OBJ tiles `0x1a0` and `0x1a4`, over the box's edge columns at
+and 1 at (0, 128) and (224, 128) (the English build: y 129), OBJ tiles `0x1a0` and `0x1a4`, over the box's edge columns at
 the height of the second line. The original's two lines start at x 9 and stay clear of them;
-the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide (the arrows on the second line, y 118, with the taller box)
+the English build lays a page that ends in `0x15` out from x 10 and up to 220 pixels wide (the arrows on the second line, y 129)
 (narrowing the letter spacing for longer lines, as for every line that does not fit), instead
 of from x 8 and up to 230 pixels (the DS's margin: its lines start 8 pixels inside its 256-wide
 box; measured on the DS, "No one's asking how you feel!" is 221 pixels on both).
 
 ## The page arrow and the third line
 
-The page arrow (OAM 2, a 16×16 sprite at x 229, y 139, sliding 2 pixels left and 1 right of it;
+The page arrow (OAM 2, a 16×16 sprite at x 229, y 148, sliding 2 pixels left and 1 right of it;
 the DS's, measured frame by frame) sits on the third line's row at the right of the box, as on the
 DS. The DS's box is 16 pixels wider, so a third line it ends well clear of its arrow can run on
 under ours: on a page that ends waiting for the A Button (`0x02`, `0x2d`), a third line whose pen
@@ -290,14 +291,14 @@ count keeps rows 0 and 1 only (`cmp r1, #1`).
   Yes / No in 40–41 and the choice cursor is 57) and places the lines by the rules above, taking the section, alignment and
   number of lines at the first character; the system messages are centred (the English lines
   have no padding) and start at y 56 with a 16-pixel pitch, under the save screen's header, and
-  a page with a third English line uses the three-line box's rows (y 102 + 16 · row). Only the OAM entries it has used are switched off again: the save screen
+  a page with a third English line uses the three-line box's rows (y 115 + 14 · row). Only the OAM entries it has used are switched off again: the save screen
   shows its Yes / No in entries 40 and 41. Likewise only the tiles of the lines a page writes on
   are cleared, each when its first character comes (`line_clean`): on the screen that announces
   a newly added episode the new box, at OBJ tile `0x398`, runs past the end of OBJ VRAM into
   tiles 0–23, the first line's, and the prompt under it is on the second and third lines.
   The episode select's box is the original's short one (top edge on map row 16, for the
   one-line prompts at y 134); while that two-line prompt is up, `select_box` grows it two rows
-  (top edge on row 14, around y 118 and 134) and puts it back for the next one-line page.
+  (top edge on row 14, the three-line box, the prompt at y 129 and 143) and puts it back for the next one-line page.
   A line wider than 222 pixels with leading spaces drops as many of their pixels as it takes
   to fit (`LBL_FIT`, `lbl_trim`): the episode endings' "THE END" is pushed right by spaces in
   the DS's script, which the DS's 256-pixel screen had room for, and on the GBA's it ran off
@@ -331,7 +332,7 @@ the old font area.
 
 | Site | Patch |
 | --- | --- |
-| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw: 1-bit glyph rows blitted at a pixel pen. The page is sprite text like the original's — three lines of eight 32×16 cells, OAM 3–26, OBJ tiles `0x00`–`0xbf` (the original's two lines take `0x00`–`0x7f`; the item shown in court, which had `0x80`–`0xbf`, is moved to `0x1e0` by `patches/icons.py`; the life bar, which goes to `0x84`–`0x9f` while a map marker is taken, does so only while a marker is shown (graphics.md, "Map markers"), and the third line then moves out of its way ("Where sprite text goes"); the effects that play over dialogue, such as the butterflies, start at `0xe0`, the continue arrow is at `0xf8` and the choice cursor at `0xfc`; effect `0xdd`, moved out of `0x80`, takes `0x100`–`0x1da`), the engine's sprite-text palette (OBJ palette 0: white 3, orange 6, blue 9, green 12, greys 13 / 2 / 14 / 1 for a line trailing off), shown while the box is open, under the Court Record's panel too. The box behind it is the engine's own (BG1, blended with the scene: text on it would take the scene's colour, and the original's never does, being sprites). A page that ends in a choice (`0x07`) is the exception: its question goes on a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..) mapped on BG1 rows 13–18 (the box's interior; its bottom edge, row 19, is the template's), so that it can move to the top rows when the box grows while the options take the sprite cells. BG1 blends with the scene (the box lets 7/16 of it through), so letters drawn on it took the colour of what was behind them; while the game has BG0 off (every choice page seen), the canvas tiles hold the letters alone and BG0 shows them over the box (see `0x0800673a` and `0x08000422` below), BG1's map shadow keeping the canvas entries and VRAM getting the box's own tiles in their place |
+| `0x0801f986` | `bl vwf_draw_char` instead of the sprite cell draw: 1-bit glyph rows blitted at a pixel pen. The page is sprite text like the original's — three lines of eight 32×16 cells, OAM 3–26, OBJ tiles `0x00`–`0xbf` (the original's two lines take `0x00`–`0x7f`; the item shown in court, which had `0x80`–`0xbf`, is moved to `0x1e0` by `patches/icons.py`; the life bar, which goes to `0x84`–`0x9f` while a map marker is taken, does so only while a marker is shown (graphics.md, "Map markers"), and the third line then moves out of its way ("Where sprite text goes"); the effects that play over dialogue, such as the butterflies, start at `0xe0`, the continue arrow is at `0xf8` and the choice cursor at `0xfc`; effect `0xdd`, moved out of `0x80`, takes `0x100`–`0x1da`), the engine's sprite-text palette (OBJ palette 0: white 3, orange 6, blue 9, green 12, greys 13 / 2 / 14 / 1 for a line trailing off), shown while the box is open, under the Court Record's panel too. The box behind it is the engine's own (BG1, blended with the scene: text on it would take the scene's colour, and the original's never does, being sprites). A page that ends in a choice (`0x07`) is the exception: its question goes on a 30×6-tile canvas in BG char block 0 (tiles `0xe0`..), over the box's six rows (14–19, its edges among them), so that it can move to the top rows when the box grows while the options take the sprite cells. BG1 blends with the scene (the box lets 7/16 of it through), so letters drawn on it took the colour of what was behind them; while the game has BG0 off (every choice page seen), the canvas tiles hold the letters alone and BG0 shows them: in the box over the box's rows, BG1 keeping the box as it is (the engine grows the box for the choice from its own rows, the top edge among them), and in the full-screen box at the top, mapped on BG1's map shadow with VRAM getting the box's own tiles in their place (see `0x0800673a` and `0x08000422` below). With BG0 in use the canvas is mapped on BG1 itself, the box's edges drawn into its first and last rows |
 | dispatch entry 1 (`0x08163b00`) | trampoline: `vwf_newline`, then the original handler `0x0802172d` |
 | `0x08021ab0`, `0x08022622`, `0x0801fc00`, `0x0801fa6c` | call `vwf_clear` before the original instructions |
 | `0x0800673a` | `ldr r0, [r2]; str r0, [r1]` (BG0CNT \| BG1CNT << 16 from the shadow at `0x03003a90`, right after the map DMAs) → `vwf_bgcnt`: while the choice question is on BG0, BG0's control (char block 0, map `0x0600e000`, BG1's priority: BG0 is drawn over BG1 at the same priority) and scroll (BG1's; at the top of the full-screen choice box 4 pixels lower, `Q_DROP`, since 0.16.48: the question's first line at y 21, clear of the penalty gauge, y 4–16 at the top right, which a long English first line ran under and touched at the original's y 17), BG0's map (the canvas entries where BG1's shadow has them) and BG1's canvas cells in VRAM put back to the box's tiles; `q_frame`, run at the end of `vwf_frame`, takes BG0 off the game's DMA meanwhile (SYS+0x1a bit 0) and sets both bits when the question goes, so that the game's own BG0 map and scroll go back. All of this runs in the vertical blank ahead of the game's own updates (the OAM DMA, the characters' tiles at `0x08005660` and after): it writes only what changed, a row at a time by DMA (a first version that rewrote twenty rows every frame took 23 scanlines and pushed the game's updates past the blank, and a character showed half updated at the top of the screen; with the cheaper canvas checks in `choice_frame` the whole update now ends around scanline 188 in a full-screen choice, against 206 before the question moved to BG0). A DMA from the cartridge always steps its source, so the zero for a fill is on the stack |
@@ -340,14 +341,10 @@ the old font area.
 | `0x08006686` | per-frame hook (`vwf_frame`) before the BG map DMA: places the page's sprite cells (or remaps the question canvas), handles caption / choice sprites, puts the box's bottom edge back where the engine writes its own arrow cells (row 19, columns 14–15, bobbing through the tile pairs `0x20`/`0x21` to `0x26`/`0x27`, each a row lower: the English arrow is the DS's, a solid white 9×9 triangle pointing right at the third line's rows, a 16×16 sprite at OBJ tiles `0xf8`–`0xfb` in the text's white (OBJ palette 0, entry 3: before 0.16.43 it took entry 8 of OBJ palette 2, which a Psyche-Lock sequence leaves pale blue-violet), x 229 at rest with its tip 2 pixels inside the box's right edge, sliding a pixel at a time three frames a step from one pixel right of its rest to two pixels left and back, an 18-frame cycle as measured on the DS; a caption, command `0x42 0`, shown in the open box gets it too since 0.16.50, where it had the original's, pointing down in the bottom edge) and clears them after the box has closed. While the box grows or shrinks around a choice, the rows the engine copies would show the canvas (the page) in every row it passes: when a canvas row is above the box's first text row, `box_moving` puts the template's tiles in place of every canvas row until the box has stopped (the original hides the text then too) |
 | `0x0801f960` | `bl` to a trampoline: the wait before the next character from `text_pace` (the DS English pace) |
 | `0x0801f9b0` | `bl` to a trampoline that calls `text_blip` (the DS English blips, on every row), then back to the loop |
-| `0x0803b844` | template rewritten to a three-line box: rows 12–19 = top edge, 6 interior rows, bottom: 64 pixels, the DS box's height, with the DS's 60 pixels between the border lines; the page's sprite lines start at y 102, 4 pixels below the top border as on the DS, and the page arrow sits 10 pixels above the bottom one |
-| `0x0800577a`, `0x08005784` | `0xe0 → 0xc0`: partial redraw starts two rows higher |
-| `0x08006678`, `0x0800667c` | name tag two rows up (`0x03002380`, `0x03002300`: rows 10–11) |
-| `0x08000eda` | WIN0V bottom 100 → 80: the item shown in court stays solid down to the tag's top |
+| `0x0803b844` | the template is the original's: the box on BG1 rows 14–19, 48 pixels, the name tag on rows 12–13. The page's three lines are 14 pixels apart from y 115 (`TEXT_Y0`, `BOX_PITCH`: the letters' ink takes rows 1–13 of their 16-pixel cells), 2 pixels under the top border's lines (y 112–113) and the last a pixel over the bottom one's (158–159); the page arrow beside the third line, y 148. From 0.1 to 0.16.7 the template was rewritten to a box a row taller (56 pixels), from 0.16.8 to 0.16.67 two rows (64, the DS box's height), with the name tag, the item box, the box clears and the episode select moved to match; those hid 8 and 16 pixels more of the scene than the original and the DS do. A save or save state from those builds is put right when it is continued or loaded (`box_rows_fix`, `old_layout`) |
 | `0x0802afd0`, `0x0802b50e` | `bl vwf_data_text` instead of `0x0801ecd4`: the episode 4 data screen's two pages (common sections `0x31`, `0x32`) in the English font, a few letters to a 16×16 sprite (OAM records from 37, tiles from `0x19c`), with the original's timing list; see graphics.md, "The escaped convict's data screen" |
-| `0x0800ebc8`, `0x0800ebfe` | the statement arrows' y 128 → 118, the second line |
-| `0x0800658c`, `0x08006596` | `0xc0 → 0xa0`: a line with no name tag puts the template back from row 10 |
-| `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 10–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice). A page of sprite text is not started over by it: `0x1c 1` can hide the box in the middle of a page (14 pages in both the Japanese and the DS script, for an animation; the Japanese sometimes goes on in the same line after `0x1c 0`), and the original keeps its sprite text through the hide, so the page's lines come back with the box |
+| `0x0800ebc8`, `0x0800ebfe` | the statement arrows' y 128 → 129, the second line |
+| `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 12–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice). A page of sprite text is not started over by it: `0x1c 1` can hide the box in the middle of a page (14 pages in both the Japanese and the DS script, for an animation; the Japanese sometimes goes on in the same line after `0x1c 0`), and the original keeps its sprite text through the hide, so the page's lines come back with the box |
 | BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
 | `0x0800bcc4`, `0x08014464` | `bl` to a trampoline that calls `vwf_restore` (drops the sprite text of the screen that is closing) and then `0x08020024`; at `0x0800bcc4` (the save screen closing) `patches/ui.py` first puts back the BG tiles its header borrowed (`hdr_close`, see graphics.md, "Save screen") |
 | `0x0800b636` (the save screen opening; `patches/ui.py`, with `hdr_game`) | `vwf_overlay`: the page's sprite text is hidden until `vwf_restore`, a page start or a box clear (a choice's options were drawn over the save screen) |
