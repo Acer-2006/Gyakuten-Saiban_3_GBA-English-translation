@@ -16,7 +16,8 @@ descriptions no letters touch.  Since 0.16.73 a last build step (court_record.cl
 choose_clear) sets the others again: other line breaks, a line spacing of 13 for one or two
 lines (the first line a row higher, or a gap a row wider), word gaps a pixel narrower, or a line
 moved a pixel or two sideways, whichever is cheapest; that leaves one of the 188 (the second Key
-Card) with a tail touching a letter, in three columns.
+Card) with a tail touching a letter, in three columns, which since 0.16.76 has a gap of 14 rows
+(court_record.SPACED, tops_variants' steps).
 
 A description that does not fit in four lines that way gets its word gaps narrowed (to 4, then 3
 pixels), and then a word hyphenated where HYPHENS allows; with the US DS text, two need the first

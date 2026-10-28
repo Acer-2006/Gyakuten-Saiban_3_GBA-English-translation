@@ -164,8 +164,8 @@ p, y or comma still touched a letter of the next line; since 0.16.73 a last buil
 of: other line breaks, one or two of the gaps 13 rows instead of 12 (a gap a row wider, or the
 first line a row higher, kept off the name), word gaps a pixel narrower (three lines then fit
 for some, 16 rows apart), or one line moved a pixel or two sideways (6 of them). The second Key
-Card ("Opens" over "CEO's") still touches, in three columns: no such layout of its text avoids
-it. The renderer's marks a row lower (text-engine.md, "Lines 14 pixels apart") would not help
+Card (the p of "Opens" over the E of "CEO's") touched in three columns in every such layout
+of its text; since 0.16.76 it has a gap two rows wider (see below), and no description touches. The renderer's marks a row lower (text-engine.md, "Lines 14 pixels apart") would not help
 here: 12 rows apart the marks meet the tails of the line above either way, and lowering them
 makes one more description touch.
 
@@ -183,11 +183,19 @@ A description can also be given its line breaks (`court_record.BREAKS`, since 0.
 the chosen ones split a phrase: the profile named "??????" (item 166), "Morgan Fey's /
 daughter and Iris's twin / sister. ..." in 0.16.73, is set "Morgan Fey's daughter / and Iris's
 twin sister. / Her father deals / in jewelry apparently.". The given lines go through the same
-search, which for these may also make a gap a row narrower or two rows wider (`BREAK_STEPS`;
+search, which for these may also make a gap a row narrower or two rows wider (`LINE_STEPS`;
 `dsdesc.tops_variants`): the tail of the g of "Morgan" is over the I of "Iris's", so the lines
 are 14, 11 and 11 rows apart (tops 14, 28, 39, 50; the second and third lines have nothing below
 the baseline, so 11 rows still leaves a clear row), with full word gaps and no line moved
 sideways. Its picture is stored after Pearl Fey's.
+
+The same spacing is used for the second Key Card (item 54; `court_record.SPACED`, since 0.16.76),
+its line breaks chosen as before ("Found in Ron's wallet. / Opens the KB Security / CEO's office.
+Leaves / a record when used."): the gap under the second line is 14 rows (13 in 0.16.73, 12
+before; tops 14, 26, 40, 52), so the tail of the p of "Opens" clears the E of "CEO's"; the last
+line has nothing below the baseline, so it still ends inside the panel. With that no description
+in the Court Record has letters of two lines touching. Its picture is stored after the "??????"
+profile's (`court_record.LATE`).
 
 ### Icons
 
