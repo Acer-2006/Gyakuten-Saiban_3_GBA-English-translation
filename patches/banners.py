@@ -37,6 +37,9 @@ whole banner in 0x240 too, right half first, so that it has the same tiles as th
 takes over from them.  The testimony banners keep two palettes (four from OBJ palette 11 would
 reach the witness's), so their flash is drawn into the pictures; Unlock Successful flashes
 through the DS's four palettes.
+
+Since 0.16.71 the pieces that slide in and out are the banner's two lines, as on the DS, not its
+halves: lines(), applied last, below.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -206,6 +209,8 @@ def label(rom, data):
         raise SystemExit(f'banners: unexpected DS testimony label palette at data.bin {DS_LABEL_PAL_EN:#x}')
     rom.w16(LABEL_PAL + 6, en[3])
 
+INSTALLED = {}     # (banner, role) -> the frame data apply() put in the animation entries
+
 def apply(rom, ctx):
     total = 0
     for names, gba_pals in ((('testimony', 'cross'), [0, 4]), (('unlock',), [0, 1, 2, 3])):
@@ -218,9 +223,130 @@ def apply(rom, ctx):
                 if len(es) != count or any(rom.u32(e + 4) != OLD_VRAM[role] or rom.u16(e + 14) != 60 for e in es):
                     raise SystemExit(f'banners: unexpected animation entries for the {n} banner')
                 fp = rom.store(new, 'ext', 4, f'{n} banner frames')
+                INSTALLED[(n, role)] = fp
                 for e in es:
                     rom.w32(e, arch); rom.w32(e + 4, vram); rom.w32(e + 8, fp)
                     rom.write(e + 17, bytes([2 if role == 0 else 1]), f'{n} banner sprites')
     label(rom, ctx.data)
     print(f"  banners: Witness Testimony / Cross Examination and Unlock Successful from the DS ({total} bytes), "
           f"the Testimony label")
+
+
+# The pieces that slide in and out are the banner's two lines, as on the DS (0.16.71).  Until then
+# they were its left and right halves, as the original's are (証言 | 開始): the engine slides them
+# in from the sides and, at the end, across each other (Witness Testimony) or up and down (Cross
+# Examination, Unlock Successful), and with the English lettering that cut "Witness" and
+# "Testimony" down the middle while they moved.  The DS moves its pieces the same way with the
+# same steps (its code at arm9 0x0202e074, 0x0202e53c and 0x02087dcc does what 0x0800e788,
+# 0x0800e9b8 and 0x0801a360 do: 10 pixels a frame in, then 1 to 12 a frame across, or 7 a frame
+# up and down), but they are the lines: "Witness" comes in from the left and leaves to the right,
+# "Testimony" the other way; "Cross" and "Unlock" leave upwards, "Examination" and "Successful"
+# downwards.  Its frame data for the lines (data.bin 0x71fb24, 0x71fb58, 0x71fb8c, 0x71fbb8,
+# 0x74307c, 0x7430b4, after each banner's) split every banner LINE_SPLIT rows below its anchor,
+# and no sprite of its whole banners' frames crosses that row but one (a sheen piece of Witness
+# Testimony, whose rows are split there too).  So every picture is composed twice, its rows above
+# and below that split, each shrunk as the whole is, and each line is a 128x32 strip (two 64x32
+# sprites) placed where it is in the banner; the strips of the two lines may share rows (Unlock
+# Successful's do).  The left piece (from x 0) is the first line, in OBJ tiles 0x280-0x2bf, the
+# right piece the second, in 0x240-0x27f, and the whole banner is the four strips with the second
+# line's first, so that the tiles are the same whichever is up.  Applied last: the earlier
+# pictures stay where they were (a save state can hold a pointer to them), unused.
+LINE_SPLIT = 16
+PADR = 16          # rows of room above and below the canvas while the strips are cut
+RECT = dspic.SHAPE[(64, 32)] << 12
+
+def compose_part(data, cells, sprites, hi, part):
+    """compose() of one line: the rows of the sprites above the split (part 0) or from it (1)."""
+    px = [[0] * 256 for _ in range(192)]
+    for x, y, w, h, c, attr in sprites:
+        g = dspic.tiles_to_rows(dspic.unrle16(data, cells[c], w * h // 2), w, h)
+        k = 16 * ds_palette(attr, hi)
+        for yy in range(h):
+            if (y + yy >= LINE_SPLIT) != bool(part): continue
+            row, src = px[96 + y + yy], g[yy]
+            for xx in range(w):
+                if src[xx]: row[128 + x + xx] = k + src[xx]
+    return px
+
+def shrink_part(b, px, win, pal):
+    """shrink() onto a canvas PADR rows taller at the top and the bottom."""
+    x0, y0, x1, y1 = win
+    s = min(W / (x1 - x0), H / (y1 - y0))
+    tw, th = round((x1 - x0) * s), round((y1 - y0) * s)
+    allpal = [v for p in b['pals'] for v in p]
+    img = dspic.shrink([r[x0:x1] for r in px[y0:y1]], allpal, tw, th)
+    q = dspic.quantize(img, pal, range(1, 16))
+    return dspic.grid(q, (W - tw) // 2, (H - th) // 2 + PADR, W, H + 2 * PADR)
+
+def build_lines(rom, ctx, names, gba_pals):
+    """build(), with the two lines as the pieces: {name: (whole, first line, second line) frame
+    data}, sub-archive"""
+    data = ctx.data
+    bs = {n: ds_banner(data, n) for n in names}
+    win = window(bs.values())
+    TOP = min(top_offset(win), clear_of_box(win))
+    npal, flag, pals_, ds_cells = dspic.sub_archive(data, DS[names[0]][0])
+    parts = {}
+    for n in names:
+        b = bs[n]
+        pal = b['pals'][b['base']]
+        for off, sp in b['defs'].items():
+            parts[(n, off)] = [shrink_part(b, compose_part(data, ds_cells, sp, b['hi'], k), win, pal) for k in (0, 1)]
+    rows = lambda c: [y for y in range(len(c)) if any(c[y])]
+    r0 = [y for (n, off), (a, _) in parts.items() for y in rows(a)]
+    r1 = [y for (n, off), (_, c) in parts.items() for y in rows(c)]
+    s0, s1 = max(r0) + 1 - 32, min(r1)          # each line's strip: its first row in the canvas
+    if min(r0) < s0 or max(r1) >= s1 + 32:
+        raise SystemExit(f'banners: a line of {names} does not fit 32 rows')
+    y0, y1 = TOP + s0 - PADR, TOP + s1 - PADR    # the strips' rows from the anchor
+    cells, frames = [], {}
+    def cell(c):
+        if c not in cells: cells.append(c)
+        return cells.index(c)
+    def strips(two):
+        a, c = two
+        return [dspic.rle16(dspic.rows_to_tiles(c, x, s1, 64, 32)) for x in (0, 64)] + \
+               [dspic.rle16(dspic.rows_to_tiles(a, x, s0, 64, 32)) for x in (0, 64)]
+    for n in names:
+        b = bs[n]
+        bits = gba_pals.index(b['base']) << 11 if not HI[n] else 0
+        plain = strips(parts[(n, b['plain'])])
+        lists = {}
+        for off, sp in b['defs'].items():
+            ks = {ds_palette(a, b['hi']) for *_, a in sp}
+            k = ks.pop() if len(ks) == 1 else None
+            same = [q[:5] for q in sp] == [q[:5] for q in b['defs'][b['plain']]]
+            if HI[n] and same and k is not None and k in gba_pals:
+                st, attr = plain, gba_pals.index(k) << 10     # the DS's palette flash
+            else:
+                st, attr = (strips(parts[(n, off)]) if off != b['plain'] else plain), bits
+            lists[off] = [(-64, y1, 64, 32, cell(st[0]), RECT | attr), (0, y1, 64, 32, cell(st[1]), RECT | attr),
+                          (-64, y0, 64, 32, cell(st[2]), RECT | attr), (0, y0, 64, 32, cell(st[3]), RECT | attr)]
+        fl = [(off, HI[n] | (t & 0xff)) for off, t in b['fl']]
+        held = [(0, HI[n] | 1), (0, HI[n] | 0xff)]
+        frames[n] = (dspic.write_frames(fl, lists),
+                     dspic.write_frames(held, {0: [(-64, y0, 64, 32, cell(plain[2]), RECT | bits),
+                                                   (0, y0, 64, 32, cell(plain[3]), RECT | bits)]}),
+                     dspic.write_frames(held, {0: [(-64, y1, 64, 32, cell(plain[0]), RECT | bits),
+                                                   (0, y1, 64, 32, cell(plain[1]), RECT | bits)]}))
+    b0 = bs[names[0]]
+    sub = dspic.write_sub(len(gba_pals), 0x8000, [[0] + b0['pals'][k][1:] for k in gba_pals], cells)
+    return frames, sub
+
+def lines(rom, ctx):
+    """Applied last: the banners again with their lines as the sliding pieces (see above)."""
+    total = 0
+    for names, gba_pals in ((('testimony', 'cross'), [0, 4]), (('unlock',), [0, 1, 2, 3])):
+        frames, sub = build_lines(rom, ctx, names, gba_pals)
+        arch = rom.store(sub, 'ext', 4, ' / '.join(names) + ' banner, by line')
+        total += len(sub)
+        for n in names:
+            for role, new in enumerate(frames[n]):
+                es = effect_entries(rom, [INSTALLED[(n, role)]])
+                if len(es) != ENTRIES[n][role]:
+                    raise SystemExit(f'banners: unexpected animation entries for the {n} banner')
+                fp = rom.store(new, 'ext', 4, f'{n} banner frames, by line')
+                for e in es:
+                    rom.w32(e, arch); rom.w32(e + 8, fp)
+                    rom.write(e + 17, bytes([4 if role == 0 else 2]), f'{n} banner sprites')
+    print(f"  banners: the lines slide in and out, as on the DS ({total} bytes)")

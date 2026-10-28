@@ -465,6 +465,28 @@ the DS's 23 (lettering y 46–91). The testimony banners keep two palettes, so t
 from OBJ palette 11 would reach the witness's 14); Unlock Successful flashes through the DS's
 four palettes, as the original's did. The frames keep the DS's timing.
 
+Since 0.16.71 the pieces that slide are the banner's two lines, as on the DS (`lines()`, a last
+build step), not its left and right halves, which cut "Witness" and "Testimony" down the middle
+while they moved. The DS's code for the three banners (arm9 `0x0202e074`, `0x0202e53c`,
+`0x02087dcc`) moves its two pieces as the GBA's (`0x0800e788`, `0x0800e9b8`, `0x0801a360`)
+moves the halves, with the same steps: 10 pixels a frame in from the sides, then across each
+other at 1 to 12 pixels a frame (Witness Testimony) or 7 a frame up and down. Its pieces are the
+lines (frame data `0x71fb24` / `0x71fb58`, `0x71fb8c` / `0x71fbb8`, `0x74307c` / `0x7430b4`):
+Witness, Cross and Unlock come in from the left and Testimony, Examination and Successful from
+the right; at the end Witness leaves to the right and Testimony to the left, Cross and Unlock go
+up and Examination and Successful down. Every DS banner splits 16 rows below its anchor (only a
+sheen piece of Witness Testimony crosses that row, and is split there too). The build composes
+each picture twice, the rows above that split and the rows from it, shrinks both as the whole is
+shrunk, and cuts each line into a 128×32 strip of two 64×32 sprites, placed where the line is in
+the banner: the first line (the left piece, from x 0) in OBJ tiles `0x280`–`0x2bf`, the second
+(the right piece, from x 240) in `0x240`–`0x27f`, and the whole banner the four sprites with the
+second line's first, so that the tiles are the same whichever is up. The whole banner takes four
+sprites (the original's three, Unlock Successful's four) and a line two (a half took one). The
+halves of 0.16.70 stay in the ROM, unused: a save state made while a banner was up points at
+them. When Unlock Successful starts to leave, the DS puts Successful 18 rows lower first (y 94
+instead of its anchor's 76) if a flag of the scene is set; the GBA's code keeps both at the
+anchor, and so does the English build.
+
 **Speech bubbles** (異議あり！, 待った！, くらえ！): sub-archives `0x28e4`, `0x3c44`, `0x4e24`,
 one palette each (1 white, 2 red, 3–4 darker reds, 5 bubble outline, 6 grey, 7 light red),
 one frame of 7 cells (32×64, two 64×64, 32×64, three 32×16; 216 tiles at OBJ tile `0x1e8`,

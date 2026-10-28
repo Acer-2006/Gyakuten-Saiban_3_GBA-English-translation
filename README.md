@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.71 — the Witness Testimony, Cross Examination and Unlock Successful banners slide in and
+  out by line, as on the DS: Witness, Cross and Unlock come in from the left and Testimony,
+  Examination and Successful from the right, and at the end Witness and Testimony slide past
+  each other while the other two banners split up and down. Until now the pieces were the
+  banner's left and right halves, as in the Japanese original, which cut the English words down
+  the middle while they moved. The timing and the held banner are as before.
 * 0.16.70 — presenting evidence: for the one frame between the evidence's icon coming in and
   the page going, the page stays whole (0.16.69 dropped its third line a frame early), and then
   all of it goes at once, as in the original and on the DS. The page arrow is back at the

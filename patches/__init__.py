@@ -22,3 +22,4 @@ def apply_all(rom, ctx):
     court_record.add_ages(rom, ctx)
     shouts.settle(rom)
     icons.present_icon(rom)
+    banners.lines(rom, ctx)
