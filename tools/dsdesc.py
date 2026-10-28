@@ -109,18 +109,32 @@ def hyphenated(us):
             if u[:1].isupper(): a = a.capitalize()
             yield us[:i] + [a + '-', u[len(a):]] + us[i + 1:], i
 
-def splits(us, n, fits, hy=None):
+def splits(us, n, fits, hy=None, must=()):
     """Every way to cut the units into n lines that fit -> lists of line strings.  hy: the index of
-    the first half of a hyphenated word, which has to end its line."""
+    the first half of a hyphenated word, which has to end its line.  must: the indices of the units
+    that have to begin a line (breaks)."""
     if n == 1:
         line = ' '.join(us)
-        if us and hy is None and fits(line): yield [line]
+        if us and hy is None and not must and fits(line): yield [line]
         return
     for k in range(1, len(us) - n + 2):
+        if must and k > must[0]: break
         line = ' '.join(us[:k])
         if not fits(line) or (hy is not None and hy < k - 1): break
-        for tail in splits(us[k:], n - 1, fits, None if hy is None or hy == k - 1 else hy - k):
+        for tail in splits(us[k:], n - 1, fits, None if hy is None or hy == k - 1 else hy - k,
+                           tuple(b - k for b in must if b > k)):
             yield [line] + tail
+
+def breaks(text, first):
+    """The indices of the units that begin a line, for a text that has to begin with the lines
+    `first` (court_record.BREAKS) -> (indices), () if first is empty."""
+    if not first: return ()
+    if not text.startswith(' '.join(first) + ' '):
+        raise SystemExit(f'dsdesc: the description does not begin with the lines {first}')
+    out, k = [], 0
+    for line in first:
+        k += len(units(line)); out.append(k)
+    return tuple(out)
 
 def clash(upper, lower, pitch):
     """(overlapping pixels, columns where letters touch) of two lines' masks, the lower `pitch`
@@ -151,18 +165,18 @@ def touches(font, lines, tops, w, x0, word_cut, shifts=None):
         n += sum(clash(ms[k], ms[k + 1], tops[k + 1] - tops[k]))
     return n
 
-def tops_variants(tops, bottom, last_row):
-    """The line tops with the first line a row higher and / or a gap a row wider, the last line's
-    ink (down to its row `last_row`) still above `bottom`; the given tops first.
-    -> [(rows changed, tops)]"""
+def tops_variants(tops, bottom, last_row, steps=(0, 1)):
+    """The line tops with the first line a row higher and / or a gap changed by one of `steps`
+    rows (a row wider), the last line's ink (down to its row `last_row`) still above `bottom`; the
+    given tops first.  -> [(rows changed, tops)]"""
     out = []
     n = len(tops)
     for up in (0, 1):
-        for wider in itertools.product((0, 1), repeat=n - 1):
+        for wider in itertools.product(steps, repeat=n - 1):
             t = [tops[0] - up]
             for k in range(1, n):
                 t.append(t[-1] + tops[k] - tops[k - 1] + wider[k - 1])
-            if t[-1] + last_row <= bottom: out.append((up + sum(wider), tuple(t)))
+            if t[-1] + last_row <= bottom: out.append((up + sum(map(abs, wider)), tuple(t)))
     return sorted(out)
 
 # what choose_clear weighs, against cost(): a line spacing a row wider (or the first line a row
@@ -181,7 +195,7 @@ def _moved(m, s):
     """Column masks moved s columns right (left if negative)."""
     return [0] * s + m[:len(m) - s] if s >= 0 else m[-s:] + [0] * -s
 
-def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom):
+def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom, first=(), steps=(0, 1)):
     """choose(), with no letters of two lines touching where that can be had.  The lines choose()
     gives stay as they are when they touch nothing.  Otherwise every way to break the text into
     lines (at each word gap narrowing, choose()'s line count for it) is tried with the lines'
@@ -190,25 +204,26 @@ def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom):
     line moved a pixel or two sideways (SHIFTS), and of those that touch nothing the cheapest is
     taken: cost(), W_MOVED a row moved, W_CUT the square of the pixels of word gap taken out,
     W_SHIFT a pixel moved sideways.  If none touches nothing, the lines (none moved sideways)
-    with the fewest touching columns.  -> (lines, tops, word_cut, shifts or None)"""
-    lines, tops, cut = choose(font, text, maxw, name_masks, x0, layouts)
+    with the fewest touching columns.  first: see choose; steps: the rows a gap between lines may
+    change by (tops_variants).  -> (lines, tops, word_cut, shifts or None)"""
+    lines, tops, cut = choose(font, text, maxw, name_masks, x0, layouts, first)
     w = len(name_masks)
     if lines is None or not touches(font, lines, tops, w, x0, cut):
         return lines, tops, cut, None
-    us = units(text)
+    us, must = units(text), breaks(text, first)
     best = None
     fewest = (touches(font, lines, tops, w, x0, cut), 0, 0), lines, tops, cut, None
     for word_cut in (0, 1, 2):
         def fits(line): return font.width(line, word_cut) <= maxw
-        for cand_units, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 else []):
+        for cand_units, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 and not must else []):
             for n in sorted(layouts):
-                cands = list(splits(cand_units, n, fits, hy))
+                cands = list(splits(cand_units, n, fits, hy, must))
                 if not cands: continue
                 for c in cands:
                     base = cost(font, c, layouts[n], maxw, name_masks, x0, word_cut) + W_CUT * word_cut * word_cut
                     ms = [font.masks(l, x0, w, word_cut) for l in c]
                     room = [(-x0, x0 + maxw + 1 - (x0 + font.width(l, word_cut))) for l in c]
-                    for moved, t in tops_variants(layouts[n], bottom, last_row(font, c[-1], x0, w, word_cut)):
+                    for moved, t in tops_variants(layouts[n], bottom, last_row(font, c[-1], x0, w, word_cut), steps):
                         for j in range(n):
                             for s in SHIFTS:
                                 if not room[j][0] <= s <= room[j][1]: continue
@@ -229,15 +244,15 @@ def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom):
     if best: return best[1:]
     return fewest[1:]
 
-def choose(font, text, maxw, name_masks, x0, layouts):
+def choose(font, text, maxw, name_masks, x0, layouts, first=()):
     """-> (lines, tops, word_cut): the description's lines and the panel row of each line's top.
-    layouts: {line count: tops}."""
-    us = units(text)
+    layouts: {line count: tops}.  first: lines the text has to begin with (court_record.BREAKS)."""
+    us, must = units(text), breaks(text, first)
     for word_cut in (0, 1, 2):
         def fits(line): return font.width(line, word_cut) <= maxw
-        for cand_units, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 else []):
+        for cand_units, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 and not must else []):
             for n in sorted(layouts):
-                cands = list(splits(cand_units, n, fits, hy))
+                cands = list(splits(cand_units, n, fits, hy, must))
                 if not cands: continue
                 tops = layouts[n]
                 return min(cands, key=lambda c: cost(font, c, tops, maxw, name_masks, x0, word_cut)), tops, word_cut

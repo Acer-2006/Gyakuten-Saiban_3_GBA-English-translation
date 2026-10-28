@@ -202,15 +202,16 @@ def name_offset(img):
     xs = [x for x in range(W_USE) if any(img[y][x] == TITLE for y in range(16))]
     return xs[0] - (W_USE - (xs[-1] - xs[0] + 1)) // 2 if xs else 0
 
-def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False, clear=False):
+def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False, clear=False, first=()):
     """name_px: 16 rows of the DS name texture (text = index 2); age: the profile's age, put after
     the name in the NameFont `names` (long_name: see name_columns).  The description's lines are
     chosen against the name line, centred.  nudge: the lines are the ones chosen against the name
     alone (as before the ages), and the name line (with the age) moves off the centre (NUDGES)
     until no letter of it touches them; only if that cannot be done are the lines chosen again
     for each place of the name line.  clear: lines that touch each other are chosen again
-    (dsdesc.choose_clear).  -> (64 rows x 160 indices, the word gap narrowing), or (None, None)
-    when the text (or the name with the age) does not fit."""
+    (dsdesc.choose_clear).  first: the lines the description begins with (BREAKS).  -> (64 rows
+    x 160 indices, the word gap narrowing), or (None, None) when the text (or the name with the
+    age) does not fit."""
     cols = name_columns(name_px, age, names, long_name)
     if cols is None: return None, None
     def ink(line, dx):
@@ -224,8 +225,9 @@ def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False
     def lay(img):
         nm = [sum(1 << y for y in range(H) if img[y][x] == TITLE) for x in range(W)]
         if clear:
-            return dsdesc.choose_clear(font, text, TEXT_W, nm, TEXT_X, LINES, H - 1)
-        return dsdesc.choose(font, text, TEXT_W, nm, TEXT_X, LINES) + (None,)
+            return dsdesc.choose_clear(font, text, TEXT_W, nm, TEXT_X, LINES, H - 1, first,
+                                       BREAK_STEPS if first else (0, 1))
+        return dsdesc.choose(font, text, TEXT_W, nm, TEXT_X, LINES, first) + (None,)
     def draw(dx, layout=None):
         img = ink(cols, dx)
         if img is None: return None
@@ -353,14 +355,24 @@ def add_ages(rom, ctx):
 # the g and l of "amazingly" (0.16.74).  Only there: the others are left as they are.
 STEM_GAPS = {20}
 
-def final_panel(i, name_px, text, font, names, clear=False):
-    """The panel apply() and add_ages() leave for item i (clear: see panel)."""
+# Descriptions whose lines are given, where the lines the build chose split what reads as one
+# phrase: the profile named "??????" (item 166) had "Morgan Fey's / daughter and Iris's twin /
+# sister." (0.16.75).  The lines are set the same way as the others (clear_lines), only their
+# breaks are these, and a gap between two of them may also be a row narrower (where nothing of the
+# line above goes below the baseline) or two rows wider (BREAK_STEPS): with the tail of the g of
+# "Morgan" over the I of "Iris's", item 166 has its lines 14, 11 and 11 rows apart.  New entries
+# go at the end (clear_lines stores them in this order).
+BREAKS = {166: ("Morgan Fey's daughter", "and Iris's twin sister.", "Her father deals")}
+BREAK_STEPS = (0, 1, -1, 2)
+
+def final_panel(i, name_px, text, font, names, clear=False, first=()):
+    """The panel apply() and add_ages() leave for item i (clear, first: see panel)."""
     if i in AGES:
-        img, _ = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i), nudge=True, clear=clear)
+        img, _ = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i), nudge=True, clear=clear, first=first)
         if img is not None: return img
-    img, _ = panel(name_px, text, font, clear=clear)
+    img, _ = panel(name_px, text, font, clear=clear, first=first)
     if img is not None and i not in AGES and touching(img):
-        img, _ = panel(name_px, text, font, nudge=True, clear=clear)
+        img, _ = panel(name_px, text, font, nudge=True, clear=clear, first=first)
     return img
 
 def clear_lines(rom, ctx):
@@ -372,8 +384,9 @@ def clear_lines(rom, ctx):
     first line a row higher, or a gap a row wider), word gaps a pixel narrower or a line moved a
     pixel or two sideways, whichever costs least; one (54) has no such layout and keeps three
     touching columns.  The descriptions in STEM_GAPS are set with the wider gap between straight
-    sides (since 0.16.74).  Applied last, like add_ages(), so that the pictures stored before stay
-    where they are; the other panels are left alone."""
+    sides (since 0.16.74), and those in BREAKS with the lines given there (since 0.16.75).  Applied
+    last, like add_ages(), so that the pictures stored before stay where they are; the other
+    panels are left alone."""
     d, arm9 = ctx.data, ctx.arm9
     font = dsdesc.Font(d, arm9)
     stems = dsdesc.Font(d, arm9, stem_gap=True)
@@ -391,12 +404,15 @@ def clear_lines(rom, ctx):
         rom.w32(GBA_ITEMS + 8 * i, stored[data])
         changed.append(i)
         if touching(after): still.append(i)
-    # after the others, so that the pictures above keep the addresses they had in 0.16.73 (the
-    # picture of these there stays in its place, unused)
-    for i in sorted(STEM_GAPS):
+    # after the others, in the order they came (STEM_GAPS in 0.16.74, then BREAKS), so that the
+    # pictures above keep the addresses they had before (the picture of these there stays in its
+    # place, unused)
+    for i in [*sorted(STEM_GAPS), *(k for k in BREAKS if k not in STEM_GAPS)]:
         name_px, text = ctx.court_inputs[i]
-        after = final_panel(i, name_px, text, stems, names, clear=True)
-        if after is None: continue
-        rom.w32(GBA_ITEMS + 8 * i, rom.store(lz.compress(cells(after)), 'ext', 4, f'court record {i} (straight sides)'))
+        after = final_panel(i, name_px, text, stems if i in STEM_GAPS else font, names, clear=True,
+                            first=BREAKS.get(i, ()))
+        if after is None: raise SystemExit(f'court record: item {i} does not fit')
+        why = 'straight sides' if i in STEM_GAPS else 'line breaks'
+        rom.w32(GBA_ITEMS + 8 * i, rom.store(lz.compress(cells(after)), 'ext', 4, f'court record {i} ({why})'))
     print(f"  court record: the lines of {changed} set again so that fewer letters touch ({len(stored)} pictures)" +
           (f"; name touching: {still}" if still else ''))

@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.75 — The Court Record profile named "??????": its lines broke in the middle of "Morgan
+  Fey's daughter" and before "sister.", and are now "Morgan Fey's daughter / and Iris's twin
+  sister. / Her father deals / in jewelry apparently." (same words). The gap under the first line
+  is two pixels wider and the two below it a pixel narrower, so that no letters touch, the word
+  gaps stay full and no line is moved sideways. Only this profile changes.
 * 0.16.74 — Pearl Fey's first profile in the Court Record: the g and l of "amazingly" (and the
   nn of "channeling") were a pixel apart and read as one thick stroke; letters whose straight
   sides face each other now have the DS's two pixels between them there, and the description is

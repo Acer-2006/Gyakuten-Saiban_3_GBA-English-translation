@@ -179,6 +179,16 @@ abilities.", its second line a pixel to the right, and no letters of two lines t
 the y of "prodigy" still touched "amazingly"). Its picture is stored after the others, which
 keep the addresses they had.
 
+A description can also be given its line breaks (`court_record.BREAKS`, since 0.16.75), where
+the chosen ones split a phrase: the profile named "??????" (item 166), "Morgan Fey's /
+daughter and Iris's twin / sister. ..." in 0.16.73, is set "Morgan Fey's daughter / and Iris's
+twin sister. / Her father deals / in jewelry apparently.". The given lines go through the same
+search, which for these may also make a gap a row narrower or two rows wider (`BREAK_STEPS`;
+`dsdesc.tops_variants`): the tail of the g of "Morgan" is over the I of "Iris's", so the lines
+are 14, 11 and 11 rows apart (tops 14, 28, 39, 50; the second and third lines have nothing below
+the baseline, so 11 rows still leaves a clear row), with full word gaps and no line moved
+sideways. Its picture is stored after Pearl Fey's.
+
 ### Icons
 
 The picture in the Court Record's left box, the item shown in court (top left, kept solid by
