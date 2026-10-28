@@ -222,3 +222,19 @@ def keep_cursor(rom, ctx):
     for lit in CURSOR_LITS:
         assert rom.u32(lit) == CURSOR_PICTURE, hex(lit)
         rom.w32(lit, addr)
+
+
+# Evidence presented shows its icon at the top middle of the screen (OAM 52), DMA'd to OBJ tiles
+# 0x80-0xbf, the third line's, while the frame is drawn with the page still up: in that one frame
+# the third line showed the icon's tiles as garbage (src/vwf.c, vwf_icon).  Both routines that
+# load it (the Court Record's item, 0x08014690; a fixed picture, 0x08036b9c) call vwf_icon before
+# they decompress it.  Applied last, so that nothing before it moves.
+ICON_LOADS = (0x08014690, 0x08036b9c)   # bl 0x0803a048 (LZ to 0x0200afc0), then the DMA to 0x06011000
+ICON_UNPACK = 0x0803a048
+
+def present_icon(rom):
+    from .text import call_hook
+    for site in ICON_LOADS:
+        if rom.read(site, 4) != rom.asm_thumb(site, f'bl #{ICON_UNPACK:#x}'):
+            raise SystemExit(f'icons: unexpected code where the presented icon is unpacked ({site:#x})')
+        call_hook(rom, site, rom.syms['vwf_icon'], f'bl #{ICON_UNPACK:#x}', 'present icon', keep=('r0', 'r1'))

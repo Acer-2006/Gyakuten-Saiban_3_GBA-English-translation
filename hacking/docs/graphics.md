@@ -506,7 +506,9 @@ original's. Presenting
 evidence from the Court Record starts effect 4 (Take that!, `0x08013488`) or 2 (Objection!,
 `0x080134ca`), and the item's icon shows at the top middle of the screen and spins away: the
 tall Japanese bubbles at x 45 left room for it, the English ones in the middle are under it for
-about half a second.
+about half a second. The icon is OAM 52 (64×64 at x 88, y 16, OBJ palette 1) in tiles
+`0x80`–`0xbf`, the English page's third line's, loaded while the page is still up (text-engine.md,
+"Where sprite text goes", for how the third line keeps clear of it).
 
 A copy of the banner kanji as 16×16 blocks also sits raw at `0x08186b20`; the game does not
 use it for the banners.

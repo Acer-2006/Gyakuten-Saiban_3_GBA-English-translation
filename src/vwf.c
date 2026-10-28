@@ -49,10 +49,15 @@
 /* continue arrow sprite */
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
-#define ARROW_X     229       /* at rest: the tip 2 pixels inside the box's right edge, as the DS's */
-#define ARROW_Y     (TEXT_Y0 + 2 * BOX_PITCH + 5)   /* beside the third line, as the DS's: y 148-156 */
-/* The arrow is on the third line's row and slides 2 px left of ARROW_X.  The DS's box is 16 px
-   wider, so a third line the DS ends well clear of its arrow can run under ours: such a line
+#define ARROW_X     229       /* at rest: the tip in the box's last column inside its edge, as the DS's */
+#define ARROW_Y     (TEXT_Y0 + 2 * BOX_PITCH + 6)   /* the tip on the third line's baseline, as the DS's */
+/* The DS's arrow, measured frame by frame in DeSmuME: a 9x9 triangle, its tip on the third line's
+   baseline (its rows from 5 below the line's capital tops to 4 below the baseline) and, at rest,
+   in the last column inside the box's right edge, sliding 2 px left and 1 right of it.  Ours is
+   the same against the third line and the box's right edge: y 149-157, the tip at x 237 (before
+   0.16.69 a pixel higher).  The DS's box is 16 px taller, the room under its arrow; in the
+   original's box the arrow ends just over the bottom edge.  The DS's box is also 16 px wider,
+   so a third line the DS ends well clear of its arrow can run under ours: such a line
    closes up just enough, the pixels spread over its letter gaps, that it ends before L3_END
    (its pen; the last letter's ink a pixel or two before), clear of the arrow wherever it is. */
 #define L3_END      (ARROW_X - 2 - 1)
@@ -659,9 +664,30 @@ static int bar_borrows(void) {
     return 0;
 }
 
+/* Evidence presented shows its icon at the top middle of the screen as it spins away (OAM 52,
+   64x64 at x 88, y 16), DMA'd to OBJ tiles 0x80-0xbf, the third line's (0x08014690 for the Court
+   Record's items, 0x08036b9c for a fixed picture; patches/icons.py, present_icon).  The routine
+   runs while the frame is being drawn, with the page still up: it hides the page for the next
+   frame (SYS+0x19) and clears the box, but the tiles change at once, and in the frame the icon
+   came the third line showed it as garbage from that scanline down.  vwf_icon, called before the
+   copy, takes the third line off the screen there and then, from OAM itself as well as from the
+   buffer copied at the next VBlank; the first two lines stay up for the rest of the frame, as in
+   the original.  While the icon is up the third line is not shown in those tiles, and one moved
+   out for the Court Record (record_lend) stays out. */
+static int icon_up(void) {
+    u32 a0 = OAMBUF[52 * 4], t = OAMBUF[52 * 4 + 2] & 0x3ff;
+    return (a0 & 0x300) != 0x200 && t >= 0x80 && t < 0xc0;
+}
+
+void vwf_icon(void) {
+    if (!vs.lbl_used[2] || lbl_tile(2, 0) != 0x80) return;
+    volatile u16* oam = (volatile u16*)0x07000000;
+    for (int k = lbl_obj0[2]; k < lbl_obj0[2] + LBL_CELLS; k++) oam[k * 4] = OAMBUF[k * 4] = 0x0200;
+}
+
 static void record_lend(void) {
     int bar = bar_borrows();
-    if (bar || record_borrows()) {
+    if (bar || record_borrows() || (vs.l3_lent && icon_up())) {
         if (vs.l3_lent || (!bar && !vs.lbl_width[2])) return;
         vs.l3_lent = 1;
         u32 base = l3_block();
@@ -721,7 +747,7 @@ static void labels_oam(void) {
             }
             if (x < 0) x = 0;
         }
-        if (L == 2 && vs.l3_lent && !vx.l3_tile) ncells = 0;
+        if (L == 2 && ((vs.l3_lent && !vx.l3_tile) || (lbl_tile(2, 0) == 0x80 && icon_up()))) ncells = 0;
         for (int c = 0; c < LBL_CELLS; c++) {
             int obj = lbl_obj0[L] + c;
             if (c >= ncells) { if (c < vs.lbl_used[L]) OAMBUF[obj * 4 + 0] = 0x0200; continue; }

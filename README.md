@@ -110,6 +110,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.69 — presenting evidence (Take that!) no longer flashes a strip of coloured blocks over
+  the page's third line for one frame: the evidence's icon, which spins away at the top of the
+  screen, is loaded into the third line's sprite tiles while the page is still up, and the third
+  line now leaves the screen the moment that happens (the first two lines go a frame later, as
+  in the original). The page arrow sits exactly where the DS's does against the text: its tip on
+  the third line's baseline (a pixel lower than before) and, at rest, in the last column inside
+  the box's right edge, sliding as the DS's does; a third line that would reach it still closes
+  up so that no letter touches it or goes under it.
 * 0.16.68 — the text box is the original's again: 48 pixels, with the three lines 14 pixels
   apart (the letters take 13 of them) and the page arrow beside the third line, as on the DS. It
   hides exactly as much of the scene as the Japanese GBA's and the DS's boxes do; the 64-pixel
