@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.70 — presenting evidence: for the one frame between the evidence's icon coming in and
+  the page going, the page stays whole (0.16.69 dropped its third line a frame early), and then
+  all of it goes at once, as in the original and on the DS. The page arrow is back at the
+  height it had before 0.16.69, a pixel clear of the box's bottom edge, keeping the DS's place
+  against the box's right edge, its slide, and the third lines that close up so as never to
+  touch it.
 * 0.16.69 — presenting evidence (Take that!) no longer flashes a strip of coloured blocks over
   the page's third line for one frame: the evidence's icon, which spins away at the top of the
   screen, is loaded into the third line's sprite tiles while the page is still up, and the third

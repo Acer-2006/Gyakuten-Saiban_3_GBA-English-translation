@@ -50,16 +50,18 @@
 #define ARROW_OBJ   2
 #define ARROW_TILE  0xf8
 #define ARROW_X     229       /* at rest: the tip in the box's last column inside its edge, as the DS's */
-#define ARROW_Y     (TEXT_Y0 + 2 * BOX_PITCH + 6)   /* the tip on the third line's baseline, as the DS's */
+#define ARROW_Y     (TEXT_Y0 + 2 * BOX_PITCH + 5)   /* beside the third line: y 148-156 */
 /* The DS's arrow, measured frame by frame in DeSmuME: a 9x9 triangle, its tip on the third line's
    baseline (its rows from 5 below the line's capital tops to 4 below the baseline) and, at rest,
    in the last column inside the box's right edge, sliding 2 px left and 1 right of it.  Ours is
-   the same against the third line and the box's right edge: y 149-157, the tip at x 237 (before
-   0.16.69 a pixel higher).  The DS's box is 16 px taller, the room under its arrow; in the
-   original's box the arrow ends just over the bottom edge.  The DS's box is also 16 px wider,
-   so a third line the DS ends well clear of its arrow can run under ours: such a line
-   closes up just enough, the pixels spread over its letter gaps, that it ends before L3_END
-   (its pen; the last letter's ink a pixel or two before), clear of the arrow wherever it is. */
+   the DS's against the box's right edge and in its slide: the tip at x 237.  It is a pixel higher
+   against the third line (y 148-156, the tip a pixel over the baseline), as in every build since
+   it became the DS's: the DS's box is 16 px taller, the room under its arrow, and in the
+   original's box this keeps a pixel between the arrow and the bottom edge (0.16.69 put the tip on
+   the baseline and the arrow on the edge).  The DS's box is also 16 px wider, so a third line
+   the DS ends well clear of its arrow can run under ours: such a line closes up just enough, the
+   pixels spread over its letter gaps, that it ends before L3_END (its pen; the last letter's ink
+   a pixel or two before), clear of the arrow wherever it is. */
 #define L3_END      (ARROW_X - 2 - 1)
 
 /* sprite text: 3 lines of 8 sprite cells (32x16, 8 tiles each) in OBJ tiles 0x00-0xbf.  The
@@ -161,6 +163,7 @@ struct vwf_ext {
     u8 edges_ok;        /* BOX_EDGES holds the box's top and bottom rows from under the canvas */
     u8 q_virt;          /* the question is over the box's rows on BG0 alone (q_frame) */
     u8 layout;          /* LAYOUT once a box made by an earlier build has been looked for (old_layout) */
+    u16 icon_tile;      /* the third line's copy for the frame the presented icon came in (vwf_icon) */
 };
 #define vx (*(struct vwf_ext*)0x02028780)
 /* The box's top and bottom rows as they were when the canvas was mapped over them (the top one
@@ -626,7 +629,7 @@ static int obj_tiles(u32 a0, u32 a1) {
 }
 
 /* 64 tiles from L3_FROM up that no sprite shown (other than the page's own) uses, or 0. */
-static u32 l3_block(void) {
+static __attribute__((noinline)) u32 l3_block(void) {
     for (u32 base = L3_FROM; base + 64 <= L3_TO; base += 8) {
         int ok = 1;
         for (int k = 0; k < 128 && ok; k++) {
@@ -670,10 +673,13 @@ static int bar_borrows(void) {
    runs while the frame is being drawn, with the page still up: it hides the page for the next
    frame (SYS+0x19) and clears the box, but the tiles change at once, and in the frame the icon
    came the third line showed it as garbage from that scanline down.  vwf_icon, called before the
-   copy, takes the third line off the screen there and then, from OAM itself as well as from the
-   buffer copied at the next VBlank; the first two lines stay up for the rest of the frame, as in
-   the original.  While the icon is up the third line is not shown in those tiles, and one moved
-   out for the Court Record (record_lend) stays out. */
+   copy, moves the third line to 64 tiles no sprite on screen uses (l3_block, as for the Court
+   Record; what was there kept at L3_BACKUP), in OAM itself as well as in the buffer, so that the
+   whole page stays up for the rest of the frame and goes the next one, all at once, as in the
+   original (and on the DS).  The tiles are put back at the start of the next frame's update
+   (icon_back), before anything else uses them; with no free tiles the third line goes at once.
+   While the icon is up the third line is not shown in its own tiles, and one moved out for the
+   Court Record (record_lend) stays out. */
 static int icon_up(void) {
     u32 a0 = OAMBUF[52 * 4], t = OAMBUF[52 * 4 + 2] & 0x3ff;
     return (a0 & 0x300) != 0x200 && t >= 0x80 && t < 0xc0;
@@ -682,7 +688,24 @@ static int icon_up(void) {
 void vwf_icon(void) {
     if (!vs.lbl_used[2] || lbl_tile(2, 0) != 0x80) return;
     volatile u16* oam = (volatile u16*)0x07000000;
-    for (int k = lbl_obj0[2]; k < lbl_obj0[2] + LBL_CELLS; k++) oam[k * 4] = OAMBUF[k * 4] = 0x0200;
+    u32 base = l3_block();
+    if (base) {
+        volatile u32* v = (volatile u32*)(0x06010000 + base * 32);
+        dma32(v, L3_BACKUP, 64 * 8, 0);
+        dma32((volatile u32*)0x06011000, v, 64 * 8, 0);
+        vx.icon_tile = base;
+    }
+    NO_UNROLL for (int c = 0; c < LBL_CELLS; c++) {
+        int k = (lbl_obj0[2] + c) * 4;
+        if (base) oam[k + 2] = OAMBUF[k + 2] = (OAMBUF[k + 2] & ~0x3ff) | (base + c * 8);
+        else oam[k] = OAMBUF[k] = 0x0200;
+    }
+}
+
+static __attribute__((noinline)) void icon_back(void) {
+    u32 t = vx.icon_tile;
+    vx.icon_tile = 0;
+    if (t >= L3_FROM && t + 64 <= L3_TO) dma32(L3_BACKUP, (volatile u32*)(0x06010000 + t * 32), 64 * 8, 0);
 }
 
 static void record_lend(void) {
@@ -1342,6 +1365,7 @@ static void frame_body(void);
 static void page_arrow(void);
 static void cursor_ahead(int on);
 void vwf_frame(void) {
+    if (vx.icon_tile) icon_back();
     frame_body();
     cursor_ahead(fullscreen_box() && !vs.overlay);
     q_frame();
