@@ -417,7 +417,10 @@ The pictures are decompressed into OBJ VRAM at the destination each time a frame
 The English page's third line lives in tiles `0x80`–`0xbf` (the original's text took `0x00`–`0x7f`),
 so the two effects that play over a page with their pictures from `0x80` up are moved
 (`patches/icons.py`, `MOVED_EFFECTS`): `0xdd`, a figure in the dark (219 tiles from `0x80`,
-started by the script in bank 21), to `0x1a0`, the Court Record's tiles; `0x45`, the "Fugitive
+started by the script in bank 21), to `0x100`–`0x1da`, between the page arrow and choice cursor
+(`0xf8`–`0xff`) and the shout bubbles (`0x1e8` on): its one scene shows Godot's Objection! over it
+(until 0.16.67 it went to `0x1a0`, into the bubble's tiles, and both showed garbage; the build now
+checks the range against the effect's own size); `0x45`, the "Fugitive
 Data" header of episode 4's data screen (112 tiles from `0x90`), to `0x310`, since the data
 screen's own text is in `0x19c`–`0x2a7` (a first move to `0x1a0` put the header into it). The other effects placed in the text tiles (the episode
 select's labels at `0x80`, the episode title cards at `0x98`, the bursts at `0x00`/`0x78`) play

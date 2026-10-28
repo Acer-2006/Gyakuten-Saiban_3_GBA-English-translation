@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.67 — Godot's Objection! in episode 3's second trial, over the flashback of Kudo at his
+  table, no longer comes out as a block of garbage: the figure in that flashback had been moved
+  into the bubble's sprite tiles (to keep it off the third line of text), so the two overwrote
+  each other for the second the bubble was up. It now has tiles of its own, and the build checks
+  that it stays clear of the bubbles.
 * 0.16.66 — after a shout's bubble shakes, it settles back where it started, every time: the
   original leaves it wherever the shake's last random step put it, up to 10 pixels above or
   below its place, which the original's bubbles at the edge of the screen hid and the English

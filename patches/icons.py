@@ -15,6 +15,7 @@ leaving pairs whose two pictures are the same alone.
 import struct, sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 import lz, dsimgtext
+from dspic import SIZE as dsimg_size
 
 GBA_ICONS = 0x0804660c
 GBA_COUNT = 123
@@ -78,13 +79,28 @@ ITEM_TILE = 0x1e0
 # 0x90, started by the screen at 0x0802b011 with the last page still counted as up) and 0xdd (a
 # figure in the dark, 219 tiles from 0x80, started by the script over a page in bank 21).  Their
 # entries in the animation table (0x08046b30 + 20 * n, u32 VRAM destination at +4) move them
-# out.  0xdd goes to 0x1a0, the Court Record's tiles, which the Record only uses while it is
-# open.  0x45 goes to 0x310: on the data screen 0x19c-0x2a7 hold its two pages of text
-# (vwf_data_text) and 0x302-0x309 the PICTURE tab, and no character is on screen there.  The
-# other effects placed in the text tiles play with no page up (the episode select, the episode
-# title cards, the bursts the original put over its own two lines at 0x00-0x7f).
+# out.  0xdd goes to 0x100-0x1da, between the page arrow and choice cursor (0xf8-0xff) and the
+# shout bubbles (0x1e8 on, effects 1-9): its one scene (bank 21 section 0xb0, a flashback in
+# episode 3's second trial) shows Godot's Objection! over it.  Until 0.16.67 it went to 0x1a0,
+# into the bubble's tiles, and both came out as garbage for the second the bubble was up.  0x45
+# goes to 0x310: on the data screen 0x19c-0x2a7 hold its two pages of text (vwf_data_text) and
+# 0x302-0x309 the PICTURE tab, and no character is on screen there.  The other effects placed in
+# the text tiles play with no page up (the episode select, the episode title cards, the bursts
+# the original put over its own two lines at 0x00-0x7f).
 ANIM_TABLE = 0x08046b30
-MOVED_EFFECTS = {0x45: 0x310, 0xdd: 0x1a0}
+MOVED_EFFECTS = {0x45: 0x310, 0xdd: 0x100}
+# where 0xdd's tiles must stay: after the cursor (0xff), before the item shown in court (0x1e0,
+# never up in that scene) and the bubbles (0x1e8)
+DARK_FIGURE_RANGE = (0x100, 0x1e0)
+
+def effect_tiles(rom, n):
+    """The OBJ tiles effect n takes: the most any of its frames' sprite lists covers."""
+    fd = rom.u32(ANIM_TABLE + 20 * n + 8)
+    lists = {rom.u16(fd + 8 + 8 * i) for i in range(rom.u16(fd + 2))}
+    def size(attr):
+        w, h = dsimg_size[attr >> 12]
+        return w * h // 64
+    return max(sum(size(rom.u16(fd + o + 6 + 4 * k)) for k in range(rom.u16(fd + o))) for o in lists)
 
 # The life bar (28 OBJ tiles, DMA'd every frame it is up) sits at 0xc4-0xdf, and moves to
 # 0x84-0x9f while any of the eight map-marker records at 0x03003af0 is taken (commands 0x39-0x3d;
@@ -141,6 +157,10 @@ def apply(rom, ctx):
         e = ANIM_TABLE + 20 * n
         assert rom.u32(e + 4) in (0x06011000, 0x06011200), hex(n)
         rom.w32(e + 4, 0x06010000 + tile * 32)
+    lo, hi = DARK_FIGURE_RANGE
+    start, need = MOVED_EFFECTS[0xdd], effect_tiles(rom, 0xdd)
+    if not (lo <= start and start + need <= hi):
+        raise SystemExit(f'icons: effect 0xdd takes tiles {start:#x}-{start + need - 1:#x}, outside {lo:#x}-{hi - 1:#x}')
     base = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[1]
     ds = ds_pictures(d, base)
     gba = {k: colours(*gba_picture(rom, k)) for k in range(GBA_COUNT)}
