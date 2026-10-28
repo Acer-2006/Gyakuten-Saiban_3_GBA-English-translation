@@ -175,7 +175,7 @@ thick stroke. Giving all of them the DS's 2 pixels (`dsdesc.Font(stem_gap)`) wid
 enough that 13 descriptions would need four lines instead of three, so it is used only where
 asked for (`court_record.STEM_GAPS`, since 0.16.74): Pearl Fey's first profile, which is then
 set "Maya's cousin, / and channeling prodigy. / She has amazingly / powerful spiritual
-abilities.", its second line a pixel to the right, and no letters of two lines touch (in 0.16.73
+abilities.", its second line two pixels to the right and its word gaps a pixel narrower, and no letters of two lines touch (in 0.16.73
 the y of "prodigy" still touched "amazingly"). Its picture is stored after the others, which
 keep the addresses they had.
 
