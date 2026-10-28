@@ -12,11 +12,16 @@ the tail of a g can come down to the row where the line below begins.  The build
 to break the text into its lines (cost): letters of two lines (or of the first line and the
 name) touching weigh most, then a lone word on the last line, a line ending on "a" or "the" or
 between the two words of a name, and lines filled unevenly.  In about two thirds of the four-line
-descriptions no letters touch.
+descriptions no letters touch.  Since 0.16.73 a last build step (court_record.clear_lines,
+choose_clear) sets the others again: other line breaks, a line spacing of 13 for one or two
+lines (the first line a row higher, or a gap a row wider), word gaps a pixel narrower, or a line
+moved a pixel or two sideways, whichever is cheapest; that leaves two of the 188 with a tail
+touching a letter, in one and three columns.
 
 A description that does not fit in four lines that way gets its word gaps narrowed (to 4, then 3
 pixels), and then a word hyphenated where HYPHENS allows; with the US DS text, two need the first
 and one (Franziska von Karma's profile) both."""
+import itertools
 import dsfont, dsimgtext
 
 # words that read badly at the end of a line, before the word they go with
@@ -126,6 +131,93 @@ def badness(end, nxt):
     if end.endswith('-') or end[-1] in '.,:;?!': return 0
     if end[0].isupper() and nxt[0].isupper(): return 2         # a name: Furio / Tigre
     return int(end.lower() in CLINGY or end.isdigit() or (len(end) == 1 and end.isalpha()))
+
+def touches(font, lines, tops, w, x0, word_cut, shifts=None):
+    """Pixels of two lines on or next to each other (the panel `w` columns wide).  (The name and
+    the first line are kept apart by moving the name, court_record.panel.)"""
+    ms = [font.masks(l, x0 + (shifts[k] if shifts else 0), w, word_cut) for k, l in enumerate(lines)]
+    n = 0
+    for k in range(len(lines) - 1):
+        n += sum(clash(ms[k], ms[k + 1], tops[k + 1] - tops[k]))
+    return n
+
+def tops_variants(tops, bottom, last_row):
+    """The line tops with the first line a row higher and / or a gap a row wider, the last line's
+    ink (down to its row `last_row`) still above `bottom`; the given tops first.
+    -> [(rows changed, tops)]"""
+    out = []
+    n = len(tops)
+    for up in (0, 1):
+        for wider in itertools.product((0, 1), repeat=n - 1):
+            t = [tops[0] - up]
+            for k in range(1, n):
+                t.append(t[-1] + tops[k] - tops[k - 1] + wider[k - 1])
+            if t[-1] + last_row <= bottom: out.append((up + sum(wider), tuple(t)))
+    return sorted(out)
+
+# what choose_clear weighs, against cost(): a line spacing a row wider (or the first line a row
+# higher); word gaps narrower (by the square of the pixels: two run the words together); a pixel
+# a line is moved sideways
+W_MOVED, W_CUT, W_SHIFT = 1000, 2500, 3000
+SHIFTS = (0, 1, -1, 2, -2)
+
+def last_row(font, line, x0, w, word_cut):
+    """The lowest row with ink in the line."""
+    m = 0
+    for v in font.masks(line, x0, w, word_cut): m |= v
+    return m.bit_length() - 1
+
+def _moved(m, s):
+    """Column masks moved s columns right (left if negative)."""
+    return [0] * s + m[:len(m) - s] if s >= 0 else m[-s:] + [0] * -s
+
+def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom):
+    """choose(), with no letters of two lines touching where that can be had.  The lines choose()
+    gives stay as they are when they touch nothing.  Otherwise every way to break the text into
+    lines (at each word gap narrowing, choose()'s line count for it) is tried with the lines'
+    tops as they are, the first line a row higher (not onto the name) and / or a gap between
+    lines a row wider (the last line's ink kept above row `bottom`, tops_variants), and with one
+    line moved a pixel or two sideways (SHIFTS), and of those that touch nothing the cheapest is
+    taken: cost(), W_MOVED a row moved, W_CUT the square of the pixels of word gap taken out,
+    W_SHIFT a pixel moved sideways.  If none touches nothing, the lines (none moved sideways)
+    with the fewest touching columns.  -> (lines, tops, word_cut, shifts or None)"""
+    lines, tops, cut = choose(font, text, maxw, name_masks, x0, layouts)
+    w = len(name_masks)
+    if lines is None or not touches(font, lines, tops, w, x0, cut):
+        return lines, tops, cut, None
+    us = units(text)
+    best = None
+    fewest = (touches(font, lines, tops, w, x0, cut), 0, 0), lines, tops, cut, None
+    for word_cut in (0, 1, 2):
+        def fits(line): return font.width(line, word_cut) <= maxw
+        for cand_units, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 else []):
+            for n in sorted(layouts):
+                cands = list(splits(cand_units, n, fits, hy))
+                if not cands: continue
+                for c in cands:
+                    base = cost(font, c, layouts[n], maxw, name_masks, x0, word_cut) + W_CUT * word_cut * word_cut
+                    ms = [font.masks(l, x0, w, word_cut) for l in c]
+                    room = [(-x0, x0 + maxw + 1 - (x0 + font.width(l, word_cut))) for l in c]
+                    for moved, t in tops_variants(layouts[n], bottom, last_row(font, c[-1], x0, w, word_cut)):
+                        for j in range(n):
+                            for s in SHIFTS:
+                                if not room[j][0] <= s <= room[j][1]: continue
+                                if s == 0 and j: continue           # unmoved: once
+                                k = base + W_MOVED * moved + W_SHIFT * abs(s)
+                                if best is not None and k >= best[0]: continue
+                                mm = ms[:j] + [_moved(ms[j], s)] + ms[j + 1:]
+                                if t[0] != layouts[n][0] and any(clash(name_masks, [m << t[0] for m in mm[0]], 0)):
+                                    continue                    # the first line, higher, on the name
+                                n_touch = sum(sum(clash(mm[i], mm[i + 1], t[i + 1] - t[i])) for i in range(n - 1))
+                                if n_touch:
+                                    if s == 0 and (n_touch, moved + word_cut, k) < fewest[0]:
+                                        fewest = (n_touch, moved + word_cut, k), c, t, word_cut, None
+                                    continue
+                                sh = None if s == 0 else [s if i == j else 0 for i in range(n)]
+                                best = (k, c, t, word_cut, sh)
+                break
+    if best: return best[1:]
+    return fewest[1:]
 
 def choose(font, text, maxw, name_masks, x0, layouts):
     """-> (lines, tops, word_cut): the description's lines and the panel row of each line's top.

@@ -202,14 +202,15 @@ def name_offset(img):
     xs = [x for x in range(W_USE) if any(img[y][x] == TITLE for y in range(16))]
     return xs[0] - (W_USE - (xs[-1] - xs[0] + 1)) // 2 if xs else 0
 
-def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False):
+def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False, clear=False):
     """name_px: 16 rows of the DS name texture (text = index 2); age: the profile's age, put after
     the name in the NameFont `names` (long_name: see name_columns).  The description's lines are
     chosen against the name line, centred.  nudge: the lines are the ones chosen against the name
     alone (as before the ages), and the name line (with the age) moves off the centre (NUDGES)
     until no letter of it touches them; only if that cannot be done are the lines chosen again
-    for each place of the name line.  -> (64 rows x 160 indices, the word gap narrowing), or
-    (None, None) when the text (or the name with the age) does not fit."""
+    for each place of the name line.  clear: lines that touch each other are chosen again
+    (dsdesc.choose_clear).  -> (64 rows x 160 indices, the word gap narrowing), or (None, None)
+    when the text (or the name with the age) does not fit."""
     cols = name_columns(name_px, age, names, long_name)
     if cols is None: return None, None
     def ink(line, dx):
@@ -221,15 +222,17 @@ def panel(name_px, text, font, age=None, names=None, long_name=None, nudge=False
                 if m >> y & 1: img[y][x0 + x] = TITLE
         return img
     def lay(img):
-        return dsdesc.choose(font, text, TEXT_W, [sum(1 << y for y in range(H) if img[y][x] == TITLE)
-                                                  for x in range(W)], TEXT_X, LINES)
+        nm = [sum(1 << y for y in range(H) if img[y][x] == TITLE) for x in range(W)]
+        if clear:
+            return dsdesc.choose_clear(font, text, TEXT_W, nm, TEXT_X, LINES, H - 1)
+        return dsdesc.choose(font, text, TEXT_W, nm, TEXT_X, LINES) + (None,)
     def draw(dx, layout=None):
         img = ink(cols, dx)
         if img is None: return None
-        lines, tops, cut = layout or lay(img)
+        lines, tops, cut, shifts = layout or lay(img)
         if lines is None: return None
-        for line, top in zip(lines, tops):
-            for x, m in enumerate(font.masks(line, TEXT_X, W_USE, cut)):
+        for k, (line, top) in enumerate(zip(lines, tops)):
+            for x, m in enumerate(font.masks(line, TEXT_X + (shifts[k] if shifts else 0), W_USE, cut)):
                 for k in range(16):
                     if m >> k & 1 and 0 <= top + k < H: img[top + k][x] = BODY
         return img, cut
@@ -344,3 +347,42 @@ def add_ages(rom, ctx):
           (f"; no room for the age of {wide}" if wide else '') +
           f"; name line moved (item, columns) {moved} ({len(stored)} pictures)" +
           (f"; still touching: {still}" if still else ''))
+
+def final_panel(i, name_px, text, font, names, clear=False):
+    """The panel apply() and add_ages() leave for item i (clear: see panel)."""
+    if i in AGES:
+        img, _ = panel(name_px, text, font, AGES[i], names, LONG_NAMES.get(i), nudge=True, clear=clear)
+        if img is not None: return img
+    img, _ = panel(name_px, text, font, clear=clear)
+    if img is not None and i not in AGES and touching(img):
+        img, _ = panel(name_px, text, font, nudge=True, clear=clear)
+    return img
+
+def clear_lines(rom, ctx):
+    """Applied last (0.16.73): no two lines of a description touching, where that can be had.  A
+    description of four lines has them 12 rows apart (LINES), less than the 13 rows the letters
+    take, and in 33 of the 188 the tail of a g, p, y or comma on one line touched a letter of the
+    next (the lines are chosen to avoid that, dsdesc.cost, but not every text can).  Those are
+    set again (dsdesc.choose_clear): other line breaks, a line spacing of 13 instead of 12 (the
+    first line a row higher, or a gap a row wider), word gaps a pixel narrower or a line moved a
+    pixel or two sideways, whichever costs least; two (20 and 54) have no such layout and keep a
+    touching column or three.  Applied last, like add_ages(), so that the pictures stored before
+    stay where they are; the other panels are left alone."""
+    d, arm9 = ctx.data, ctx.arm9
+    font = dsdesc.Font(d, arm9)
+    recs = ds_items(arm9)
+    nb = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[NAME_BASE]
+    nsz = dsimgtext.texture_size(d, nb)
+    names = NameFont(lambda i: dsimgtext.texture(d, nb + recs[i][1] * nsz)[0])
+    stored, changed, still = {}, [], []
+    for i, (name_px, text) in sorted(ctx.court_inputs.items()):
+        before = final_panel(i, name_px, text, font, names)
+        after = final_panel(i, name_px, text, font, names, clear=True)
+        if after is None or after == before: continue
+        data = lz.compress(cells(after))
+        if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} (clear lines)')
+        rom.w32(GBA_ITEMS + 8 * i, stored[data])
+        changed.append(i)
+        if touching(after): still.append(i)
+    print(f"  court record: the lines of {changed} set again so that fewer letters touch ({len(stored)} pictures)" +
+          (f"; name touching: {still}" if still else ''))

@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.73 — Court Record descriptions: in 33 of them (all four-line ones, 12 pixels apart) the
+  tail of a g, p, y or comma touched a letter on the line below. They are set again with other
+  line breaks, a pixel more between two of the lines, word gaps a pixel narrower or, in six, one
+  line a pixel or two to the side, whichever looks least changed; 31 no longer touch, and the
+  other two (Pearl Fey's first profile, the second Key Card) touch in one and three columns
+  instead of two and four, as no layout of their text avoids it.
 * 0.16.72 — no more touching or cut-off text. The apostrophe, quotation marks, brackets, $, #
   and the star sit a pixel lower, level with the capitals: the box's lines are 14 pixels apart
   (the DS's 16), and a mark on one line came right under a g, p or y of the line above

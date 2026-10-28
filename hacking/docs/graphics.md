@@ -158,7 +158,16 @@ lines run to 228 pixels with letters 2 pixels apart and words 10; the build halv
 (letters 1, words 5) and breaks the text into lines of up to 149 pixels: three lines 16 rows
 apart when it fits (as the Japanese), otherwise four 12 rows apart, broken so that the letters
 of two lines touch as little as possible (they are 13 rows tall). Where the DS says "Touch the Check Button",
-the GBA text says "Press L".
+the GBA text says "Press L". In 33 of the 188 descriptions (130 have four lines) the tail of a g,
+p, y or comma still touched a letter of the next line; since 0.16.73 a last build step
+(`court_record.clear_lines`, `dsdesc.choose_clear`) sets those again with whichever costs least
+of: other line breaks, one or two of the gaps 13 rows instead of 12 (a gap a row wider, or the
+first line a row higher, kept off the name), word gaps a pixel narrower (three lines then fit
+for some, 16 rows apart), or one line moved a pixel or two sideways (6 of them). Two still touch,
+in one and three columns: Pearl Fey's first profile ("prodigy" over "amazingly") and the second
+Key Card ("Opens" over "CEO's"), for which no such layout exists. The renderer's marks a row lower
+(text-engine.md, "Lines 14 pixels apart") would not help here: 12 rows apart the marks meet the
+tails of the line above either way, and lowering them makes one more description touch.
 
 ### Icons
 
