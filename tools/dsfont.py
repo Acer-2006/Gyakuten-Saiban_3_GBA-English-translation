@@ -38,16 +38,27 @@ def glyph_width(arm9, code):
     if 0x681 <= code < 0x698: return arm9[WIDTH_TAB + 0x100 + code - 0x681]
     return 14
 
-def tables(data, arm9):
-    """-> (rows: u16[NGLYPH*16] bytes, widths: u8[NGLYPH] bytes)"""
+def tables(data, arm9, clear_top=False):
+    """-> (rows: u16[NGLYPH*16] bytes, widths: u8[NGLYPH] bytes).  clear_top: every glyph with ink
+    in its top row is moved a row down (see below)."""
     rows = []; widths = []
     for code in slot_codes():
-        rows += glyph_rows(data, code); widths.append(glyph_width(arm9, code))
+        r = glyph_rows(data, code)
+        if clear_top and r[0] and not r[15]: r = [0] + r[:15]
+        rows += r; widths.append(glyph_width(arm9, code))
     # missing glyph: a hollow box
     rows += [0x7ffe if r in (2, 12) else (0x4002 if 2 < r < 12 else 0) for r in range(16)]
     widths.append(10)
     assert len(widths) == NGLYPH
     return b''.join(struct.pack('<H', r) for r in rows), bytes(widths)
+
+# The DS sets its lines 16 pixels apart, the GBA's box 14.  The letters take rows 1-13 of the
+# glyph (capitals 1-10, descenders to 13), but a few marks reach a row higher: the apostrophe, the
+# quotation mark, the brackets, $ and # (and the star).  14 pixels apart, a mark on a line's top
+# row came right under the descenders of the line above ("grandfather" over '"Violetta"': the
+# quotation mark under the g), with no row between them.  The renderer's font (patches/text.py)
+# has those marks a row lower, their tops level with the capitals', which keeps a row clear
+# between any two lines.  (The pictures drawn with the font, tools/textgfx.py, keep the DS's.)
 
 def width_map(arm9):
     """code -> advance width, for the script line-measuring in the converter."""

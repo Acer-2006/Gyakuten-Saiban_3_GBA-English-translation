@@ -164,7 +164,9 @@ struct vwf_ext {
     u8 q_virt;          /* the question is over the box's rows on BG0 alone (q_frame) */
     u8 layout;          /* LAYOUT once a box made by an earlier build has been looked for (old_layout) */
     u16 icon_tile;      /* the third line's copy for the frame the presented icon came in (vwf_icon) */
+    u8 cap_sq[LBL_LINES];   /* a caption's lines: pixels taken out of every letter gap (line_done) */
 };
+_Static_assert(sizeof(struct vwf_ext) <= 0x80, "vx runs into script.c's state at 0x02028800");
 #define vx (*(struct vwf_ext*)0x02028780)
 /* The box's top and bottom rows as they were when the canvas was mapped over them (the top one
    carries the name tag's joint), 2 x 30 entries: shown under the question's letters (vwf_bgcnt)
@@ -230,6 +232,21 @@ static int glyph_index(u32 code) {
     if (code >= 0x80 && code < 0x180) return code - 0x80;
     if (code >= 0x680 && code < 0x698) return 0x100 + (code - 0x680);
     return FONT_MISSING;
+}
+
+/* A glyph's advance with `sq` pixels taken out of the gap after it (a line that does not fit
+   closes up), but never more than the blank columns at its right: W and the digits have none,
+   and the next letter has one at its left (but for j), so a column stays clear between them.
+   Up to 0.16.71 a closed-up W touched the next letter ("What", "We"). */
+static __attribute__((noinline)) int glyph_adv(int gi, int sq) {
+    const u16* r = font_rows + gi * 16;
+    u32 m = 0;
+    NO_UNROLL for (int i = 0; i < 16; i++) m |= r[i];
+    int room = font_w[gi];                  /* a blank glyph: all of it */
+    if (m) { room -= 16; while (!(m & 1)) { m >>= 1; room++; } }
+    if (sq > room) sq = room;
+    if (sq < 0) sq = 0;
+    return font_w[gi] - sq;
 }
 
 typedef volatile u32* (*rowptr_fn)(int tx, int ty, int r);
@@ -464,7 +481,7 @@ static void canvas_check(void) {
 
 /* Measure the rest of the current line (from the script pointer) in pixels; `glyphs`, if given,
    gets the number of characters in it. */
-static int measure_line_n(const u16* p, int* glyphs) {
+static __attribute__((noinline)) int measure_line_n(const u16* p, int* glyphs) {
     int w = 0, g = 0;
     for (int n = 0; n < 512; n++) {
         u32 t = *p++;
@@ -476,17 +493,7 @@ static int measure_line_n(const u16* p, int* glyphs) {
     if (glyphs) *glyphs = g;
     return w;
 }
-static int measure_line(const u16* p) {
-    int w = 0;
-    for (int n = 0; n < 512; n++) {
-        u32 t = *p++;
-        if (t >= 0x80) { w += font_w[glyph_index(t)]; continue; }
-        if (t == 0x00 || t == 0x01 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a ||
-            t == 0x0d || t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) break;
-        p += cmd_args[t];
-    }
-    return w;
-}
+#define measure_line(p) measure_line_n(p, 0)
 
 /* ---------------------------------------------------------------- choice labels */
 /* A line's tiles are cleared when the page first puts a character on it, not all three when it
@@ -518,18 +525,24 @@ static void labels_reset(void) {
    Like a page line that does not fit (box_glyph), its letters close up a pixel, two if one is not
    enough; every option of the menu takes the same spacing, so that they still look alike. */
 #define OPT_FIT (236 - LBL_X0)
+/* A caption's line starts at x 9 (labels_oam) and has the box's right edge, x 238, as a page's
+   line has (TEXT_X0 + TEXT_MAXW).  Up to 0.16.71 its letters were never closed up, and the few
+   caption lines the DS's 256 pixels had room for ran off the box, their last letters cut off
+   (episode 3's last narration: "And who knows? Maybe a whole", 238 pixels).  Now such a line
+   closes up a pixel a letter gap, two if one is not enough, as a page's line does; each line by
+   itself, as on a page (cap_sq). */
+#define CAP_FIT (TEXT_X0 + TEXT_MAXW - 9)
 static void line_done(int L, int w, int lead, int n) {
     if (L < 0 || L >= LBL_LINES) return;
     int trim = 0;
     if (w > LBL_FIT) { trim = w - LBL_FIT; if (trim > lead) trim = lead; }
     w -= trim;
+    int sq = 0;
+    if (n > 1) while (w - sq * (n - 1) > (vs.lbl_caption ? CAP_FIT : OPT_FIT) && sq < 2) sq++;
+    if (vs.lbl_caption) { vx.cap_sq[L] = sq; w -= sq * (n - 1); }
+    else if (sq > vx.lbl_sq) vx.lbl_sq = sq;
     vs.lbl_full[L] = w > 255 ? 255 : w;
     vx.lbl_trim[L] = trim > 255 ? 255 : trim;
-    if (!vs.lbl_caption && n > 1) {
-        int sq = 0;
-        while (w - sq * (n - 1) > OPT_FIT && sq < 2) sq++;
-        if (sq > vx.lbl_sq) vx.lbl_sq = sq;
-    }
 }
 
 static int page_scan(const u16* p, u32 code, int row) {
@@ -588,7 +601,7 @@ static void label_draw_char(u32 code, int col, int row) {
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
     if (vs.lbl_pen >= 0 && vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
-    vs.lbl_pen += font_w[gi] - (vs.lbl_caption ? 0 : vx.lbl_sq);
+    vs.lbl_pen += glyph_adv(gi, vs.lbl_caption ? vx.cap_sq[L] : vx.lbl_sq);
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
 }
@@ -921,31 +934,24 @@ static int page_has_choice(const u16* p) {
     return 0;
 }
 
-/* Does the page end in command 0x15 (the text stays up while the game waits: a cross-examination
-   statement) rather than in a page end? */
-static int page_is_statement(const u16* p) {
+/* The command the page stops at (0 if none is found): a page end, or 0x15 (the text stays up
+   while the game waits: a cross-examination statement, page_is_statement). */
+static __attribute__((noinline)) u32 page_stop(const u16* p) {
     for (int n = 0; n < 1024; n++) {
         u32 t = *p++;
         if (t >= 0x80) continue;
-        if (t == 0x15) return 1;
         if (t == 0x00 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d ||
-            t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) return 0;
+            t == 0x15 || t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) return t;
         p += cmd_args[t];
     }
     return 0;
 }
+#define page_is_statement(p) (page_stop(p) == 0x15)
 
 /* Does the page end waiting for the A Button (0x02, 0x2d), the page arrow up? */
 static int page_waits(const u16* p) {
-    for (int n = 0; n < 1024; n++) {
-        u32 t = *p++;
-        if (t >= 0x80) continue;
-        if (t == 0x02 || t == 0x2d) return 1;
-        if (t == 0x00 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a || t == 0x0d || t == 0x15 ||
-            t == 0x2c || t == 0x2e || t == 0x35 || t == 0x36) return 0;
-        p += cmd_args[t];
-    }
-    return 0;
+    u32 t = page_stop(p);
+    return t == 0x02 || t == 0x2d;
 }
 
 /* One character onto the canvas at the pen (the script pointer is just after it); with `blit`
@@ -988,7 +994,7 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
         if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | y << 17 | c << 23;
         vs.csum_ok = 0;
     }
-    int adv = font_w[gi] - vs.squeeze;
+    int adv = glyph_adv(gi, vs.squeeze);
     if (adv < 1) adv = 1;
     vs.pen_x += adv;
 }
@@ -1044,11 +1050,13 @@ static void box_glyph(u32 code, u32 col) {
         if (right > 255) right = 255;
         if (right > vs.lbl_width[L]) vs.lbl_width[L] = right;
     }
-    int adv = font_w[gi] - vs.squeeze;
+    int adv = glyph_adv(gi, vs.squeeze);
     if (vx.cut_r && vs.line == MAX_LINES - 1) {
+        /* a pixel the gap has no room for goes to the next gap (the sum keeps it) */
         u32 acc = vx.cut_acc + vx.cut_r;
-        while (acc >= vx.cut_g) { acc -= vx.cut_g; adv--; }
-        vx.cut_acc = acc;
+        int least = glyph_adv(gi, 15);
+        while (acc >= vx.cut_g && adv > least) { acc -= vx.cut_g; adv--; }
+        vx.cut_acc = acc > 255 ? 255 : acc;
     }
     if (adv < 1) adv = 1;
     vs.pen_x += adv;

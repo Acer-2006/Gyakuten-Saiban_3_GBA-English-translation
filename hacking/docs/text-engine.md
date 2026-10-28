@@ -278,6 +278,29 @@ speed is 1, the typewriter included, and never on a space (`0x0202370c`; the Jap
 gives the third line of the three-line box its blips (the original had none past the second
 row).
 
+## Closing up and the clear column
+
+A line that closes up (a page line over 230 pixels, a caption line or a choice's option that
+does not fit, a third line under the page arrow) takes its pixels out of the gaps after its
+letters (`glyph_adv`), but never more than a gap's blank columns at the left letter's right:
+most letters have one there and one at their left (all but j), so a closed-up gap keeps one
+clear column. W and the digits have none at their right; up to 0.16.71 a closed-up W touched the
+next letter ("What", "We": 131 places in the script), and the third line's cut put three more
+pairs together. Their gaps are now left as they are, and a third line's cut that a gap has no
+room for goes to the next gap.
+
+## Lines 14 pixels apart
+
+The DS sets its lines 16 pixels apart, the GBA's box 14 (`BOX_PITCH`). The DS's letters take
+rows 1–13 of the 16×16 glyph (capitals 1–10, descenders to 13), but a few marks reach row 0: the
+apostrophe, the quotation mark, the brackets, $, # and the star. With 14 pixels between lines,
+a mark on a line's top row sat right under the descenders of the line above, with no row
+between them (episode 3: the quotation mark of '"Violetta"' under the g of "grandfather"; some
+320 pages in all, mostly apostrophes under a g, p or y). Since 0.16.72 the renderer's font has
+those marks a row lower (`tools/dsfont.py`, `tables(clear_top=True)`), level with the capitals,
+which keeps a row clear between any two lines. The pictures drawn with the font
+(`tools/textgfx.py`) keep the DS's glyphs.
+
 ## Centred lines
 
 The DS centres the date and place cards ("April 11, 9:40 AM / District Court / ...") and the
@@ -330,6 +353,14 @@ count keeps rows 0 and 1 only (`cmp r1, #1`).
   to fit (`LBL_FIT`, `lbl_trim`): the episode endings' "THE END" is pushed right by spaces in
   the DS's script, which the DS's 256-pixel screen had room for, and on the GBA's it ran off
   the right edge.
+  A caption's line starts at x 9 and has up to the box's right edge (x 238), 229 pixels
+  (`CAP_FIT`). Up to 0.16.71 caption letters never closed up, and the few caption lines wider
+  than that ran off the box with their last letters cut off (`labels_oam` puts a line's eight
+  cells from x 9; the box's border and the screen's edge took the rest): the episode 3 ending's
+  "And who knows? Maybe a whole" (238 pixels), the gallery's "What the... Wasn't he supposed"
+  in episode 2 (237), and four more (up to 244). Since 0.16.72 such a line closes up a pixel a
+  letter gap, two if one is not enough, as a page's line does, each line by itself (`line_done`,
+  `vx.cap_sq`).
 * **Choice menus** (command `0x07`): the box grows to the full screen (the map shadow then starts
   with tile `0x06` at `[0]` and `0x01` at `[1]`, which is how the English build recognises the
   mode), the question stays in the top rows and the labels are drawn as text in the lower part.

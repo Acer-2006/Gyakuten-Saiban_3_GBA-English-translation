@@ -63,7 +63,7 @@ def call_hook(rom, site, target, displaced, note='', keep=('r0', 'r1', 'r2', 'r3
 def apply(rom, ctx):
     genfont.gen()
     # font tables (from the DS ROM) first, at fixed positions in the old font area
-    rows, widths = dsfont.tables(ctx.data, ctx.arm9)
+    rows, widths = dsfont.tables(ctx.data, ctx.arm9, clear_top=True)
     rows_addr = rom.store(rows, 'font', 4, 'font rows')
     w_addr = rom.store(widths, 'font', 4, 'font widths')
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)

@@ -110,6 +110,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.72 — no more touching or cut-off text. The apostrophe, quotation marks, brackets, $, #
+  and the star sit a pixel lower, level with the capitals: the box's lines are 14 pixels apart
+  (the DS's 16), and a mark on one line came right under a g, p or y of the line above
+  ("grandfather" over '"Violetta"'; some 320 pages). Narration and other caption lines too
+  wide for the box now close up their letters a pixel, as page lines do; six were cut off at
+  the right ("And who knows? Maybe a whole" at the end of episode 3 lost its "e"). And a line
+  that closes up keeps a clear column after a W or a digit, which used to touch the next
+  letter ("What", "We").
 * 0.16.71 — the Witness Testimony, Cross Examination and Unlock Successful banners slide in and
   out by line, as on the DS: Witness, Cross and Unlock come in from the left and Testimony,
   Examination and Successful from the right, and at the end Witness and Testimony slide past
