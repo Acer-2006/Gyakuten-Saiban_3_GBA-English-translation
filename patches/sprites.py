@@ -13,8 +13,14 @@ expansion area and the sub-archive's cell table points to it (cell offsets are 3
 from the table, and the game unpacks a cell until the sprite is full rather than up to the next
 cell), so the frame data and the rest of the sub-archive stay where they are.
 
-Two more pairs in data.bin (0x70f8dc / 0x70fab8 and 0x712ac8 / 0x713258, effects 204 and 211 on
-the GBA) change a few pixels of pictures with no writing in them, so they are left as they are.
+One more pair in data.bin (0x70f8dc / 0x70fab8, effect 204 on the GBA) changes a few pixels of a
+picture with no writing in it, so it is left as it is.  Another (0x712ac8 / 0x713258, effect 211)
+was left too until 0.16.77, as the same kind of change: it is the view from where the photo was
+taken in episode 4, a cone of light over the map of the river whose sprites carry the map's own
+pixels under the light, and the English cells are cut from the English map.  The GBA's, cut from
+the Japanese one, put the river where the E of "Eagle River" is and a corner of the Japanese
+label's white edge beside it.  It is done last (LATE_PAIRS), so that what is stored before keeps
+its address.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -59,11 +65,13 @@ def gba_cells(g):
         for k, o in enumerate(offs): out.setdefault(tab + o, (tab, k))
     return out
 
-def apply(rom, ctx):
+def replace(rom, ctx, pairs):
+    """Every GBA cell that is a Japanese cell of one of the pairs the English one changed gets the
+    English cell. -> the number of cells"""
     data, g = ctx.data, bytes(rom.d[:rom.orig_size])
     cells = gba_cells(g)
     stored, changed = {}, 0
-    for jp, en, name in DS_PAIRS:
+    for jp, en, name in pairs:
         nj, fj, pj, cj = dspic.sub_archive(data, jp)
         ne, fe, pe, ce = dspic.sub_archive(data, en)
         if (nj, len(cj)) != (ne, len(ce)) or pj != pe:
@@ -84,4 +92,18 @@ def apply(rom, ctx):
                 h = g.find(a, h + 1, GBA_AREA[1])
         if not found: raise SystemExit(f'sprites: none of the {name} cells changed by the DS are in the GBA ROM')
         changed += found
+    return changed
+
+def apply(rom, ctx):
+    changed = replace(rom, ctx, DS_PAIRS)
     print(f"  sprites: {changed} cells from the DS English sprites (college Phoenix's sweater, Larry's armband)")
+
+# pairs done in the last build step (late), in the order they came
+LATE_PAIRS = [
+    (0x712ac8, 0x713258, 'the view from the photo\'s spot'),    # effect 211 (0xd3), 0.16.77
+]
+
+def late(rom, ctx):
+    changed = replace(rom, ctx, LATE_PAIRS)
+    print(f"  sprites: {changed} cells from the DS English sprites over the map of the river (the view "
+          f"from where the photo was taken)")

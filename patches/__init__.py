@@ -24,3 +24,4 @@ def apply_all(rom, ctx):
     icons.present_icon(rom)
     banners.lines(rom, ctx)
     court_record.clear_lines(rom, ctx)
+    sprites.late(rom, ctx)

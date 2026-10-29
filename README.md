@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.77 — the view from where the photo was taken in episode 4 (the cone of light from the red
+  dot on the map of the river, as Mia says "Your own photo tells the whole story!"): its sprites
+  carry the map under the light and were cut from the Japanese map, so the E of "Eagle River"
+  lost its stroke and a square patch of the Japanese label's edge showed in the light. They are
+  the DS's English ones now, cut from the English map. A savestate made while the cone is up
+  keeps the old pictures until the scene is played again.
 * 0.16.76 — The second Key Card in the Court Record: the tail of the p of "Opens" touched the E
   of "CEO's" on the line below. The gap under that line is now a pixel wider, with the same line
   breaks and word gaps; no Court Record description has touching letters any more. Only this

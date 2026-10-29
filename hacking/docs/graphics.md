@@ -621,12 +621,25 @@ Japanese (the GBA's cells, byte for byte) and English, with the same cells in th
 a few cells the GBA does not have. Its English sprites put P on Phoenix's sweater instead of RYU
 (`0x53ccf0` / `0x6f3f9c`, `0x544150` / `0x6fb274`, `0x548ad0` / `0x6ffaf8`, and the close-up
 `0x758718` / `0x75ac78`) and take away Larry's armband with Japanese writing on it
-(`0x58b270` / `0x704db8`, `0x590f5c` / `0x70a9dc`, `0x593cc4` / `0x70d710`). Two more pairs
-(`0x70f8dc` / `0x70fab8`, `0x712ac8` / `0x713258`, effects 204 and 211) change a few pixels of
-pictures with no writing in them. `patches/sprites.py` finds the GBA cell that is the same as each
-Japanese cell the English version changed, stores the English one in the expansion area and
-points the sub-archive's cell table at it (offsets are 32-bit and count from the table; the game
-unpacks a cell until the sprite is full, so the cells need not follow one another): 37 cells.
+(`0x58b270` / `0x704db8`, `0x590f5c` / `0x70a9dc`, `0x593cc4` / `0x70d710`). One more pair
+(`0x70f8dc` / `0x70fab8`, effect 204) changes a few pixels of a picture with no writing in it.
+`patches/sprites.py` finds the GBA cell that is the same as each Japanese cell the English
+version changed, stores the English one in the expansion area and points the sub-archive's cell
+table at it (offsets are 32-bit and count from the table; the game unpacks a cell until the
+sprite is full, so the cells need not follow one another): 37 cells.
+
+The pair `0x712ac8` / `0x713258` (effect 211, `0xd3`) was taken for the same kind of change until
+0.16.77, and left. It is the view from where the photo was taken, in episode 4's investigation
+(bank 24 section `0x99`, after "This is the location that the photo was taken from."): a cone of
+light from the red dot on the map of the river, 15 sprites that carry the map's own pixels under
+the light, cut from the Japanese map. Over the English map they put the river where the E of
+"Eagle River" is, and a square corner of the Japanese label's white edge in the light above it.
+The DS's English cells 10, 11, 13 and 14 are cut from the English map; since 0.16.77 the build
+takes them in its last step (`sprites.LATE_PAIRS`, `sprites.late`), so that what is stored before
+keeps its address: 4 cells. Of the other effects whose pictures `data.bin` holds twice, the rest
+are either already taken (the ones above) or not a version of the GBA's: effect `0xcf`'s cell 0
+is another picture on the DS (a red mark in place of its white light), and effect `0xec`'s sub-archive has
+other cells altogether.
 
 ## Buttons
 
