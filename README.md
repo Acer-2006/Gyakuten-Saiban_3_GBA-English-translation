@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.78 — when the Court Record comes up over a page with a third line while a large character
+  is on screen (Diego Armando in episode 4's trial, as it opens for "Who is the one person who can
+  testify to that demon woman's crimes...?"), the third line no longer turns into coloured blocks
+  for two frames: the Record's picture shares those sprite tiles, and the line now moves out of
+  them before the picture is copied in, not a frame after.
 * 0.16.77 — the view from where the photo was taken in episode 4 (the cone of light from the red
   dot on the map of the river, as Mia says "Your own photo tells the whole story!"): its sprites
   carry the map under the light and were cut from the Japanese map, so the E of "Eagle River"

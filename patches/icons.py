@@ -238,3 +238,21 @@ def present_icon(rom):
         if rom.read(site, 4) != rom.asm_thumb(site, f'bl #{ICON_UNPACK:#x}'):
             raise SystemExit(f'icons: unexpected code where the presented icon is unpacked ({site:#x})')
         call_hook(rom, site, rom.syms['vwf_icon'], f'bl #{ICON_UNPACK:#x}', 'present icon', keep=('r0', 'r1'))
+
+
+# The Court Record's picture goes to OBJ tile 0x280, or with a large character on screen to 0x80,
+# the third line's (graphics.md, text-engine.md "Where sprite text goes"): the DMA at 0x08014dda
+# runs during the frame's update, and the third line moved out only the next frame, so for two
+# frames it showed the picture's tiles (src/vwf.c, vwf_record_pic).  The DMA calls vwf_record_pic
+# first.  Applied last (0.16.78), so that nothing before it moves.
+RECORD_PIC_DMA = 0x08014dda                # str r5, [r2]; ldr r0, =0x06011000 (DMA source, dest)
+RECORD_PIC_CODE = bytes.fromhex('15600b48')
+
+def record_picture(rom):
+    from .text import call_hook
+    if rom.read(RECORD_PIC_DMA, 4) != RECORD_PIC_CODE or rom.u32(((RECORD_PIC_DMA + 2 + 4) & ~3) + 0x2c) != 0x06011000:
+        raise SystemExit('icons: unexpected code where the Court Record picture is copied to 0x80')
+    # the literal load is redone without its pool: 0x6011 << 12
+    call_hook(rom, RECORD_PIC_DMA, rom.syms['vwf_record_pic'],
+              'str r5, [r2]\n movs r0, #0x60\n lsls r0, r0, #8\n adds r0, #0x11\n lsls r0, r0, #12',
+              'record picture', keep=('r1', 'r2', 'r3'))

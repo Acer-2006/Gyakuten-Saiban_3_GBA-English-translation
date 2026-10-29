@@ -698,21 +698,41 @@ static int icon_up(void) {
     return (a0 & 0x300) != 0x200 && t >= 0x80 && t < 0xc0;
 }
 
-void vwf_icon(void) {
-    if (!vs.lbl_used[2] || lbl_tile(2, 0) != 0x80) return;
+/* The third line, in 0x80-0xbf, moved out at once: its tiles copied to 64 that no sprite on
+   screen uses (l3_block; what was there kept at L3_BACKUP), in OAM itself as well as in the
+   buffer; with no such tiles it is hidden.  -> the tiles it went to, or 0 */
+static __attribute__((noinline)) u32 l3_out(void) {
     volatile u16* oam = (volatile u16*)0x07000000;
     u32 base = l3_block();
     if (base) {
         volatile u32* v = (volatile u32*)(0x06010000 + base * 32);
         dma32(v, L3_BACKUP, 64 * 8, 0);
         dma32((volatile u32*)0x06011000, v, 64 * 8, 0);
-        vx.icon_tile = base;
     }
     NO_UNROLL for (int c = 0; c < LBL_CELLS; c++) {
         int k = (lbl_obj0[2] + c) * 4;
         if (base) oam[k + 2] = OAMBUF[k + 2] = (OAMBUF[k + 2] & ~0x3ff) | (base + c * 8);
         else oam[k] = OAMBUF[k] = 0x0200;
     }
+    return base;
+}
+
+void vwf_icon(void) {
+    if (!vs.lbl_used[2] || lbl_tile(2, 0) != 0x80) return;
+    vx.icon_tile = l3_out();
+}
+
+/* The Court Record's picture, with a large character on screen, is copied to 0x80-0xbf
+   (0x08014dda; patches/icons.py, record_picture) during the frame's update, and record_borrows
+   sees it in the next one: until 0.16.78 the third line showed the picture's tiles for two frames
+   as the Record came up (in episode 4's trial, with Diego Armando on screen, as it opens for
+   "Who is the one person who can testify...").  vwf_record_pic, called before the copy, lends
+   the third line at once, as record_lend would a frame later (which then finds it lent, and
+   gives it back when the Record closes). */
+void vwf_record_pic(void) {
+    if (vs.l3_lent || !vs.lbl_used[2] || lbl_tile(2, 0) != 0x80) return;
+    vs.l3_lent = 1;
+    vx.l3_tile = l3_out();
 }
 
 static __attribute__((noinline)) void icon_back(void) {

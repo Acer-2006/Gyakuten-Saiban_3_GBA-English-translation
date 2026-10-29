@@ -107,12 +107,18 @@ box since 0.16.68, is clear of it (in the taller boxes before, it was under the 
 Record was open: 0.16.18 moved the page 8 px lower meanwhile, and 0.16.21 put it back).) The Record's picture (OAM 34, 64×64) goes to OBJ tile `0x280`, or with a large character
 on screen whose sprites start below `0x2c0` (the loader's test at `0x08014dca`; Armando's start at
 `0x284`) to `0x80` (`0x08014ddc`, attribute at `0x08014e9a`): the original's spare tiles of the item
-shown in court, the third line's here. While it is there `vwf_frame` moves the third line to
+shown in court, the third line's here. While it is there the third line moves to
 64 tiles from `0x100`–`0x17f` that no shown sprite uses (in court the defence bench's and witness
 stand's fronts take `0x100`–`0x12f`, so it is usually `0x130`), keeping what was there in EWRAM
-`0x0202a000` and putting it back when the Record closes; the page is drawn again from its start
-(`vwf_resume`) each time it moves. If no such block is free the third line is hidden until
-the Record closes. The same goes for the life bar, whose 28 tiles go to `0x84`–`0x9f` while it is
+`0x0202a000` and putting it back when the Record closes. The copy (the DMA at `0x08014dda`) is
+made during the frame's update, and `vwf_frame` (`record_lend`) sees the picture there only in
+the next frame's: until 0.16.78 the third line showed the picture's tiles for two frames as the
+Record came up (episode 4's trial, Diego Armando on screen, the Record opened by the script for
+"Who is the one person who can testify..."). `vwf_record_pic`, called before the DMA
+(`patches/icons.py`, `record_picture`, a last build step), moves it at once, its tiles copied
+with it, in OAM as well as in the buffer; `record_lend` then finds it moved, and moves it back
+when the Record closes, the page drawn again from its start (`vwf_resume`). If no such block is
+free the third line is hidden until the Record closes. The same goes for the life bar, whose 28 tiles go to `0x84`–`0x9f` while it is
 up with a map marker on screen (graphics.md, "Map markers"; the Judge's question on the bridge's
 map in episode 4): the third line moves while the bar is there (`bar_borrows`, 0.16.61), from the
 page's start when the bar is already there, so that the page is not drawn again. Evidence
@@ -402,6 +408,7 @@ the old font area.
 | `0x0803b844` | the template is the original's: the box on BG1 rows 14–19, 48 pixels, the name tag on rows 12–13. The page's three lines are 14 pixels apart from y 115 (`TEXT_Y0`, `BOX_PITCH`: the letters' ink takes rows 1–13 of their 16-pixel cells), 2 pixels under the top border's lines (y 112–113) and the last a pixel over the bottom one's (158–159); the page arrow beside the third line, y 148. From 0.1 to 0.16.7 the template was rewritten to a box a row taller (56 pixels), from 0.16.8 to 0.16.67 two rows (64, the DS box's height), with the name tag, the item box, the box clears and the episode select moved to match; those hid 8 and 16 pixels more of the scene than the original and the DS do. A save or save state from those builds is put right when it is continued or loaded (`box_rows_fix`, `old_layout`) |
 | `0x0802afd0`, `0x0802b50e` | `bl vwf_data_text` instead of `0x0801ecd4`: the episode 4 data screen's two pages (common sections `0x31`, `0x32`) in the English font, a few letters to a 16×16 sprite (OAM records from 37, tiles from `0x19c`), with the original's timing list; see graphics.md, "The escaped convict's data screen" |
 | `0x0800ebc8`, `0x0800ebfe` | the statement arrows' y 128 → 129, the second line |
+| `0x08014dda` | `str r5, [r2]; ldr r0, =0x06011000` (the Court Record's picture copied to OBJ tile `0x80`, with a large character on screen) → a trampoline that calls `vwf_record_pic` first and redoes the two (the constant built with shifts): the third line moved out of those tiles before they change (since 0.16.78) |
 | `0x08014690`, `0x08036b9c` | `bl 0x0803a048` (the presented evidence's icon unpacked, then copied to OBJ tile `0x80`) → a trampoline that calls `vwf_icon` first: the third line moved out of those tiles for the rest of the frame ("Where sprite text goes"; since 0.16.69, moved rather than hidden since 0.16.70) |
 | `0x08022166`, `0x08021c8e` | the two box clear loops replaced by `bl vwf_boxclear` (rows 12–19) and a branch past the loop, keeping the register the code after the loop uses (`r4` = `TXT+0x23` for command `0x1c`, `r5` = `0x03002080` after a choice). A page of sprite text is not started over by it: `0x1c 1` can hide the box in the middle of a page (14 pages in both the Japanese and the DS script, for an animation; the Japanese sometimes goes on in the same line after `0x1c 0`), and the original keeps its sprite text through the hide, so the page's lines come back with the box |
 | BG tiles `0xe0`–`0x193` | the question canvas. The Court Record copies its panel into BG tiles `0xa0`–`0x17f` to slide from one item to the next, and char block 0 has no room for both; `vwf_frame` keeps a checksum of the canvas tiles and, when they change behind its back, draws the question again from a log of the glyphs blitted since the last clear, once no background uses those tiles any more |
