@@ -26,3 +26,4 @@ def apply_all(rom, ctx):
     court_record.clear_lines(rom, ctx)
     sprites.late(rom, ctx)
     icons.record_picture(rom)
+    court_record.tall_panels(rom, ctx)

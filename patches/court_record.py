@@ -3,7 +3,8 @@
 GBA: a table of 211 entries at 0x08045f74, {u32 image, u32 icon | detail << 16}, indexed by item
 id.  Each image is LZ77: a 160x64 4bpp picture (ten 32x32 sprite cells, 5 across and 2 down,
 tiles row-major in each cell) with the name on top and the description below; palette indices
-9 background, 15 name, 8 text, 0 for the transparent columns 152-159.
+9 background, 15 name, 8 text, 0 for the transparent columns 152-159.  The English build's are
+160x72 (since 0.16.80, tall_panels: 8 rows more, drawn on the panel's background).
 
 DS: the same item ids.  The arm9 has a table of 211 records of 24 bytes at 0x020a2368
 ({u16 icon, u16 name, u16 name, u16 info panel, u16 description, u16 detail, ...}; icon and
@@ -14,7 +15,7 @@ font text.  The names are copied as pictures; the descriptions are read back to 
 tools/dsimgtext.py) and set again in the same font, the DS's letters with the DS's gaps halved, so
 they fit the GBA panel (tools/dsdesc.py).
 """
-import os, re, struct, sys
+import json, os, re, struct, sys
 from collections import Counter
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
 import lz, dsdesc, dsimgtext, textgfx
@@ -298,10 +299,11 @@ def apply(rom, ctx):
         if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i}')
         new[i] = stored[data]
     # unused items share the picture of a used one in the GBA ROM (item 0 mostly); keep that
+    shared = ctx.court_shared = {}             # for tall_panels: unused item -> the item it shares
     for i in range(COUNT):
         if i not in new:
             same = [k for k in new if orig[k] == orig[i]]
-            if same: new[i] = new[same[0]]
+            if same: new[i] = new[same[0]]; shared[i] = shared.get(same[0], same[0])
     for i, addr in new.items():
         rom.w32(GBA_ITEMS + 8 * i, addr)
     print(f"  court record: {len(new)} of {COUNT} panels in English ({len(stored)} pictures)" +
@@ -426,3 +428,181 @@ def clear_lines(rom, ctx):
         rom.w32(GBA_ITEMS + 8 * i, rom.store(lz.compress(cells(after)), 'ext', 4, f'court record {i} ({why})'))
     print(f"  court record: the lines of {changed} set again so that fewer letters touch ({len(stored)} pictures)" +
           (f"; name touching: {still}" if still else ''))
+
+# The panels on 160x72 pictures (0.16.80, as in the maintainer's English GS1): no pixel of a line
+# touching one of the line above or below it, the name line included, with the DS's line breaks.
+# The Japanese picture is 160x64, drawn as sprites at y 24-87, and the DS's letters reach from
+# row 0 of their cell (quotes, brackets) to row 13 (the tails of g, j, p, q, y and the comma), so
+# with the name four lines fitted only 12 rows apart, and at that spacing letters met (0.16.73-
+# 0.16.76 chose other line breaks, spacings and word gaps around that).  The panel's red runs
+# down to y 92, under the picture's last row: the picture grows to 72 rows, its rows 0-68 red and
+# 69-71 the panel's bottom border (BORDER_TILE's last three rows), and four lines go 14 rows apart
+# (dsdesc.choose_tall).  The first 160 tiles are the picture's rows 0-63 as before (the ten
+# sprites); the 20 after them are its rows 64-71, of which the first 19 (the transparent columns
+# 152-159 are the panel's corner tile) are drawn on the panel itself, BG2 row 11, where the panel's
+# map has BORDER_TILE: no sprite memory is free for them whenever the Record shows, and the
+# background has its slide copy there already.  The loader (LOADER_DMA) copies them to one of two
+# sets of BG tiles in char block 0 (STRIP_SETS, which nothing else uses), the other one each time,
+# and the scroll that brings the panel's columns in (FEEDS) takes them from a copy of the panel's
+# map (SLIDE_MAP) whose row 11 has the set of the item last loaded: the item sliding out keeps
+# its strip, in the set it had, until it is gone.
+TALL_H, RED_LAST = 72, 68
+UI_SHEET = 0x08180820          # BG tile sheet in char block 0 (256 tiles)
+BORDER_TILE = 0x4c             # under the description: 5 red rows, then the border (a, b, 1)
+SLIDE_MAP = 0x0803bc44         # the panel's BG2 map (32x12), read only by the scroll at 0x080061bc
+STRIP_ROW, STRIP_COL, STRIP_TILES = 11, 11, 19
+STRIP_SETS = (0x194, 0x1a7)    # BG tiles of the two strip sets (char block 0)
+STRIP_STATE = 0x02029c00       # u8: the set of the item last loaded
+UNPACK = 0x0200afc0            # where the loader unpacks the picture
+LOADER_DMA = 0x08014e40        # ldr r0, [r1, #8]; pop {r4, r5}: after the 0x1400-byte DMA to 0x06013c00
+FEEDS = {0x08006298: ('r4', 'mov r1, ip'),     # ldr r4, =SLIDE_MAP; mov r1, ip (right edge)
+         0x080062cc: ('r2', 'mov sl, r2')}     # ldr r2, =SLIDE_MAP; mov sl, r2 (left edge)
+SLIDE_MAP_POOL = 0x08006348
+
+def border_rows(rom):
+    """BORDER_TILE's rows (each one colour), checked against what the pictures assume."""
+    b = rom.read(UI_SHEET + 32 * BORDER_TILE, 32)
+    t = [[b[y * 4 + x // 2] >> 4 * (x & 1) & 15 for x in range(8)] for y in range(8)]
+    if any(len(set(row)) != 1 for row in t) or any(row[0] != BG for row in t[:5]):
+        raise SystemExit('court record: unexpected panel border tile')
+    return [row[0] for row in t]
+
+def tall_picture(name_cols, dx, lines, tops, font, cut, border):
+    """160x72 indices: the name line `dx` columns off the centre, the lines at `tops`."""
+    img = [[border[y - 64] if y >= 64 else BG] * W_USE + [CLEAR] * (W - W_USE) for y in range(TALL_H)]
+    x0 = (W_USE - len(name_cols)) // 2 + dx
+    for x, m in enumerate(name_cols):
+        for y in range(16):
+            if m >> y & 1: img[y][x0 + x] = TITLE
+    for line, top in zip(lines, tops):
+        for x, m in enumerate(font.masks(line, TEXT_X, W_USE, cut)):
+            for k in range(16):
+                if m >> k & 1: img[top + k][x] = BODY
+    return img
+
+def tall_tiles(img):
+    """The picture's tiles: rows 0-63 as cells() (160 tiles), then rows 64-71 left to right (20)."""
+    out = bytearray(cells(img))
+    for tx in range(W // 8):
+        for r in range(8):
+            row = img[64 + r]
+            for x in range(tx * 8, tx * 8 + 8, 2):
+                out.append((row[x] & 15) | ((row[x + 1] & 15) << 4))
+    return bytes(out)
+
+def tall_layouts(ctx, font, stems, names):
+    """{item: (name columns, dx, lines, tops, word cut, font)} for every description."""
+    out, bad = {}, []
+    for i, (name_px, text) in sorted(ctx.court_inputs.items()):
+        cols = name_columns(name_px, AGES[i], names, LONG_NAMES.get(i)) if i in AGES else None
+        if cols is None: cols = name_columns(name_px)
+        places = []
+        for dx in NUDGES:
+            x0 = (W_USE - len(cols)) // 2 + dx
+            if 0 <= x0 and x0 + len(cols) <= W_USE:
+                m = [0] * W
+                m[x0:x0 + len(cols)] = cols
+                places.append((dx, m))
+        f = stems if i in STEM_GAPS else font
+        found = dsdesc.choose_tall(f, text, TEXT_W, TEXT_X, W, places, RED_LAST, BREAKS.get(i, ()))
+        if found is None: bad.append(i); continue
+        lines, tops, cut, dx = found
+        out[i] = (cols, dx, lines, tops, cut, f)
+    if bad: raise SystemExit(f'court record: no layout without touching letters for {bad}')
+    return out
+
+def tall_panels(rom, ctx):
+    """Applied last (0.16.80): every panel again on a 160x72 picture (see above), the loader and
+    the scroll taught about the strip.  The pictures stored before stay where they are, unused."""
+    d, arm9 = ctx.data, ctx.arm9
+    font = dsdesc.Font(d, arm9)
+    stems = dsdesc.Font(d, arm9, stem_gap=True)
+    recs = ds_items(arm9)
+    nb = struct.unpack_from('<8I', arm9, DS_BASES - DS_ARM9)[NAME_BASE]
+    nsz = dsimgtext.texture_size(d, nb)
+    names = NameFont(lambda i: dsimgtext.texture(d, nb + recs[i][1] * nsz)[0])
+    border = border_rows(rom)
+    layouts = ctx.court_layouts = tall_layouts(ctx, font, stems, names)
+    stored, addr = {}, {}
+    for i, (cols, dx, lines, tops, cut, f) in layouts.items():
+        data = lz.compress(tall_tiles(tall_picture(cols, dx, lines, tops, f, cut, border)))
+        if data not in stored: stored[data] = rom.store(data, 'ext', 4, f'court record {i} (160x72)')
+        addr[i] = stored[data]
+    for i, k in ctx.court_shared.items(): addr[i] = addr[k]
+    if sorted(addr) != list(range(COUNT)): raise SystemExit('court record: items without a 160x72 picture')
+    for i, a in addr.items(): rom.w32(GBA_ITEMS + 8 * i, a)
+    # the panel's map with row 11 on each strip set
+    if rom.u32(SLIDE_MAP_POOL) != SLIDE_MAP: raise SystemExit('court record: unexpected panel scroll')
+    base = rom.read(SLIDE_MAP, 32 * 12 * 2)
+    maps = []
+    for first in STRIP_SETS:
+        m = bytearray(base)
+        for k in range(STRIP_TILES):
+            o = 2 * (STRIP_ROW * 32 + STRIP_COL + k)
+            if struct.unpack_from('<H', m, o)[0] != BORDER_TILE: raise SystemExit('court record: unexpected panel map')
+            struct.pack_into('<H', m, o, first + k)
+        maps.append(rom.store(bytes(m), 'ext', 4, f'court record panel map, strip at {first:#x}'))
+    # the loader: the strip to the other set (the sprites' DMA has run), then what was replaced
+    if rom.read(LOADER_DMA, 4) != rom.asm_thumb(LOADER_DMA, 'ldr r0, [r1, #8]\n pop {r4, r5}'):
+        raise SystemExit('court record: unexpected code after the description DMA')
+    strip = rom.thumb_code(f'''
+        ldr r0, [r1, #8]
+        ldr r3, state
+        ldrb r2, [r3]
+        movs r0, #1
+        eors r2, r0
+        strb r2, [r3]
+        ldr r0, set_a
+        cmp r2, #0
+        beq have
+        ldr r0, set_b
+    have:
+        ldr r2, src
+        str r2, [r1]
+        str r0, [r1, #4]
+        ldr r2, ctrl
+        str r2, [r1, #8]
+        ldr r2, [r1, #8]
+        pop {{r4, r5}}
+        bx lr
+        .align 2
+    state: .word {STRIP_STATE:#x}
+    set_a: .word {0x06000000 + 32 * STRIP_SETS[0]:#x}
+    set_b: .word {0x06000000 + 32 * STRIP_SETS[1]:#x}
+    src: .word {UNPACK + 160 * 32:#x}
+    ctrl: .word {0x84000000 | STRIP_TILES * 8:#x}
+    ''', note='court record strip')
+    rom.hook_bl(LOADER_DMA, strip, 'court record strip')
+    # the scroll: the map of the set last loaded
+    for site, (reg, rest) in FEEDS.items():
+        if rom.read(site, 4) != rom.asm_thumb(site, f'ldr {reg}, [pc, #{SLIDE_MAP_POOL - ((site + 4) & ~3):#x}]\n {rest}'):
+            raise SystemExit(f'court record: unexpected code in the panel scroll at {site:#x}')
+        feed = rom.thumb_code(f'''
+            ldr {reg}, state
+            ldrb {reg}, [{reg}]
+            cmp {reg}, #0
+            ldr {reg}, map_a
+            beq have
+            ldr {reg}, map_b
+        have:
+            {rest}
+            bx lr
+            .align 2
+        state: .word {STRIP_STATE:#x}
+        map_a: .word {maps[0]:#x}
+        map_b: .word {maps[1]:#x}
+        ''', note='court record panel map')
+        rom.hook_bl(site, feed, 'court record panel map')
+    # what each picture has where, for hacking/tools/gs3_record_audit.py
+    out = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'build', 'court_record.json')
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, 'w') as fh:
+        json.dump({'pictures': {i: addr[i] for i in sorted(addr)},
+                   'layouts': {i: {'name_dx': l[1], 'lines': l[2], 'tops': l[3], 'word_cut': l[4],
+                                   'stem_gap': l[5] is stems, 'age': AGES.get(i)}
+                               for i, l in layouts.items()}}, fh, indent=1)
+    four = [i for i, l in layouts.items() if len(l[2]) == 4]
+    moved = [i for i, l in layouts.items() if len(l[2]) == 4 and l[3] != dsdesc.TALL_TOPS[4]]
+    print(f"  court record: {len(layouts)} descriptions on 160x72 pictures ({len(stored)}), "
+          f"{len(four)} in four lines ({len(moved)} spaced otherwise), "
+          f"narrower word gaps in {[i for i, l in layouts.items() if l[4]]}")

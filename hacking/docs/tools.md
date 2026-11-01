@@ -118,6 +118,21 @@ every Thumb `bl` that calls an address — the usual first step from a data bloc
 that uses it, or from a function to its callers. `dis` needs capstone and annotates `ldr rX, [pc, #n]`
 with the literal's value.
 
+## gs3_record_audit.py — the Court Record descriptions
+
+```
+gs3_record_audit.py out/gs3_en.gba tt_us.nds [--layout build/court_record.json] [--png DIR]
+```
+
+For a ROM made by the English build (0.16.80 on): unpacks every item's 160×72 picture and
+checks that it is red (rows 0–68) and border (69–71) in columns 0–151 and transparent in 152–159
+with only the name and the text on it; that the text's pixels are exactly the lines the build
+recorded in `build/court_record.json` (written by every build), each drawn on its own with the DS
+font; that no pixel of one line is on or next to a pixel of another (8 ways, the name line
+counting as a line); and that the lines are the DS description word for word. Prints the items
+with a problem and the count with lines touching, and exits with 1 if there is any. `--png`
+writes each picture, 4× and in the panel's colours, for looking at.
+
 ## Emulator harness (`hacking/emu/`)
 
 `gbarun.c` is a tiny front end for the mGBA core, driven by commands on standard input, one

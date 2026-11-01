@@ -21,7 +21,13 @@ Card) with a tail touching a letter, in three columns, which since 0.16.76 has a
 
 A description that does not fit in four lines that way gets its word gaps narrowed (to 4, then 3
 pixels), and then a word hyphenated where HYPHENS allows; with the US DS text, two need the first
-and one (Franziska von Karma's profile) both."""
+and one (Franziska von Karma's profile) both.
+
+Since 0.16.80 the panels are 160x72 (court_record.tall_panels) and the lines are chosen by
+choose_tall instead: the DS's own line breaks (natural), four lines 14 rows apart, other spacings
+of 13 to 15 rows where letters would touch, other breaks only where nothing else does.  choose,
+choose_clear and cost still make the 160x64 pictures of the earlier build steps, which are no
+longer used."""
 import itertools
 import dsfont, dsimgtext
 
@@ -244,6 +250,84 @@ def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom, first=(), st
                 break
     if best: return best[1:]
     return fewest[1:]
+
+# The 160x72 panels (since 0.16.80, court_record.tall_panels): the picture reaches 8 rows further
+# down, to the panel's bottom border, its rows 0-68 red.  Up to three lines keep their rows; four
+# lines go 14 rows apart from row 13 (the last one's tails on row 68), and where letters of two
+# lines (or of the name and the first line) would touch, every other spacing of 13 to 15 rows with
+# the first line on rows 11 to 14 is tried, the evenest first.
+TALL_TOPS = {1: (17,), 2: (17, 33), 3: (17, 33, 49), 4: (13, 27, 41, 55)}
+TALL_FIRST = (13, 12, 14, 11)
+TALL_PITCHES = (14, 13, 15)
+
+def tall_tops(n):
+    """The rows of n lines' tops on the 160x72 panel, in the order they are tried."""
+    yield TALL_TOPS[n]
+    if n < 4: return
+    out = []
+    for top in TALL_FIRST:
+        for st in itertools.product(TALL_PITCHES, repeat=n - 1):
+            ys = (top,) + tuple(top + sum(st[:k + 1]) for k in range(n - 1))
+            if ys != TALL_TOPS[n]:
+                out.append(((len(set(st)) > 1, sum(abs(s - 14) for s in st), abs(top - 13)), ys))
+    for _, ys in sorted(out): yield ys
+
+def natural(us, fits, hy=None, must=()):
+    """The units broken into lines as the DS breaks them: each line filled as far as it goes (a
+    hyphenated word's first half, hy, and the units in must end or begin a line).  -> lines, or
+    None if a unit alone does not fit or the hyphenated word stays whole."""
+    out, cur = [], []
+    for k, u in enumerate(us):
+        new_line = (hy is not None and k == hy + 1) or k in must
+        if cur and not new_line and fits(' '.join(cur + [u])):
+            cur.append(u); continue
+        if hy is not None and k == hy + 1 and fits(' '.join(cur[:-1] + [cur[-1][:-1] + u])):
+            return None
+        if cur: out.append(' '.join(cur))
+        if not fits(u): return None
+        cur = [u]
+    out.append(' '.join(cur))
+    return out
+
+def contacts(font, lines, tops, x0, w, word_cut, name_masks, last_row):
+    """Columns where pixels of two lines (the name the first) are on or next to each other (8
+    ways), or None if a line's ink goes below row last_row."""
+    ms = [font.masks(l, x0, w, word_cut) for l in lines]
+    for t, m in zip(tops, ms):
+        if t + max(v.bit_length() for v in m) - 1 > last_row: return None
+    n = sum(clash(name_masks, [v << tops[0] for v in ms[0]], 0))
+    for k in range(len(lines) - 1):
+        n += sum(clash(ms[k], ms[k + 1], tops[k + 1] - tops[k]))
+    return n
+
+def choose_tall(font, text, maxw, x0, w, names, last_row, first=()):
+    """The lines of a 160x72 panel with no pixel of one line touching one of another: the
+    natural line breaks (natural) at the rows tall_tops gives, the name line at each place
+    `names` offers ([(dx, column masks)], the centre first); only if no row spacing and no place
+    of the name works, the other ways to break the text into that many lines (cheapest first,
+    cost).  Word gaps narrow (1, then 2 pixels) and a word is hyphenated (HYPHENS) only for a
+    text that does not fit in four lines otherwise.  first: the lines the text begins with
+    (court_record.BREAKS).  -> (lines, tops, word_cut, dx), or None."""
+    us, must = units(text), breaks(text, first)
+    for word_cut in (0, 1, 2):
+        def fits(line): return font.width(line, word_cut) <= maxw
+        for cand, hy in [(us, None)] + (list(hyphenated(us)) if word_cut == 2 and not must else []):
+            nat = natural(cand, fits, hy, must)
+            if nat is None or len(nat) > 4: continue
+            def ok(lines):
+                for tops in tall_tops(len(lines)):
+                    for dx, nm in names:
+                        if contacts(font, lines, tops, x0, w, word_cut, nm, last_row) == 0:
+                            return lines, tops, word_cut, dx
+            found = ok(nat)
+            if found: return found
+            centre = names[0][1]
+            others = [c for c in splits(cand, len(nat), fits, hy, must) if c != nat]
+            others.sort(key=lambda c: cost(font, c, TALL_TOPS[len(c)], maxw, centre, x0, word_cut))
+            for c in others:
+                found = ok(c)
+                if found: return found
+    return None
 
 def choose(font, text, maxw, name_masks, x0, layouts, first=()):
     """-> (lines, tops, word_cut): the description's lines and the panel row of each line's top.

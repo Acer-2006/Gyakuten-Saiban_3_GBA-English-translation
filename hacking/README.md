@@ -35,6 +35,8 @@ optional extras (see tools.md).
 * `gs3_sound.py` — list songs and samples, export a sample to WAV, replace one.
 * `gs3_dis.py` — cross references (literals and `bl` calls), literal pool and hex dumps, and
   Thumb/ARM disassembly when capstone is installed.
+* `gs3_record_audit.py` — check the Court Record descriptions of a ROM made by the English
+  build: no two lines touching, all ink in the panel's red, the DS text word for word.
 
 ## Emulator harness (`emu/`)
 

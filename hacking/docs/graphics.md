@@ -145,7 +145,7 @@ memory-map.md). `icon` selects the picture in the left box; `detail` is non-zero
 have a second page opened with the L Button (photos, maps, letters).
 
 Each `image` is LZ: 5120 bytes, a 160×64 4bpp picture stored as ten 32×32 sprite cells, 5 across
-and 2 down, each cell 4×4 tiles row-major. It holds the item name on top and the description
+and 2 down, each cell 4×4 tiles row-major (the English build's are 160×72, see below). It holds the item name on top and the description
 below it (Japanese: the name in 12-pixel kanji, three lines of text at a 16-pixel pitch). The
 picture is drawn at (80, 24) with OBJ palette 2: index 9 is the background, 15 the name
 (yellow), 8 the text (white), and columns 152–159 are index 0 (transparent; the right arrow sits
@@ -162,47 +162,56 @@ The English build makes new pictures: the name is the DS version's name picture 
 for pixel), the description is the DS text set again in the font the DS pictures use, the
 dialogue font, white (8) only like the DS's and the Japanese text (`tools/dsdesc.py`). The DS
 lines run to 228 pixels with letters 2 pixels apart and words 10; the build halves every gap
-(letters 1, words 5) and breaks the text into lines of up to 149 pixels: three lines 16 rows
-apart when it fits (as the Japanese), otherwise four 12 rows apart, broken so that the letters
-of two lines touch as little as possible (they are 13 rows tall). Where the DS says "Touch the Check Button",
-the GBA text says "Press L". In 33 of the 188 descriptions (130 have four lines) the tail of a g,
-p, y or comma still touched a letter of the next line; since 0.16.73 a last build step
-(`court_record.clear_lines`, `dsdesc.choose_clear`) sets those again with whichever costs least
-of: other line breaks, one or two of the gaps 13 rows instead of 12 (a gap a row wider, or the
-first line a row higher, kept off the name), word gaps a pixel narrower (three lines then fit
-for some, 16 rows apart), or one line moved a pixel or two sideways (6 of them). The second Key
-Card (the p of "Opens" over the E of "CEO's") touched in three columns in every such layout
-of its text; since 0.16.76 it has a gap two rows wider (see below), and no description touches. The renderer's marks a row lower (text-engine.md, "Lines 14 pixels apart") would not help
-here: 12 rows apart the marks meet the tails of the line above either way, and lowering them
-makes one more description touch.
+(letters 1, words 5) and breaks the text into lines of up to 149 pixels. Where the DS says
+"Touch the Check Button", the GBA text says "Press L".
 
-With every gap halved, two letters whose straight sides face each other (the g and l of
-"amazingly", nn, il, ne: 5 or more rows of ink side by side) are 1 pixel apart and read as one
-thick stroke. Giving all of them the DS's 2 pixels (`dsdesc.Font(stem_gap)`) widens the text
-enough that 13 descriptions would need four lines instead of three, so it is used only where
-asked for (`court_record.STEM_GAPS`, since 0.16.74): Pearl Fey's first profile, which is then
-set "Maya's cousin, / and channeling prodigy. / She has amazingly / powerful spiritual
-abilities.", its second line two pixels to the right and its word gaps a pixel narrower, and
-no letters of two lines touch (in 0.16.73 the y of "prodigy" still touched "amazingly"). Its
-picture is stored after the others, which keep the addresses they had.
+**Since 0.16.80 the pictures are 160×72** (`court_record.tall_panels`, the last build step; as
+in the maintainer's English GS1). The letters reach from row 0 of their cell (quotes,
+apostrophes, brackets) to row 13 (the tails of g, j, p, q, y and the comma; Ç to 14), so in
+160×64 a name and four lines fitted only 12 rows apart, and at that spacing letters of two lines
+met (0.16.73-0.16.76 chose other line breaks, spacings and word gaps around that:
+`court_record.clear_lines`, `STEM_GAPS`, `BREAKS`, `SPACED`, `dsdesc.choose_clear`; those steps
+still run, so that everything stored after them keeps its address, but their pictures are no
+longer used). The panel's red runs from y 19 to 92 and its bottom border is y 93–95, while the
+picture ended at y 87; the background's tiles are 8 rows high, so the picture cannot start
+higher, but it can go 8 rows further down. Rows 0–68 are red (9) and rows 69–71 the border
+(10, 11, 1: the last three rows of BG tile `0x4c`, which has five red rows above them).
 
-A description can also be given its line breaks (`court_record.BREAKS`, since 0.16.75), where
-the chosen ones split a phrase: the profile named "??????" (item 166), "Morgan Fey's /
-daughter and Iris's twin / sister. ..." in 0.16.73, is set "Morgan Fey's daughter / and Iris's
-twin sister. / Her father deals / in jewelry apparently.". The given lines go through the same
-search, which for these may also make a gap a row narrower or two rows wider (`LINE_STEPS`;
-`dsdesc.tops_variants`): the tail of the g of "Morgan" is over the I of "Iris's", so the lines
-are 14, 11 and 11 rows apart (tops 14, 28, 39, 50; the second and third lines have nothing below
-the baseline, so 11 rows still leaves a clear row), with full word gaps and no line moved
-sideways. Its picture is stored after Pearl Fey's.
+Layout (`dsdesc.choose_tall`): the DS's line breaks, each line filled as far as it goes; up to
+three lines at rows 17, 33 and 49 (16 apart, as before); four lines at 13, 27, 41 and 55 (14
+apart, the last line's tails on row 68). Where a pixel of one line would be on or next to (8
+ways) a pixel of another, the name line counting as the first, the name line moves off the
+centre (as since 0.16.65), then every other spacing of 13 to 15 rows with the first line on rows
+11 to 14 is tried, the evenest first; only then other line breaks; with none of that the build
+stops. With the US DS text all 195 descriptions keep the DS's breaks: 130 of the 132 four-line
+ones are 14 rows apart, one is 13 apart from row 14 and one 14 apart from row 14 (its last line
+has no tails). Word gaps narrow (4, then 3 pixels) only for a text that does not fit four lines
+otherwise (Franziska von Karma's second profile, item 163, which also has "prosecutor"
+hyphenated, and item 210). Pearl Fey's first profile keeps the 2-pixel gap between straight sides
+(`dsdesc.Font(stem_gap)`, since 0.16.74: the g and l of "amazingly") and the "??????" profile
+its given breaks ("Morgan Fey's daughter / and Iris's twin sister. / Her father deals / in
+jewelry apparently.", since 0.16.75). `hacking/tools/gs3_record_audit.py` checks a built ROM.
 
-The same spacing is used for the second Key Card (item 54; `court_record.SPACED`, since 0.16.76),
-its line breaks chosen as before ("Found in Ron's wallet. / Opens the KB Security / CEO's office.
-Leaves / a record when used."): the gap under the second line is 14 rows (13 in 0.16.73, 12
-before; tops 14, 26, 40, 52), so the tail of the p of "Opens" clears the E of "CEO's"; the last
-line has nothing below the baseline, so it still ends inside the panel. With that no description
-in the Court Record has letters of two lines touching. Its picture is stored after the "??????"
-profile's (`court_record.LATE`).
+Tiles: the first 160 are rows 0–63 in the ten cells as before (the sprites take them unchanged);
+the 20 after them are rows 64–71, left to right. No sprite memory is free for those whenever the
+Record can show (the text box's lines reach x 238, so GS1's spare last block of each line is not
+free here), so the 19 that are not transparent go on the panel itself, BG2 row 11 (y 88–95),
+where the panel's map (`0x0803bc44`, 32×12, columns 11–29) has tile `0x4c`:
+
+* The loader (`0x08014d94`) unpacks the picture to `0x0200afc0` (5760 bytes now, to
+  `0x0200c640`; in every scene measured nothing else reads or writes the 640 bytes after the
+  original's 5120) and DMAs the first 0x1400 bytes to OBJ `0x06013c00`. After that DMA (`0x08014e40`) the strip goes to one of two sets of BG
+  tiles in char block 0, `0x194`–`0x1a6` or `0x1a7`–`0x1b9` (nothing else uses them; the question
+  canvas ends at `0x193`, the save screen's header starts at `0x1c4`), the other one each time; the
+  set is kept in `0x02029c00`.
+* The scroll that brings the panel's columns in (`0x080061bc`, at its right and left edges:
+  `0x08006298` and `0x080062cc`, which loaded the map's address) reads instead one of two copies
+  of the map whose row 11 has the strip set of the item last loaded. When the Record flips from
+  one item to the next, the old item slides out on BG2 (the game copies its sprite tiles to BG
+  tiles `0xa0`-`0x17f`) with its strip in the set it had, and the new one comes in with the other;
+  the game takes no input until the slide is over, so a set is never written while it shows.
+  Opening the Record and the evidence-added pop-up go through the same loader and scroll. The
+  save screen's map (`0x0803bf44`) is not touched.
 
 ### Icons
 

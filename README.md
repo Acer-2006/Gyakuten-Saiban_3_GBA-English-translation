@@ -48,8 +48,8 @@ load an in-game save instead.
 * English name tags from the DS version.
 * Court Record in English: every evidence and profile name (the DS name pictures) and
   description (the DS text in the DS's own description font, set a little tighter so it fits
-  the GBA panel; "Touch the Check Button" becomes "Press L"), and the R Profiles / R Evidence
-  switch.
+  the GBA panel, with the DS's line breaks and no two lines touching; "Touch the Check Button"
+  becomes "Press L"), and the R Profiles / R Evidence switch.
 * The DS version's Witness Testimony / Cross Examination banners (shrunk to the GBA's banner
   width) and Testimony label; the cross-examination buttons (L Press / Present R) and the OK /
   Back prompts when presenting.
@@ -110,6 +110,16 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.80 — Court Record descriptions, as in the English GS1: the description's picture now
+  reaches 8 pixels further down, into the bottom of the panel's red that was empty, so four lines
+  have 14 pixels between them instead of 12. No pixel of a line touches one of the line above or
+  below it, not even at a corner, the name line included, and every description keeps the DS's
+  own line breaks, each line filled as far as it goes (110 of the 195 break differently from
+  0.16.79; the words are the same). The workarounds of 0.16.73-0.16.76 (other breaks, uneven
+  spacing, lines moved sideways) are no longer needed; Pearl Fey's first profile keeps the wider
+  gap in "amazingly" and the "??????" profile its breaks. The bottom 8 rows are drawn on the
+  panel's background, which slides with the rest. A savestate made with the Court Record open
+  shows the old picture until the next item is chosen.
 * 0.16.79 — the title menu's New Game and Continue are drawn as in the English GS1 and GS2:
   purple letters with a white outline, softened with grey at the corners, as the Japanese items
   are (they were white letters with a purple outline). They are the same pixels as GS2's.

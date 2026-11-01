@@ -58,7 +58,7 @@ references at it, `patches/icons.py`).
 | --- | --- |
 | `0x02011fc0` | decompressed chapter bank (appears to be `0x1b000` bytes) |
 | `0x0202cfc0` | episode-select sprite sheet after decompression (`0x9600` bytes) |
-| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, with the fields added since 0.16.22 at `0x02028780` so that save states from earlier builds keep its layout, `0x02028800` script, `0x02029000` the save screen header's: the BG tiles it borrows during the game, `src/menu.c`; `0x02029800` the verdict's, `src/verdict.c`; `0x0202a000` the OBJ tiles the third line of text borrows while the Court Record is open, or for the frame a presented item's icon comes in, `src/vwf.c`; `0x0202a800` the text box's top and bottom map rows under a question mapped on BG1, `BOX_EDGES`) |
+| `0x02028000` | free in the original; the English build keeps its renderer state here (`0x02028000` vwf, with the fields added since 0.16.22 at `0x02028780` so that save states from earlier builds keep its layout, `0x02028800` script, `0x02029000` the save screen header's: the BG tiles it borrows during the game, `src/menu.c`; `0x02029800` the verdict's, `src/verdict.c`; `0x02029c00` the Court Record's strip set, which of the two sets of BG tiles holds the last description's bottom rows (graphics.md, Court Record); `0x0202a000` the OBJ tiles the third line of text borrows while the Court Record is open, or for the frame a presented item's icon comes in, `src/vwf.c`; `0x0202a800` the text box's top and bottom map rows under a question mapped on BG1, `BOX_EDGES`) |
 
 ## Saved games
 
@@ -104,7 +104,7 @@ before the pointer and the one at it (`src/script.c`, `script_save`, called inst
 
 | Address | Contents |
 | --- | --- |
-| `0x06000000` | BG char block 0 (the English build's text canvas uses tiles `0xe0`..; on the save and continue screens its SAVE / LOAD header is in tiles `0x1c4`–`0x1fb`) |
+| `0x06000000` | BG char block 0 (the English build's text canvas uses tiles `0xe0`..`0x193`; the Court Record's description strips `0x194`–`0x1a6` and `0x1a7`–`0x1b9`; on the save and continue screens its SAVE / LOAD header is in tiles `0x1c4`–`0x1fb`) |
 | `0x0600e800` | BG1 map |
 | `0x06010000` | OBJ tiles 0–127: dialogue text cells (original engine) |
 | `0x06011000` | OBJ tiles 128–255: pool for "free slot" sprite text |
