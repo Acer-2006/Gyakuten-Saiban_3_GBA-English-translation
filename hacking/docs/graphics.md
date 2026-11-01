@@ -96,8 +96,15 @@ cells (a cell = 4×2 tiles, row-major, 256 bytes):
 | `0x0818e300` | first menu item (new game) |
 | `0x0818e500` | second menu item (continue) |
 
-They use OBJ palette 2; the lettering is index 3 with an outline of index 1. The English build
-renders new text into these slots with the DS font (`tools/textgfx.py`).
+They use OBJ palette 2 (3 and 5 while the item is not the one chosen, darker: the menu flashes
+between them). The Japanese items are drawn in index 1 (purple) with an outline of index 3
+(white), grey (index 4) at its corners. The English build renders new text into these slots with
+the DS font (`tools/textgfx.py`, `patches/graphics.py` `title_menu`): until 0.16.78 the other
+way round, white letters with a purple outline; since 0.16.79 as the maintainer's English GS1 and
+GS2 have them (GS2 338V40, whose items the build's are byte for byte), the letters purple, a pixel
+closer than the DS sets them and 3 rows down, centred, with a white outline beside them and grey
+where it only meets a corner (white too in the notch between two letters, `menu_outline`), and
+New Game's space 4 pixels narrower so that it fits. GS2's title palettes 2, 3 and 5 are GS3's.
 
 ## Name tags
 

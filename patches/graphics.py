@@ -5,10 +5,14 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 import lz, chunkimg, textgfx, resample
 
-TITLE_MENU = {0x0818e300: 'New Game', 0x0818e500: 'Continue'}   # 64x16 sprites (two 32x16 cells), OBJ palette 2
-# New Game only fits with its letters 2 pixels closer than the DS sets them, so that they touch;
-# every pair of letters gets a pixel back, which fills the sprite to its last column
-TITLE_KERN = {'Ne': 1, 'ew': 1, 'Ga': 1, 'am': 1, 'me': 1}
+# The title menu's items: 64x16 sprites (two 32x16 cells), OBJ palette 2 (3 while dimmed), as in
+# the maintainer's English GS1 and GS2 (since 0.16.79, from GS2 338V40): the DS font's letters in
+# the purple (1) with a white outline (3), grey (4) where the outline only meets a letter at its
+# corner, as the Japanese items are drawn; a pixel closer than the DS sets them, 3 rows down,
+# centred.  New Game's space is 4 pixels narrower, so that it fits.  {sprite: (text, kerning)}
+TITLE_MENU = {0x0818e300: ('New Game', {' G': -4}), 0x0818e500: ('Continue', None)}
+TITLE_Y0, TITLE_SQUEEZE = 3, 1
+TITLE_INK, TITLE_EDGE, TITLE_CORNER = 1, 3, 4
 
 DS_TITLE = 0x3684          # LZ: 512-byte palette + 256x192 8bpp tiles (English title logo)
 DS_TITLE_BG = 32           # its background colour
@@ -53,15 +57,33 @@ def markers(rom, ctx):
         rom.write(tiles, en, f'map marker {obj}')
     print(f"  map markers: {', '.join(w for _, w in DS_MARKERS.values())} from the DS")
 
+def menu_outline(grid):
+    """The letters' outline in the title menu's style: white where a pixel is beside a letter (4
+    ways), grey where it only meets one at a corner, but white where it meets two letters'
+    corners at once and outline is on all four sides of it (the notch between two letters)."""
+    h, w = len(grid), len(grid[0])
+    ink = lambda y, x: 0 <= y < h and 0 <= x < w and grid[y][x] == TITLE_INK
+    side = lambda y, x: any(ink(y + dy, x + dx) for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)))
+    near = lambda y, x: 0 <= y < h and 0 <= x < w and not ink(y, x) and \
+        any(ink(y + dy, x + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1))
+    out = [row[:] for row in grid]
+    for y in range(h):
+        for x in range(w):
+            if ink(y, x) or not near(y, x): continue
+            if side(y, x): out[y][x] = TITLE_EDGE; continue
+            corners = sum(ink(y + dy, x + dx) for dy, dx in ((1, 1), (1, -1), (-1, 1), (-1, -1)))
+            closed = all(near(y + dy, x + dx) for dy, dx in ((0, 1), (0, -1), (1, 0), (-1, 0)))
+            out[y][x] = TITLE_EDGE if corners == 2 and closed else TITLE_CORNER
+    return out
+
 def title_menu(rom, ctx):
-    """Title menu items: rendered with the DS font into the original sprite slots."""
+    """Title menu items: rendered with the DS font into the original sprite slots (TITLE_MENU)."""
     font = textgfx.Font.from_ctx(ctx)
-    for addr, text in TITLE_MENU.items():
-        sq = 0
-        kern = sum(TITLE_KERN.get(text[i:i + 2], 0) for i in range(len(text) - 1))
-        while font.measure(text) - sq * (len(text) - 1) + kern > 64: sq += 1   # the bearings hold the outline
-        grid = textgfx.render(font, text, 64, 16, fill=3, outline=1, squeeze=sq, kern=TITLE_KERN)
-        rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'title menu ' + text)
+    for addr, (text, kern) in TITLE_MENU.items():
+        grid = textgfx.render(font, text, 64, 16, fill=TITLE_INK, y0=TITLE_Y0, squeeze=TITLE_SQUEEZE, kern=kern)
+        if any(grid[y][x] for y in range(16) for x in (0, 63)) or any(grid[y][x] for y in (0, 15) for x in range(64)):
+            raise SystemExit(f'title menu: no room for the outline of {text}')
+        rom.write(addr, textgfx.sprite_cells(menu_outline(grid), 32, 16), 'title menu ' + text)
     print(f"  title menu: {len(TITLE_MENU)} items rendered")
 
 def title(rom, ctx):

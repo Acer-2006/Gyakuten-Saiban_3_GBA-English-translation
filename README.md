@@ -110,6 +110,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.79 — the title menu's New Game and Continue are drawn as in the English GS1 and GS2:
+  purple letters with a white outline, softened with grey at the corners, as the Japanese items
+  are (they were white letters with a purple outline). They are the same pixels as GS2's.
 * 0.16.78 — when the Court Record comes up over a page with a third line while a large character
   is on screen (Diego Armando in episode 4's trial, as it opens for "Who is the one person who can
   testify to that demon woman's crimes...?"), the third line no longer turns into coloured blocks
