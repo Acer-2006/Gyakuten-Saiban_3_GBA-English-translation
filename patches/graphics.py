@@ -13,6 +13,10 @@ import lz, chunkimg, textgfx, resample
 TITLE_MENU = {0x0818e300: ('New Game', {' G': -4}), 0x0818e500: ('Continue', None)}
 TITLE_Y0, TITLE_SQUEEZE = 3, 1
 TITLE_INK, TITLE_EDGE, TITLE_CORNER = 1, 3, 4
+# grey corners that go (transparent, the black behind showing as in the rest of the letter's inside),
+# as in the maintainer's English GS1 (v0.7.58): the two inside the G of "Game", where its curve meets
+# its bar (0.16.81).  {sprite: ((x, y), ...)}
+TITLE_REMOVE = {0x0818e300: ((32, 10), (33, 11))}
 
 DS_TITLE = 0x3684          # LZ: 512-byte palette + 256x192 8bpp tiles (English title logo)
 DS_TITLE_BG = 32           # its background colour
@@ -83,7 +87,11 @@ def title_menu(rom, ctx):
         grid = textgfx.render(font, text, 64, 16, fill=TITLE_INK, y0=TITLE_Y0, squeeze=TITLE_SQUEEZE, kern=kern)
         if any(grid[y][x] for y in range(16) for x in (0, 63)) or any(grid[y][x] for y in (0, 15) for x in range(64)):
             raise SystemExit(f'title menu: no room for the outline of {text}')
-        rom.write(addr, textgfx.sprite_cells(menu_outline(grid), 32, 16), 'title menu ' + text)
+        grid = menu_outline(grid)
+        for x, y in TITLE_REMOVE.get(addr, ()):
+            if grid[y][x] != TITLE_CORNER: raise SystemExit(f'title menu: ({x}, {y}) of {text} is not a grey corner')
+            grid[y][x] = 0
+        rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'title menu ' + text)
     print(f"  title menu: {len(TITLE_MENU)} items rendered")
 
 def title(rom, ctx):

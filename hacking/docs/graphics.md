@@ -105,6 +105,9 @@ GS2 have them (GS2 338V40, whose items the build's are byte for byte), the lette
 closer than the DS sets them and 3 rows down, centred, with a white outline beside them and grey
 where it only meets a corner (white too in the notch between two letters, `menu_outline`), and
 New Game's space 4 pixels narrower so that it fits. GS2's title palettes 2, 3 and 5 are GS3's.
+Since 0.16.81 the two grey corners inside the G of "Game", where its curve meets its bar, are
+transparent (`TITLE_REMOVE`), as in the English GS1 v0.7.58, whose items the build's are byte for
+byte.
 
 ## Name tags
 

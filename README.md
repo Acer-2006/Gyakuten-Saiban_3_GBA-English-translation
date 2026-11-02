@@ -110,6 +110,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.81 — the title menu: the two grey pixels inside the G of "New Game", where its curve meets
+  its bar, are gone, so the inside of the G is clean black, as in the English GS1 (v0.7.58). New
+  Game and Continue are now byte for byte GS1's. Nothing else changes.
 * 0.16.80 — Court Record descriptions, as in the English GS1: the description's picture now
   reaches 8 pixels further down, into the bottom of the panel's red that was empty, so four lines
   have 14 pixels between them instead of 12. No pixel of a line touches one of the line above or
