@@ -315,6 +315,16 @@ Two commands differ between the versions:
   for the whole statement. A command of `RESTORE9` names the English DS command it goes after,
   for where the English text is laid out differently: here the line's pause after "diamond."
   (`{0c 10}`), so Valerie comes into focus with "My sister, Valerie, brought it to the bridge".
+* The flashback to Dahlia Hawthorne at the courthouse doors in episode 5 (0.16.82, fix level 10,
+  `RESTORE10`; bank 32 section `0x80`, "Dahlia Hawthorne..."): the GBA fades to black
+  (`{12 204 1 1f}`), sets the flashback's background and grey (`{55 3 4}` ... `{5f 3 1 1f}`) and
+  brings the screen back at once with `{12 100 0 1f}`. The DS's engine needs no such command and
+  the English DS script has none there, so the screen stayed black and the flashback's lines went
+  by over it, the box as dark as the rest. The command goes back after the `{5f 3 1 1f}` it
+  follows on the GBA. Found by running every section with a fade in the Japanese GBA and the
+  English build side by side and counting the text typed while the screen was fully faded; no
+  other section types more of it than the Japanese game (episode 5's first part has the same
+  pattern in bank 27 section `0x81`, where the white flash before it leaves the screen visible).
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is

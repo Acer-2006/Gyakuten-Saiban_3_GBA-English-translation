@@ -112,7 +112,13 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     bridge ({6b 6d 2 0}{69 307 200}); the English DS rewrote that stretch of the line (its pauses
 #     too) and lost the fade.  It goes after the English line's pause after "diamond." ({0c 10}),
 #     so Valerie comes into focus with "My sister, Valerie, brought it to the bridge" (RESTORE9).
-FIX_LEVEL = 9
+#  10 (0.16.82): the flashback to Dahlia Hawthorne at the courthouse doors in episode 5 (bank 32
+#     section 0x80, "Dahlia Hawthorne..."): after the fade to black ({12 204 1 1f}) the GBA brings
+#     the screen back with {12 100 0 1f} once the flashback's grey ({5f 3 1 1f}) is set.  The DS
+#     needs no such command there and the English DS script has none, so the screen stayed black
+#     and the flashback's lines went by over it, the box as dark as the rest.  It goes back after
+#     the {5f 3 1 1f} it follows on the GBA (RESTORE10).
+FIX_LEVEL = 10
 # fix level 7: section (bank, GBA number) -> the GBA's commands put back there, where the GBA has
 # them (each one the GBA has and the conversion did not keep)
 RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
@@ -127,11 +133,13 @@ RESTORE8 = {(36, 0xa7): {(0x55, (6, 4))}}
 # fix level 9: {(bank, section): {(command, arguments): the English DS command after which it goes}}:
 # where the English text is laid out differently, the place a command of the GBA's belongs in it
 RESTORE9 = {(25, 0xac): {(0x6b, (0x6d, 2, 0)): (0x0c, (0x10,)), (0x69, (0x307, 0x200)): (0x0c, (0x10,))}}
+# fix level 10, as fix level 7
+RESTORE10 = {(32, 0x80): {(0x12, (0x100, 0, 0x1f))}}
 def restore_for(b, s):
     """(bank, GBA section number) -> {(command, arguments): (the fix level that puts it back, the
     English DS command it goes after, or None for after the command it follows on the GBA)}"""
     out = {}
-    for lv, table in ((9, RESTORE9), (8, RESTORE8), (7, RESTORE7)):
+    for lv, table in ((10, RESTORE10), (9, RESTORE9), (8, RESTORE8), (7, RESTORE7)):
         t = table.get((b, s), ())
         for it in t: out[it] = (lv, t[it] if isinstance(t, dict) else None)
     return out
