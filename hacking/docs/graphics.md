@@ -422,9 +422,13 @@ from twice its size about its own centre at its frame: Not at 0, then Guilty at 
 letter by letter at 10, 20, ... 60. The size goes from 512 to 256 in ten steps (`0x0202fb58`), and
 as the ninth begins the letter lands: a 4-frame shake of the screen (strength 1, in the fields
 the DS's shake command `0x27` sets) and sound `0x56` (`0x0202fd70`), so
-Guilty slams six times where the Japanese 有罪 slams twice, and there is no flash. 61 frames after
-the last letter has landed they all go at once (no rise, unlike the Japanese words), and the
-confetti follows for not guilty.
+Guilty slams six times where the Japanese 有罪 slams twice, with no flash as they land: the DS
+flashes once, as the verdict starts (`0x0202f988`, its fade function `0x02017a30` with mode 3, a
+step a frame, 8 a step, every layer, the script's `12 301 8 1f`; white for two frames and half
+for one as the first letter begins, seen in DeSmuME and gone when the verdict command is left
+out). 61 frames after the last letter has landed they all go at once (no rise, unlike the
+Japanese words), and the confetti follows for not guilty. (Its timer also slides something on
+the bottom screen, `0x0204bcd4`, which the GBA has not.)
 
 The English build (`patches/verdict.py`, `src/verdict.c`) shrinks the letters to 4/5, each into a
 32×64 sprite (OBJ tiles `0x1a0`–`0x2bf` for the nine of not guilty), laid out as on the DS around
@@ -436,7 +440,10 @@ sprites once they have landed; each landing sets off the GBA's shake as command 
 sound `0x56`. Then it hides the
 letters, sets state 4 with its timer run out (`SYS+0xa` = `0x21`) and calls the original, which
 hides its two words (entries 49 and 50, hidden from the start) and goes on to the confetti, or
-back to the court. (Nine affine sprites with double size take 9 × 138 cycles of the 1210 a line
+back to the court. Since 0.16.86 the verdict starts with the DS's flash: the last build step
+(`start_flash`) points the start hook's trampoline at a routine that starts the fade through the
+game's own `0x08000b40` (3, 1, 8, `0x1f`; BLDY 24, 16, 8, 0) and then calls `verdict_start`, so
+nothing before it moves; the frames after the flash are those of 0.16.85. (Nine affine sprites with double size take 9 × 138 cycles of the 1210 a line
 has for sprites, and the judge behind them would not be drawn.)
 
 ## Effects archive: banners and speech bubbles

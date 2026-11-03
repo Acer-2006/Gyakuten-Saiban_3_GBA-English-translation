@@ -27,6 +27,15 @@ the letters go it runs the DS's timeline itself (each letter zooming in from its
 and the slam 0x56 as each lands, as the DS's English verdict does, which plays the slam once a
 letter), then hands over to the original's state 4 with its timer run out, which goes on to the
 confetti or back to the court.
+
+The flash (0.16.86): the DS's verdict starts with a flash of the screen, as it sets up the
+letters (0x0202f988: its fade function 0x02017a30 with mode 3, a step a frame, 8 a step, every
+layer, the script's 12 301 8 1f), for either verdict: white for two frames, half for one, as the
+first letter begins (seen in DeSmuME, the US release, and gone when the verdict command is left
+out); it does not flash as the letters land.  Until 0.16.86 the English build had no flash at
+all.  start_flash, the last build step, puts a routine in front of verdict_start (the
+trampoline's call is pointed at it, so nothing before moves) that starts the same fade through
+the game's own function, 0x08000b40, which command 0x12 uses: BLDY 24, 16, 8, 0.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -108,3 +117,34 @@ def apply(rom, ctx):
     rom.w32(entry, syms['verdict_mode'] | 1)
     print(f"  verdict: Not Guilty / Guilty from the DS letters ({DS_COUNT[0]} and {DS_COUNT[1]}), "
           f"a slam for each as on the DS")
+    ctx.verdict_start = syms['verdict_start']
+
+FADE_START = 0x08000b40                   # starts a brightness fade: (mode, frames a step, step, layers)
+FLASH = (3, 1, 8, 0x1f)                   # brighter, back down to 0: the script's 12 301 8 1f
+
+def thumb_bl_target(rom, at):
+    h1, h2 = struct.unpack('<HH', rom.read(at, 4))
+    if h1 & 0xf800 != 0xf000 or h2 & 0xf800 != 0xf800: return None
+    off = (h1 & 0x7ff) << 12 | (h2 & 0x7ff) << 1
+    if off & 0x400000: off -= 0x800000
+    return at + 4 + off
+
+def start_flash(rom, ctx):
+    """Last build step: the DS's flash as the verdict starts (see the module's docstring)."""
+    tramp = thumb_bl_target(rom, HANDLER_END)
+    call = tramp + 6 if tramp else None               # push {r0-r3, lr}; mov r0, r12; push {r0}; bl
+    if not call or thumb_bl_target(rom, call) != ctx.verdict_start & ~1:
+        raise SystemExit('verdict: the start hook is not where it was')
+    m, per, step, layers = FLASH
+    stub = rom.thumb_code(f'''
+        push {{lr}}
+        movs r0, #{m}
+        movs r1, #{per}
+        movs r2, #{step}
+        movs r3, #{layers:#x}
+        bl #{FADE_START:#x}
+        bl #{ctx.verdict_start & ~1:#x}
+        pop {{pc}}
+    ''', note='verdict flash')
+    rom.thumb(call, f'bl #{stub & ~1:#x}', 'verdict start: the flash first')
+    print("  verdict: a flash as it starts, as on the DS")

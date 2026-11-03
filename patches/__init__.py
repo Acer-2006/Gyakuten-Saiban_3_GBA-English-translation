@@ -27,3 +27,4 @@ def apply_all(rom, ctx):
     sprites.late(rom, ctx)
     icons.record_picture(rom)
     court_record.tall_panels(rom, ctx)
+    verdict.start_flash(rom, ctx)

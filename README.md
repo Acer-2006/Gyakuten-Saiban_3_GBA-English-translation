@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.86 — the verdict starts with a white flash, as on the DS: both Guilty and Not Guilty
+  flash the screen white for a moment as the first letter comes in (the DS's verdict does it
+  itself; the English build had no flash). Nothing else about the verdict changes: the letters,
+  the shake and slam as each lands and the confetti already matched the DS. Savestates from
+  earlier builds keep working.
 * 0.16.85 — all twelve English voice clips ("Objection!", "Hold it!", "Take that!") are converted
   properly to the GBA's playback rate. Seven of them, Franziska's and Godot's among them, kept the
   DS's higher rate, and the GBA brought them down as it played them, which added a harshness to
