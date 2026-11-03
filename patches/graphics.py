@@ -17,6 +17,12 @@ TITLE_INK, TITLE_EDGE, TITLE_CORNER = 1, 3, 4
 # as in the maintainer's English GS1 (v0.7.58): the two inside the G of "Game", where its curve meets
 # its bar (0.16.81).  {sprite: ((x, y), ...)}
 TITLE_REMOVE = {0x0818e300: ((32, 10), (33, 11))}
+# the m of "Game" filled between its stems (0.16.83): the one column of black between the outlines of
+# each two stems goes white from under the arch down to the foot, grey in the outline's bottom row, so
+# the m reads as one solid letter as in the maintainer's reference shot, without the two black slits.
+# The n and u of "Continue" keep their two-pixel openings.  {sprite: ((x, y, index), ...)}
+TITLE_FILL = {0x0818e300: tuple((x, y, TITLE_EDGE) for x in (48, 52) for y in range(9, 14)) +
+                          tuple((x, 14, TITLE_CORNER) for x in (48, 52))}
 
 DS_TITLE = 0x3684          # LZ: 512-byte palette + 256x192 8bpp tiles (English title logo)
 DS_TITLE_BG = 32           # its background colour
@@ -91,6 +97,11 @@ def title_menu(rom, ctx):
         for x, y in TITLE_REMOVE.get(addr, ()):
             if grid[y][x] != TITLE_CORNER: raise SystemExit(f'title menu: ({x}, {y}) of {text} is not a grey corner')
             grid[y][x] = 0
+        for x, y, v in TITLE_FILL.get(addr, ()):
+            # between two outlines: nothing (or a grey corner) there yet, outline on both sides
+            if grid[y][x] not in (0, TITLE_CORNER) or grid[y][x - 1] == 0 or grid[y][x + 1] == 0:
+                raise SystemExit(f'title menu: ({x}, {y}) of {text} is not between two outlines')
+            grid[y][x] = v
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'title menu ' + text)
     print(f"  title menu: {len(TITLE_MENU)} items rendered")
 

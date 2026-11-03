@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.83 — the title menu: the m of "New Game" is filled between its stems. The one-pixel
+  black slit inside each of its two arches is now the white of the outline, with the grey of the
+  outline's corners at the foot, so the m reads as one solid letter. Continue is unchanged, and
+  so is the rest of the game; savestates from earlier builds keep working.
 * 0.16.82 — episode 5: the flashback to Dahlia Hawthorne at the courthouse doors ("Dahlia
   Hawthorne...") no longer stays black. After the fade to black the screen never came back, and
   the flashback's lines went by over a black screen, the text box as dark as the rest; the

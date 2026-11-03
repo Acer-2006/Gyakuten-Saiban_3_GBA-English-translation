@@ -106,8 +106,12 @@ closer than the DS sets them and 3 rows down, centred, with a white outline besi
 where it only meets a corner (white too in the notch between two letters, `menu_outline`), and
 New Game's space 4 pixels narrower so that it fits. GS2's title palettes 2, 3 and 5 are GS3's.
 Since 0.16.81 the two grey corners inside the G of "Game", where its curve meets its bar, are
-transparent (`TITLE_REMOVE`), as in the English GS1 v0.7.58, whose items the build's are byte for
-byte.
+transparent (`TITLE_REMOVE`), as in the English GS1 v0.7.58, whose items the build's were byte
+for byte. Since 0.16.83 the m of "Game" is filled between its stems (`TITLE_FILL`): the column
+of transparent between the outlines of each two stems (x 48 and 52 of the 64x16 sprite) is white
+from under the arch (row 9, a grey corner before) down to the foot (row 13), and grey in the
+outline's bottom row (14), so there is no black inside the m. Continue's n and u keep their
+two-pixel openings.
 
 ## Name tags
 
