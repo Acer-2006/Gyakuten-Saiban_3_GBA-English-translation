@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.84 — Franziska von Karma's "Objection!" has her voice again. On the English DS her shout
+  is two recordings played together, her voice and a quieter noisy layer with no voice in it, and
+  the build took only the first: the noisy layer, so each of her objections was a hiss without
+  the word. The clip is now both, mixed as the DS plays them and as loud as the other shouts. The
+  other eleven shouts are one recording each and are unchanged; savestates from earlier builds
+  keep working.
 * 0.16.83 — the title menu: the m of "New Game" is filled between its stems. The one-pixel
   black slit inside each of its two arches is now the white of the outline, with the grey of the
   outline's corners at the foot, so the m reads as one solid letter. Continue is unchanged, and

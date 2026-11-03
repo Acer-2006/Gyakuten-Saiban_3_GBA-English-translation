@@ -77,55 +77,112 @@ class SdatEx(Sdat):
         fid, _ = struct.unpack_from('<HH', self.s, self.info_off + p)
         was = struct.unpack_from('<4H', self.s, self.info_off + p + 4)
         return self.file(fid), [w for w in was if w != 0xffff]
-    def instrument_wave(self, b, prog):
-        """-> (wavearc index, wave index) of a PCM instrument"""
+    def instrument(self, b, prog):
+        """-> (wavearc index, wave index, attack) of a single-wave PCM instrument, or None"""
         f, was = self.bank(b)
         fr, off = struct.unpack_from('<BH', f, 0x3c + prog * 4)
         if fr not in (1, 2, 3, 4, 5): return None
-        swav, swar = struct.unpack_from('<HH', f, off)
-        return was[swar], swav
-    def first_note(self, data):
-        """first (program, key) of a sequence byte stream"""
-        p = 0; prog = 0
-        while p < len(data):
-            b = data[p]
-            if b == 0xff: break
-            if b == 0x81:
-                v = 0; p += 1
-                while True:
-                    c = data[p]; p += 1; v = (v << 7) | (c & 0x7f)
-                    if not c & 0x80: break
-                prog = v; continue
-            if b < 0x80: return prog, b
-            if b == 0x80:
-                p += 1
-                while data[p] & 0x80: p += 1
-                p += 1; continue
-            if 0xc0 <= b <= 0xd6: p += 2; continue
-            if b in (0xe0, 0xe1, 0xe3): p += 3; continue
-            if b == 0x93: p += 5; continue
-            if b in (0x94, 0x95): p += 4; continue
-            if b == 0xfe: p += 3; continue
-            p += 1
-        return None
-    def se_wave(self, se):
-        """SE id (as the game's play-SE function receives it, after language remap) ->
-        (wavearc index, wave index).  Ids beyond the SEQ table (and a few special ones) live in
-        the sequence archive; the sub-sequence index is the id itself."""
+        swav, swar, _key, attack = struct.unpack_from('<HHBB', f, off)
+        return was[swar], swav, attack
+    @staticmethod
+    def notes(data, base, start):
+        """Every note of a sequence: data is the file, base where its track offsets count from
+        (its data block), start where track 0 begins.  -> list of (tick, program, key,
+        velocity), tracks opened with 0x93 included.  Only what sound effects use is read: a
+        jump, call or variable command raises ValueError."""
+        def varlen(p):
+            v = 0
+            while True:
+                c = data[p]; p += 1; v = (v << 7) | (c & 0x7f)
+                if not c & 0x80: return v, p
+        out, todo = [], [start]
+        while todo:
+            p = todo.pop(0); tick = prog = 0; mono = False
+            while True:
+                b = data[p]
+                if b in (0xff, 0xfd): break
+                if b < 0x80:                                   # note: key, velocity, length
+                    length, q = varlen(p + 2)
+                    out.append((tick, prog, b, data[p + 1]))
+                    if mono: tick += length                    # mono: the note waits its length
+                    p = q
+                elif b == 0x80: v, p = varlen(p + 1); tick += v            # rest
+                elif b == 0x81: prog, p = varlen(p + 1)                    # program
+                elif b == 0x93:                                            # open track
+                    todo.append(base + (data[p + 2] | data[p + 3] << 8 | data[p + 4] << 16)); p += 5
+                elif b == 0xfe: p += 3                                     # tracks used
+                elif b == 0xc7: mono = bool(data[p + 1]); p += 2           # mono / poly
+                elif 0xc0 <= b <= 0xd6: p += 2
+                elif b in (0xe0, 0xe1, 0xe3): p += 3
+                else: raise ValueError(f'sequence command {b:#x} at {p:#x}')
+        return out
+    def se_notes(self, se):
+        """SE id (as the game's play-SE function receives it, after language remap) -> every note
+        it plays: list of (tick, wavearc index, wave index, velocity, attack).  Ids beyond the
+        SEQ table (and a few special ones) live in the sequence archive; the sub-sequence index
+        is the id itself."""
         n_seq = struct.unpack_from('<I', self.s, self.info_off + self.irecs[0])[0]
         if se < n_seq and self.seq_info(se) is not None:
             fid, bnk = self.seq_info(se)
-            f = self.file(fid)
-            doff = struct.unpack_from('<I', f, 0x18)[0]
-            pn = self.first_note(f[doff:doff + 256])
+            data = self.file(fid)
+            base = start = struct.unpack_from('<I', data, 0x18)[0]
         else:
-            arc = self.seqarc_file(0)
-            dataoff = struct.unpack_from('<I', arc, 0x18)[0]
-            off, bnk = struct.unpack_from('<IH', arc, 0x20 + se * 12)
-            pn = self.first_note(arc[dataoff + off: dataoff + off + 64])
-        if pn is None: return None
-        return self.instrument_wave(bnk, pn[0])
+            data = self.seqarc_file(0)
+            base = struct.unpack_from('<I', data, 0x18)[0]
+            off, bnk = struct.unpack_from('<IH', data, 0x20 + se * 12)
+            start = base + off
+        out = []
+        for tick, prog, key, vel in self.notes(data, base, start):
+            ins = self.instrument(bnk, prog)
+            if ins is None: raise ValueError(f'SE {se:#x}: program {prog} is not a PCM instrument')
+            out.append((tick,) + ins[:2] + (vel, ins[2]))
+        return out
     def wave(self, wa, wi):
         """-> (rate, pcm16 list)"""
         w = self.wavearc(wa)[wi]
         return w[1], w[4]
+    def se_sound(self, se):
+        """SE id -> (rate, samples, peak): the sound as the DS plays it.  One note is its wave as
+        it is; several notes starting together (Franziska's English Objection!: her voice and a
+        quieter second layer) are mixed as the sound driver mixes them, each at its velocity's
+        volume with its instrument's attack, as long as the longest.  peak is the loudest
+        layer's peak as heard (one wave: its own), the level to scale the sound by: where the
+        layers add up a mix goes beyond it."""
+        notes = self.se_notes(se)
+        if not notes: return None
+        if any(t for t, *_ in notes): raise ValueError(f'SE {se:#x}: a note does not start at once')
+        layers = [(self.wave(wa, wi), vel, atk) for _, wa, wi, vel, atk in notes]
+        rate = layers[0][0][0]
+        if any(r != rate for (r, _), _, _ in layers): raise ValueError(f'SE {se:#x}: waves at different rates')
+        if len(layers) == 1 and layers[0][1] == 127 and layers[0][2] == 127:
+            pcm = layers[0][0][1]
+            return rate, pcm, max(abs(v) for v in pcm)
+        out, peak = [0.0] * max(len(pcm) for (_, pcm), _, _ in layers), 0
+        for (_, pcm), vel, atk in layers:
+            g = velocity_gain(vel)
+            peak = max(peak, g * max(abs(v) for v in pcm))
+            for i, (v, e) in enumerate(zip(pcm, attack_envelope(atk, len(pcm), rate))):
+                out[i] += v * g * e
+        return rate, out, peak
+
+# The DS sound driver's volume curves (NitroSDK): a note's velocity sets its volume in tenths of
+# a decibel from the square of velocity / 127; the attack starts the envelope at -92544 (-72.3 dB in
+# 1/128ths of a tenth) and multiplies it by the attack rate / 256 once a sound frame (64 * 2728
+# cycles of the 33.51 MHz clock), before the frame is heard, until it reaches 0 dB.  Attack 127 is
+# instant.
+ATTACK_RATES = (0x00, 0x01, 0x05, 0x0e, 0x1a, 0x26, 0x33, 0x3f, 0x49, 0x54, 0x5c, 0x64, 0x6d, 0x74,
+                0x7b, 0x7f, 0x84, 0x89, 0x8f)      # attack 127 down to 109; below that 255 - attack
+SOUND_FRAME = 64 * 2728 / 33513982
+
+def velocity_gain(vel):
+    return (vel / 127) ** 2
+
+def attack_envelope(attack, n, rate):
+    """Amplitude (0..1) of each of n samples at rate under the attack."""
+    k = ATTACK_RATES[127 - attack] if attack >= 109 else 255 - attack
+    env, out, f = -92544, [], 0
+    while len(out) < n:
+        env = -((-env * k) >> 8)
+        f += 1
+        out.extend([10 ** ((env >> 7) / 200)] * (round(f * rate * SOUND_FRAME) - len(out)))
+    return out[:n]

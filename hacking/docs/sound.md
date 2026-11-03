@@ -81,6 +81,14 @@ are SSEQ records; higher ones are entries of sequence archive 0 (`0x20 + id * 12
 `{u32 offset, u16 bank, u8 volume, ...}`) whose banks point at the voice SWAR waves
 (16 000 Hz, about 1.3 s). `tools/sdat.py` in the build tool reads all of this.
 
+A sound can be more than one note. Eleven of the twelve English shouts are one note each; the
+English `0x1fa` (sequence `SE0D6`, for the GBA's `0x96`, Franziska's Objection!: the script plays
+it in her ten objections, with her bubble, character `0x22`) is two tracks starting together on
+two waves of wave archive 106: wave 0 at velocity 101, a noisy layer with no voice in it, and
+wave 1 at velocity 127, her voice (attacks 110 and 117). `SdatEx.se_sound` mixes every note of a
+sound as the DS's sound driver plays it (velocity as (v/127)², the attack envelope frame by
+frame); until 0.16.84 the build took the first note only, and her Objection! had no voice.
+
 ## Compared with the DS version
 
 What differs between the two games' sound, and what the English build does about it (0.14):
@@ -92,7 +100,9 @@ What differs between the two games' sound, and what the English build does about
   `0x197` and the GBA `0x17c`; the script converter learns that from the two Japanese scripts
   and turns it back.
 * **Language.** The DS swaps only the twelve shouts per language (the table above); the English
-  build puts the DS's English clips in their place (`patches/voices.py`).
+  build puts the DS's English clips in their place (`patches/voices.py`), each scaled so that its
+  peak is the Japanese clip's, Franziska's two-layer one by its voice's peak (as loud beside the
+  others as on the DS; the 81 samples where the layers add up beyond the 8-bit range are cut).
 * **The script's sounds.** The DS's English script plays the same sounds as its Japanese one.
   Up to 0.13 the converter dropped every DS command that has no counterpart in the GBA's script,
   and three of those were sounds: `0x175` and the looping `0x187` at the end of episode 2's trial
