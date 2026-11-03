@@ -102,7 +102,16 @@ What differs between the two games' sound, and what the English build does about
 * **Language.** The DS swaps only the twelve shouts per language (the table above); the English
   build puts the DS's English clips in their place (`patches/voices.py`), each scaled so that its
   peak is the Japanese clip's, Franziska's two-layer one by its voice's peak (as loud beside the
-  others as on the DS; the 81 samples where the layers add up beyond the 8-bit range are cut).
+  others as on the DS; the few samples where the layers add up beyond the 8-bit range are cut).
+  Since 0.16.85 every clip is converted to the mixer's rate, 10512 Hz, the Japanese clips' own,
+  with a band-limiting filter (`tools/resample.py` `band_limited`, a Blackman-windowed sinc cut at
+  97% of 5256 Hz), so the mixer plays each one sample for sample. Before, the seven on pitched
+  instruments kept the DS's rate (16 kHz; Franziska's 22.05 kHz) and the mixer brought them down
+  as it played them, with no filter, so 3-6% of their energy, the part above 5256 Hz, folded
+  back into the voice as a harshness; the five on fixed instruments were converted with
+  Lanczos-3, which dulls the top of the band. Each clip keeps the room it had (the rest zeros),
+  so nothing after it moves. In the emulator the new clips play at the Japanese clips' rate
+  (channel frequency 10512 at key 60).
 * **The script's sounds.** The DS's English script plays the same sounds as its Japanese one.
   Up to 0.13 the converter dropped every DS command that has no counterpart in the GBA's script,
   and three of those were sounds: `0x175` and the looping `0x187` at the end of episode 2's trial

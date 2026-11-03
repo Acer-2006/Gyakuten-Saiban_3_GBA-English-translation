@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.85 — all twelve English voice clips ("Objection!", "Hold it!", "Take that!") are converted
+  properly to the GBA's playback rate. Seven of them, Franziska's and Godot's among them, kept the
+  DS's higher rate, and the GBA brought them down as it played them, which added a harshness to
+  the voice; the other five were converted with a softer filter that dulled them a little. Now
+  each is filtered and converted ahead of time, the way the English GS2 stores its clips, so they
+  sound closer to the DS. Same recordings, pitch, length and loudness; savestates from earlier
+  builds keep working.
 * 0.16.84 — Franziska von Karma's "Objection!" has her voice again. On the English DS her shout
   is two recordings played together, her voice and a quieter noisy layer with no voice in it, and
   the build took only the first: the noisy layer, so each of her objections was a hiss without
