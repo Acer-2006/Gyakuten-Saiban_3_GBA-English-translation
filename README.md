@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.89 — no more garbled "Take that!" bubble when the evidence you present comes up on screen
+  right away (presenting Larry's profile in episode 5, for one): for its last two frames the
+  bubble's top left showed the item's picture in the wrong colours. The item now comes up just
+  after the bubble has gone, two frames later than before; nothing else changes. Savestates from
+  earlier builds keep working.
 * 0.16.88 — the verdict's Guilty / Not Guilty letters sit at the same height as on the DS, across
   the middle of the screen (they were 23 pixels higher, where GS1 has them). The letters, their
   timing, the shake and the slam are unchanged, and they are still GS1's pixel for pixel. To keep

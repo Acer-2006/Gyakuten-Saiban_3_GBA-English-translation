@@ -68,8 +68,9 @@ def encode(rows, pal):
 # The item shown in court (OAM 65, a 64x64 sprite at the top left) is DMA'd to OBJ tiles
 # 0x80-0xbf, which the English page's third line of sprite text needs (the original's two lines
 # take 0x00-0x7f; the effects that play over dialogue, such as the butterflies, are at 0xe0 on).
-# It moves to 0x1e0-0x21f, the Court Record's text sprites, whose only other user is the Record
-# itself: the game DMAs the item again when the Record closes.
+# It moves to 0x1e0-0x21f, the Court Record's text sprites (the game DMAs the item again when the
+# Record closes) and the first tiles of the shout bubbles' (0x1e8 on), which are never up with an
+# item but for the frames after presenting: see item_waits, at the end.
 ITEM_DMA_LIT = 0x080158a4            # 0x06011000 in the routine at 0x08015870
 ITEM_ATTR2 = (0x080155be, 0x08015710)   # movs r0, #0x84 (<< 5 = attr2 0x1080: palette 1, tile 0x80)
 ITEM_TILE = 0x1e0
@@ -256,3 +257,38 @@ def record_picture(rom):
     call_hook(rom, RECORD_PIC_DMA, rom.syms['vwf_record_pic'],
               'str r5, [r2]\n movs r0, #0x60\n lsls r0, r0, #8\n adds r0, #0x11\n lsls r0, r0, #12',
               'record picture', keep=('r1', 'r2', 'r3'))
+
+# The item shown in court and the shout bubbles share tiles: the item is at 0x1e0-0x21f (above),
+# the bubbles from 0x1e8 (effects 1-9, patches/shouts.py).  Presenting evidence in court closes the
+# Record while its bubble (Take that!, or Objection!) is still up for two frames, and the item's
+# update (ITEM_FRAME) copied the item's picture then: an item that was up before the Record opened
+# comes back, or the section the evidence leads to puts one up at once (Larry's profile, bank 30
+# section 0xde).  The bubble's top left showed the item's picture in the bubble's palette for
+# those frames (0.16.89).  The original's item is in other tiles and shows with the bubble.  The
+# update now waits, in the two states that copy the picture, while the bubble is on screen
+# (src/item.c): the bubble goes as in the original, the item comes up after it.
+ITEM_FRAME = 0x0801545c             # the item's update, every frame (r0 = SYS)
+ITEM_FRAME_CALLS = (0x08000430, 0x0801db9c)
+ITEM_BSS = 0x02029900               # src/item.c's (a byte), between the verdict's and the strip set
+
+def thumb_bl_target(rom, at):
+    h1, h2 = struct.unpack('<HH', rom.read(at, 4))
+    if h1 & 0xf800 != 0xf000 or h2 & 0xf800 != 0xf800: return None
+    off = (h1 & 0x7ff) << 12 | (h2 & 0x7ff) << 1
+    if off & 0x400000: off -= 0x800000
+    return at + 4 + off
+
+def item_waits(rom, ctx):
+    """The build's last step: the item's update through src/item.c (see above)."""
+    from rom import compile_c
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if any(thumb_bl_target(rom, at) != ITEM_FRAME for at in ITEM_FRAME_CALLS):
+        raise SystemExit("icons: the item's update is not called where it was")
+    text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)
+    binary, syms, bss = compile_c([os.path.join(root, 'src/item.c')], text_addr, ITEM_BSS,
+                                  os.path.join(root, 'build/item'), defines=(f'ITEM_TILE={ITEM_TILE:#x}',))
+    assert rom.store(binary, 'font', 4, 'item waits for a bubble') == text_addr
+    assert bss <= 0x10, bss
+    for at in ITEM_FRAME_CALLS:
+        rom.hook_bl(at, syms['item_frame'], 'item update: waits for a shout bubble')
+    print("  icons: the item shown in court waits for a shout bubble to go")

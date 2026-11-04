@@ -234,8 +234,18 @@ transparent, loaded into OBJ palette 1) and a 64×64 4bpp picture as 8×8 tiles 
 bytes), decompressed to `0x0200afc0` by `0x0803a048` and DMA'd to OBJ tile `0x280`. The item
 shown in court (OAM 65) is the same picture DMA'd to OBJ tile `0x80` (`0x08015870`), which the
 English page's third line of sprite text needs: `patches/icons.py` moves it to `0x1e0`, the
-Court Record's text sprites, whose only other user is the Record itself — the game DMAs the
-item again when the Record closes (so it must not share tiles with anything that stays). The DS has
+Court Record's text sprites — the game DMAs the item again when the Record closes (so it must not
+share tiles with anything that stays) — and the first 56 tiles of the shout bubbles' (`0x1e8` on).
+A bubble and the item are up together only as evidence is presented in court: the Record goes,
+the bubble (Take that! or Objection!) stays two frames longer, and the item's update
+(`0x0801545c`, every frame, state in `SYS+0x99`) copies the picture then, in state 3 (command
+`0x13`, a section that puts the item up at once: Larry's profile, bank 30 section `0xde`) or 5
+(an item up before the Record opened, back once the mode, `SYS+8`, is 6 or under). Until
+0.16.88 the bubble's top left showed the item's picture in the bubble's palette for those two
+frames; since 0.16.89 the update waits in those two states while a sprite in the bubbles'
+palette (11) uses the item's tiles, in the OAM shadow or in OAM (`src/item.c`, called in its place
+at `0x08000430` and `0x0801db9c`): the bubble goes as in the original and the item comes up two
+frames after the original's, the script running on as before. The DS has
 the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
 per-language bases, the same set for both languages), then one more and twenty pairs: the
 Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the
