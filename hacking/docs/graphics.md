@@ -441,10 +441,12 @@ letter whose ink is at most 30 wide is centred on a 32×64 sprite, N and G (35) 
 two t of Not Guilty share their tiles (320 tiles for Not Guilty, from `0x180` up to the
 characters' `0x2c0`; 224 for Guilty, from `0x1e0`; the effects that use the tiles below `0x1a0`
 load their own when they start, and no sprite uses them during any of the 21 verdicts). The layout
-is GS1's: the DS's centres scaled by 0.9 about the middle of the screen, the word centred at y 57:
-Not Guilty 230 × 57 (x 5–234, y 28–84, 96% of the width; the DS's 255 × 63 fills its 256), Guilty
-143 × 57 (x 50–192). Until 0.16.86 the letters were at 4/5 in 32×64 sprites, Not Guilty 195 wide,
-centred at y 47.
+is GS1's, the DS's centres scaled by 0.9 about the middle of the screen, but at the DS's height
+(since 0.16.88): the DS centres its letters on the middle of its screen (boxes at y 32–159 of 192,
+ink at 64–126), and so does the build, at y 80 (GS1 has them at 57): Not Guilty 230 × 57 (x 5–234,
+y 51–107, 96% of the width; the DS's 255 × 63 fills its 256), Guilty 143 × 57 (x 50–192), both
+centred at 49.7% of the screen's height as on the DS. Until 0.16.86 the letters were at 4/5 in
+32×64 sprites, Not Guilty 195 wide, centred at y 47.
 
 `verdict_mode` takes the place of the mode's handler in the mode table and runs the DS's timeline
 itself until the letters go: the letters are entries 51–59, affine (matrix 0 or 1) with the DS's
@@ -459,14 +461,23 @@ routine that starts the fade through the game's own `0x08000b40` (3, 1, 8, `0x1f
 
 Sprite time: a line has 1210 cycles for sprites, a plain sprite takes its width, an affine one 10
 + 2 × its box's width (nine affine sprites with double size would take 9 × 138, and the judge
-behind them would not be drawn; hence plain sprites once landed). As Not Guilty's Guilty zooms in,
-its six letters (G 266, five 138) and Not landed (N 64, o 32, t 32) take 1084 on a line, and the
-judge's sprites that start at y 88 another 160 on line 88, the landed letters' last row (all
-transparent): 34 over (mGBA draws the sprite that runs over and stops after it; the GBA cuts it
-short). So a landed 32×64 letter that is up while a group of several letters zooms in and whose
-ink ends within its 56th row (Not's o and t) is drawn as 32×32, 32×16 and 32×8 from the same
-tiles (entries 45–48 for the other pieces), which end at y 80: the busiest line then takes 1196.
-Guilty's letters zoom in one at a time (at most 490).
+behind them would not be drawn; hence plain sprites once landed). It is close as Not Guilty's
+Guilty zooms in: its six boxes (G 266, five 138) cover lines 16–143, and the judge's sprites take
+up to 160 on lines 85–98, which leaves 94 there for Not, landed at lines 48–111 in sprites 64 +
+32 + 32 wide (mGBA draws the sprite that runs over and stops after it; the GBA cuts it short). So
+every landed letter is drawn from a list of pieces, which the build works out by playing the
+verdict frame by frame as `verdict_mode` draws it, with the judge's measured sprite time per line
+behind it: every letter whole, then, wherever a line would run over, one tile row of a landed
+letter on that line narrowed, the biggest saving first, to its inked tiles from its own (32×8,
+16×8, 8×8) or else to its ink cut out afresh, as narrow as whole tiles allow. For Not Guilty: o
+whole; N as 64×32 and its inked tiles below; t as 32×32, 16×8 and its stem (rows 40–55, three
+tiles wide in its own) as one 16×16 cut from x 11. The cut tiles go into four of N's tiles that
+N's pieces leave unused (`0x2b6`–`0x2b9`); N's zoom shows them, so they are copied as Guilty
+begins, N long landed, and t is whole until then. The busiest line then takes 1204 and the judge
+is drawn whole (measured in the courtroom, all five not guilty verdicts); Guilty's letters zoom in
+one at a time (at most 490). The pieces take OAM entries 42–48, which nothing else uses during a
+verdict, and the letters are pixel for pixel GS1's on every frame. (0.16.87, at y 57, split o and
+t at their 56th row instead: 32×32, 32×16 and 32×8, entries 45–48, 1196 at most.)
 
 Savestates: `apply` keeps the room the 0.16.86 letters, layouts, table and code had (zeros now),
 and `letters`, the build's last step, stores the new ones and points the mode table and the flash

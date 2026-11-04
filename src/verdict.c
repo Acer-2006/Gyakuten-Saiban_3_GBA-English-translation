@@ -13,10 +13,12 @@
  * then the confetti or the court).  The original's two entries stay hidden.
  *
  * A letter is affine only while it zooms in: nine affine sprites with double size would take more
- * of a line's sprite time than there is, and the judge behind them would go.  A letter marked
- * L_SPLIT is drawn, once landed, as 32x32, 32x16 and 32x8 from the same tiles (its entry and
- * entries extra, extra + 1), which stop at its 56th row: Not's o and t, so that the line below them
- * keeps the sprite time the judge needs while Guilty zooms in.
+ * of a line's sprite time than there is, and the judge behind them would go.  Landed, a letter is
+ * drawn as its pieces (the build works them out, patches/verdict.py): mostly the whole sprite; but
+ * Not's letters, up while Guilty zooms in, are drawn narrower where a line would run out of time,
+ * from their own tiles or, for t, from a piece of its ink cut out afresh, which goes into tiles
+ * of N's that N's pieces leave unused (the late tiles, copied as Guilty begins; until then t is
+ * whole).  The first piece is the letter's entry, the others entries from EXTRA down.
  */
 #include "gba.h"
 
@@ -24,11 +26,9 @@
 #define WORD0    49                            /* the original's two words */
 #define FIRST    51                            /* the letters (the confetti, afterwards, uses 58-88) */
 #define HIDE     0x0200
+#define EXTRA    48                            /* the other pieces, from here down */
 #define TALL     0x8000                        /* attr0 shape: 32x64 with size 3 */
-#define WIDE     0x4000                        /* attr0 shape: 32x16 with size 2, 32x8 with size 1 */
 #define AFFINE2  0x0300                        /* attr0: affine, double size */
-#define SIZE1    0x4000
-#define SIZE2    0x8000
 #define SIZE3    0xc000
 #define ZOOM     10                            /* steps from twice the size, as on the DS */
 #define SLAM_AT  8                             /* the DS plays the slam as the ninth step begins */
@@ -38,7 +38,6 @@
 
 #define L_MATRIX 1                             /* affine matrix 1, else 0 */
 #define L_SQUARE 2                             /* 64x64, else 32x64 */
-#define L_SPLIT  4                             /* landed in three pieces (see above) */
 
 /* the screen shake (0x0800024c, every frame while bit 0 of SYS+0xe8 is set): frames, strength */
 #define SHAKE_TIME  ((volatile u16*)(SYS + 0x14))
@@ -48,9 +47,15 @@
 #define PLAY_SE(n)  ((void (*)(u32))0x08015bc9)(n)
 #define ORIGINAL(s) ((void (*)(volatile u8*))0x0800f23d)(s)
 
-/* x, y: the corner of the double-size box (y as attr0 has it) */
-struct letter { u8 frame, flags; s16 x; u16 attr2; u8 y, extra; };
-struct verdict { u16 n, words; const u32* tiles; const struct letter* l; volatile u32* vram; };
+/* a landed letter's piece: shape, attr0's shape | attr1's size << 2; dx, dy from the sprite's corner;
+ * when: 0 always, 1 until the late tiles are in, 2 after */
+struct piece { u16 attr2; u8 shape, dx, dy, when; };
+/* x, y: the corner of the double-size box (y as attr0 has it); n pieces from first */
+struct letter { u8 frame, flags; s16 x; u16 attr2; u8 y, n; u16 first; };
+struct verdict {
+    u16 n, words; const u32* tiles; const struct letter* l; volatile u32* vram;
+    const struct piece* p; u16 extra, late, late_words; const u32* late_tiles; volatile u32* late_vram;
+};
 extern const struct verdict verdicts[2];      /* not guilty, guilty */
 
 /* 0x10000 / size, the size going from 512 to 256 in tenths as the DS computes it */
@@ -69,21 +74,17 @@ void verdict_start(void) {
 }
 
 static void hide(const struct verdict* v) {
-    for (int i = 0; i < v->n; i++) {
-        OAM_SH[(FIRST + i) * 4] = HIDE;
-        if (v->l[i].flags & L_SPLIT) {
-            OAM_SH[v->l[i].extra * 4] = HIDE;
-            OAM_SH[(v->l[i].extra + 1) * 4] = HIDE;
-        }
-    }
+    for (int i = 0; i < v->n; i++) OAM_SH[(FIRST + i) * 4] = HIDE;
+    for (int i = 0; i < v->extra; i++) OAM_SH[(EXTRA - i) * 4] = HIDE;
 }
 
 /* the verdict mode, every frame (entry 9 of the mode table) */
 void verdict_mode(volatile u8* sys) {
     if (!active || sys[9] >= 4) { ORIGINAL(sys); return; }
     const struct verdict* v = &verdicts[active - 1];
-    int last = 0, slam = 0, end;
+    int last = 0, slam = 0, end, extra = 0, late = t >= v->late;
     hide(v);
+    if (late) for (u32 i = 0; i < v->late_words; i++) v->late_vram[i] = v->late_tiles[i];
     for (int i = 0; i < v->n; i++) {
         const struct letter* l = &v->l[i];
         volatile u16* o = &OAM_SH[(FIRST + i) * 4];
@@ -102,14 +103,15 @@ void verdict_mode(volatile u8* sys) {
             continue;
         }
         /* landed: plain, the size of the sprite, about the box's centre */
-        u32 x = (l->x + (sq ? 32 : 16)) & 0x1ff, y = (l->y + 32) & 0xff;
-        if (l->flags & L_SPLIT) {
-            volatile u16* e = &OAM_SH[l->extra * 4];
-            o[0] = y;                    o[1] = SIZE2 | x; o[2] = l->attr2;        /* 32x32 */
-            e[0] = WIDE | ((y + 32) & 0xff); e[1] = SIZE2 | x; e[2] = l->attr2 + 16;   /* 32x16 */
-            e[4] = WIDE | ((y + 48) & 0xff); e[5] = SIZE1 | x; e[6] = l->attr2 + 24;   /* 32x8 */
-        } else {
-            o[0] = (sq ? 0 : TALL) | y;  o[1] = SIZE3 | x; o[2] = l->attr2;
+        int x = l->x + (sq ? 32 : 16), y = l->y + 32;
+        const struct piece* p = &v->p[l->first];
+        for (int k = 0; k < l->n; k++, p++) {
+            if (p->when && (p->when == 2) != late) continue;
+            volatile u16* e = o ? o : &OAM_SH[(EXTRA - extra++) * 4];
+            o = 0;
+            e[0] = (p->shape & 3) << 14 | ((y + p->dy) & 0xff);
+            e[1] = (p->shape >> 2) << 14 | ((x + p->dx) & 0x1ff);
+            e[2] = p->attr2;
         }
     }
     OAM_SH[WORD0 * 4] = HIDE;

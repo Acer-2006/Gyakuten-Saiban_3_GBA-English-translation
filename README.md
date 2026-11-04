@@ -66,7 +66,7 @@ load an in-game save instead.
 * College Phoenix's sweater says P instead of RYU, and Larry's armband with Japanese
   writing is gone, as in the DS version's sprites.
 * The DS version's Unlock Successful banner when the last Psyche-Lock breaks, and its Not Guilty
-  / Guilty verdict letters, each landing with a slam and a shake as on the DS.
+  / Guilty verdict letters at the DS's height, each landing with a slam and a shake as on the DS.
 * Pictures with writing in them, from the DS English ones: the pages behind the L Button (case
   summaries, letters, the price list, notes), maps, the newspapers, the calling card, the
   exhibition poster and the signs in the backgrounds.
@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.88 — the verdict's Guilty / Not Guilty letters sit at the same height as on the DS, across
+  the middle of the screen (they were 23 pixels higher, where GS1 has them). The letters, their
+  timing, the shake and the slam are unchanged, and they are still GS1's pixel for pixel. To keep
+  the judge behind them drawn whole while "Guilty" zooms in beside "Not", the GBA now draws "Not"
+  from smaller pieces that leave out its empty parts (it looks the same). Savestates from earlier
+  builds keep working.
 * 0.16.87 — the verdict's Guilty / Not Guilty letters are the English GS1's: the DS's own letters
   at 90% (they were at 80%), so "Not Guilty" spans 96% of the screen as in GS1, at GS1's height.
   The build makes them from the DS ROM exactly as GS1's tools do, pixel for pixel the same as
