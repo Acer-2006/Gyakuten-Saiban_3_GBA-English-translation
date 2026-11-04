@@ -430,21 +430,48 @@ out). 61 frames after the last letter has landed they all go at once (no rise, u
 Japanese words), and the confetti follows for not guilty. (Its timer also slides something on
 the bottom screen, `0x0204bcd4`, which the GBA has not.)
 
-The English build (`patches/verdict.py`, `src/verdict.c`) shrinks the letters to 4/5, each into a
-32×64 sprite (OBJ tiles `0x1a0`–`0x2bf` for the nine of not guilty), laid out as on the DS around
-the middle of the screen at the original's height. `verdict_mode` takes the place of the mode's
-handler in the mode table and runs the DS's timeline itself until the letters go: the letters
-are entries 51–59, affine (matrix 0 or 1) with the DS's ten sizes while they zoom in and plain
-sprites once they have landed; each landing sets off the GBA's shake as command `0x27 4 1` would
-(`SYS+0x14` frames, `SYS+0x16` strength, bit 0 of `SYS+0xe8`; run by `0x0800024c`) and plays
-sound `0x56`. Then it hides the
-letters, sets state 4 with its timer run out (`SYS+0xa` = `0x21`) and calls the original, which
-hides its two words (entries 49 and 50, hidden from the start) and goes on to the confetti, or
-back to the court. Since 0.16.86 the verdict starts with the DS's flash: the last build step
-(`start_flash`) points the start hook's trampoline at a routine that starts the fade through the
-game's own `0x08000b40` (3, 1, 8, `0x1f`; BLDY 24, 16, 8, 0) and then calls `verdict_start`, so
-nothing before it moves; the frames after the flash are those of 0.16.85. (Nine affine sprites with double size take 9 × 138 cycles of the 1210 a line
-has for sprites, and the judge behind them would not be drawn.)
+The English build (`patches/verdict.py`, `src/verdict.c`) has the English GS1's letters (since
+0.16.87, from the maintainer's GS1 v0.7.58 verdict lettering kit): the DS letters at 90%, made as
+GS1's `tools/en/make_effects.py` makes them, here from the Trials and Tribulations DS ROM, whose
+letters and palettes are GS1's DS's; every letter comes out pixel for pixel as the kit's.
+`resample.scale_indexed_box` (GS1's `scale_indexed`: Pillow's BOX filter on mode F pictures,
+reproduced exactly in plain Python) averages each colour channel and the coverage over each new
+pixel and keeps the pixels at least half covered in the nearest of the DS's own six colours. A
+letter whose ink is at most 30 wide is centred on a 32×64 sprite, N and G (35) on a 64×64 one; the
+two t of Not Guilty share their tiles (320 tiles for Not Guilty, from `0x180` up to the
+characters' `0x2c0`; 224 for Guilty, from `0x1e0`; the effects that use the tiles below `0x1a0`
+load their own when they start, and no sprite uses them during any of the 21 verdicts). The layout
+is GS1's: the DS's centres scaled by 0.9 about the middle of the screen, the word centred at y 57:
+Not Guilty 230 × 57 (x 5–234, y 28–84, 96% of the width; the DS's 255 × 63 fills its 256), Guilty
+143 × 57 (x 50–192). Until 0.16.86 the letters were at 4/5 in 32×64 sprites, Not Guilty 195 wide,
+centred at y 47.
+
+`verdict_mode` takes the place of the mode's handler in the mode table and runs the DS's timeline
+itself until the letters go: the letters are entries 51–59, affine (matrix 0 or 1) with the DS's
+ten sizes while they zoom in and plain sprites once they have landed; each landing sets off the
+GBA's shake as command `0x27 4 1` would (`SYS+0x14` frames, `SYS+0x16` strength, bit 0 of
+`SYS+0xe8`; run by `0x0800024c`) and plays sound `0x56`. Then it hides the letters, sets state 4
+with its timer run out (`SYS+0xa` = `0x21`) and calls the original, which hides its two words
+(entries 49 and 50, hidden from the start) and goes on to the confetti, or back to the court. The
+verdict starts with the DS's flash (0.16.86): `start_flash` points the start hook's trampoline at a
+routine that starts the fade through the game's own `0x08000b40` (3, 1, 8, `0x1f`; BLDY 24, 16, 8,
+0) and then calls `verdict_start`.
+
+Sprite time: a line has 1210 cycles for sprites, a plain sprite takes its width, an affine one 10
++ 2 × its box's width (nine affine sprites with double size would take 9 × 138, and the judge
+behind them would not be drawn; hence plain sprites once landed). As Not Guilty's Guilty zooms in,
+its six letters (G 266, five 138) and Not landed (N 64, o 32, t 32) take 1084 on a line, and the
+judge's sprites that start at y 88 another 160 on line 88, the landed letters' last row (all
+transparent): 34 over (mGBA draws the sprite that runs over and stops after it; the GBA cuts it
+short). So a landed 32×64 letter that is up while a group of several letters zooms in and whose
+ink ends within its 56th row (Not's o and t) is drawn as 32×32, 32×16 and 32×8 from the same
+tiles (entries 45–48 for the other pieces), which end at y 80: the busiest line then takes 1196.
+Guilty's letters zoom in one at a time (at most 490).
+
+Savestates: `apply` keeps the room the 0.16.86 letters, layouts, table and code had (zeros now),
+and `letters`, the build's last step, stores the new ones and points the mode table and the flash
+routine at the new code; the ROM differs from 0.16.86's only there. (A savestate taken while a
+verdict's letters are up finishes that verdict with the old letters' tiles under the new layout.)
 
 ## Effects archive: banners and speech bubbles
 

@@ -28,3 +28,4 @@ def apply_all(rom, ctx):
     icons.record_picture(rom)
     court_record.tall_panels(rom, ctx)
     verdict.start_flash(rom, ctx)
+    verdict.letters(rom, ctx)

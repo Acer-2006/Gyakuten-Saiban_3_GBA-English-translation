@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.87 — the verdict's Guilty / Not Guilty letters are the English GS1's: the DS's own letters
+  at 90% (they were at 80%), so "Not Guilty" spans 96% of the screen as in GS1, at GS1's height.
+  The build makes them from the DS ROM exactly as GS1's tools do, pixel for pixel the same as
+  GS1's. The letters still come in, land, shake and slam on the same frames as before, and the
+  judge behind them is drawn whole. Savestates from earlier builds keep working.
 * 0.16.86 — the verdict starts with a white flash, as on the DS: both Guilty and Not Guilty
   flash the screen white for a moment as the first letter comes in (the DS's verdict does it
   itself; the English build had no flash). Nothing else about the verdict changes: the letters,

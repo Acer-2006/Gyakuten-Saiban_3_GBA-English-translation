@@ -6,7 +6,7 @@ breaks thin strokes and makes letters uneven.  Here the picture is scaled in ful
 Lanczos filter (3 lobes, stretched by the scale factor so that every source pixel counts), and
 each new pixel then takes the nearest colour of the picture's own palette, so the result needs no
 new colours.  (Python only: no Pillow at build time.)"""
-import math
+import math, struct
 
 def _lanczos(t, a=3):
     if t == 0: return 1.0
@@ -106,4 +106,53 @@ def band_limited(samples, rate_in, rate_out, zeros=32, cutoff=0.97):
             w = s * (0.42 + 0.5 * math.cos(u) + 0.08 * math.cos(2 * u))
             acc += samples[i] * w; wsum += w
         out.append(acc / wsum if wsum else 0.0)
+    return out
+
+# ---- the English GS1's verdict letters (tools/en/effects_common.py scale_indexed there) -------
+# Pillow's BOX resize of mode F pictures, reproduced exactly: a pass along the rows, then one down
+# the columns, each output sample the plain mean of the input samples whose centres fall inside it
+# (Pillow's box filter on (x - centre + 0.5) / scale, in (-0.5, 0.5]), stored as 32-bit floats.
+
+def _f32(x):
+    return struct.unpack('<f', struct.pack('<f', x))[0]
+
+def _box_coeffs(n_in, n_out):
+    scale = n_in / n_out
+    fscale = max(scale, 1.0)
+    support = 0.5 * fscale
+    out = []
+    for o in range(n_out):
+        centre = (o + 0.5) * scale
+        lo = max(0, int(centre - support + 0.5))
+        hi = min(n_in, int(centre + support + 0.5))
+        ws = [1.0 if -0.5 < (i - centre + 0.5) / fscale <= 0.5 else 0.0 for i in range(lo, hi)]
+        total = sum(ws)
+        out.append((lo, [w / total for w in ws] if total else ws))
+    return out
+
+def _box_resize(rows, w, h, tw, th):
+    hc, vc = _box_coeffs(w, tw), _box_coeffs(h, th)
+    tmp = [[_f32(sum(row[lo + k] * wk for k, wk in enumerate(ws))) for lo, ws in hc] for row in rows]
+    return [[_f32(sum(tmp[lo + k][x] * wk for k, wk in enumerate(ws))) for x in range(tw)] for lo, ws in vc]
+
+def scale_indexed_box(px, colors, factor, usable):
+    """The English GS1's scale_indexed: px (rows of palette indices, 0 transparent) scaled by
+    factor (to round(w * factor) x round(h * factor)): each colour channel times the coverage,
+    and the coverage itself, box-averaged; a pixel at least half covered takes the colour of
+    `usable` (palette indices; colors: index -> (r, g, b)) nearest to the averaged colour, the
+    rest stay transparent.  Every pixel is one of the picture's own colours."""
+    h, w = len(px), len(px[0])
+    tw, th = int(round(w * factor)), int(round(h * factor))
+    cover = _box_resize([[1.0 if v else 0.0 for v in row] for row in px], w, h, tw, th)
+    chans = [_box_resize([[float(colors[v][c]) if v else 0.0 for v in row] for row in px], w, h, tw, th)
+             for c in range(3)]
+    cand = [colors[u] for u in usable]
+    out = [[0] * tw for _ in range(th)]
+    for y in range(th):
+        for x in range(tw):
+            a = cover[y][x]
+            if a < 0.5: continue
+            col = [_f32(chans[c][y][x] / a) for c in range(3)]
+            d = [sum((col[c] - k[c]) ** 2 for c in range(3)) for k in cand]
+            out[y][x] = usable[d.index(min(d))]
     return out
