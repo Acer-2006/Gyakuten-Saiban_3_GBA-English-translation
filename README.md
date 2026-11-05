@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.90 — the Guilty / Not Guilty letters start one frame later, a frame into the white flash
+  as on the DS (they came in with it, a frame early). Every step of the letters' zoom, each slam
+  and shake, and the moment the letters go now fall on the same frame as on the DS, counted from
+  the flash. (The DS itself stalls for a frame here and there when several letters slam at
+  once, Not's three and Guilty's six; that isn't copied.) Savestates from earlier builds keep
+  working.
 * 0.16.89 — no more garbled "Take that!" bubble when the evidence you present comes up on screen
   right away (presenting Larry's profile in episode 5, for one): for its last two frames the
   bubble's top left showed the item's picture in the wrong colours. The item now comes up just

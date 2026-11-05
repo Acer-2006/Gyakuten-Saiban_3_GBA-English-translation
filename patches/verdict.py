@@ -19,8 +19,10 @@ screen for 4 frames (strength 1) and plays sound 0x56 (0x0202fd70), once for eac
 letters stay 61 frames after the last has landed, then go at once (they do not rise as the
 Japanese words do), and the confetti follows for not guilty.  The verdict starts with a flash
 (0x0202f988: the DS's fade function 0x02017a30 with mode 3, a step a frame, 8 a step, every
-layer, the script's 12 301 8 1f), white for two frames and half for one as the first letter
-begins; there is none as the letters land.
+layer, the script's 12 301 8 1f), white for two frames and half for one; the letters' timeline
+starts a frame into it (Not's first step under the second white frame, its second under the half
+one; Guilty's G eleven frames after the flash starts; measured in DeSmuME, both verdicts, two
+scenes each).  There is no flash as the letters land.
 
 The English build's letters are the English GS1's (v0.7.58, its verdict lettering kit; 0.16.87):
 the DS letters at 90% (SCALE), made as GS1's tools/en/make_effects.py makes them, here from the
@@ -65,7 +67,10 @@ are pixel for pixel GS1's on every frame.
 
 The flash (0.16.86): start_flash, the build's last step but one, puts a routine in front of
 verdict_start (the trampoline's call is pointed at it) that starts the same fade as the DS through
-the game's own function, 0x08000b40, which command 0x12 uses: BLDY 24, 16, 8, 0.
+the game's own function, 0x08000b40, which command 0x12 uses: BLDY 24, 16, 8, 0.  Since 0.16.90
+the letters' frames are the DS's list's plus START (1), so that, as on the DS, the timeline starts a
+frame after the flash (until then they started with it, a frame early); the slams, the shakes and
+the letters' going follow, a frame later than before.
 
 Savestates: apply() keeps the room the 0.16.86 letters and code had (zeros now), so nothing
 stored after it moves; the letters, their tables and the code are stored by letters(), the build's
@@ -94,6 +99,7 @@ BSS = 0x02029800                          # after src/menu.c's
 L_MATRIX, L_SQUARE = 1, 2                 # src/verdict.c's letter flags
 EXTRA_TOP, EXTRA_LOW = 48, 34             # OAM entries for pieces, from 48 down (src/verdict.c's EXTRA)
 ZOOM = 10                                 # src/verdict.c's ZOOM: a letter has landed ZOOM frames on
+START = 1                                 # the DS's letters begin a frame into its flash (0.16.90)
 LINE_TIME = 1210                          # sprite cycles a line (DISPCNT bit 5 clear)
 # the judge's sprites (OAM 114-127) behind the verdict: the most cycles they take on a line in the
 # game's verdicts (measured in mGBA on every frame the letters are up; screen lines first-last)
@@ -243,7 +249,7 @@ def layout(ctx, kind):
         cx = (dx + dw - 128) * SCALE + 120
         cy = (dy + 64 - 96) * SCALE + CENTRE_Y
         bx, by = int(round(cx - w)), int(round(cy - 64))
-        letters.append(dict(frame=fr, w=w, rows=rows, bx=bx, by=by, lx=bx + w // 2, ly=by + 32,
+        letters.append(dict(frame=fr + START, w=w, rows=rows, bx=bx, by=by, lx=bx + w // 2, ly=by + 32,
                             t0=pics[key][0], key=key, bands=_bands(rows, w)))
     if tile < TILE_LOW: raise SystemExit('verdict: the letters need more sprite tiles')
     frames = sorted({L['frame'] for L in letters})

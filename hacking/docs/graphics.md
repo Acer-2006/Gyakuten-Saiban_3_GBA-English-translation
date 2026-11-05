@@ -435,8 +435,13 @@ the DS's shake command `0x27` sets) and sound `0x56` (`0x0202fd70`), so
 Guilty slams six times where the Japanese 有罪 slams twice, with no flash as they land: the DS
 flashes once, as the verdict starts (`0x0202f988`, its fade function `0x02017a30` with mode 3, a
 step a frame, 8 a step, every layer, the script's `12 301 8 1f`; white for two frames and half
-for one as the first letter begins, seen in DeSmuME and gone when the verdict command is left
-out). 61 frames after the last letter has landed they all go at once (no rise, unlike the
+for one, seen in DeSmuME and gone when the verdict command is left out). The letters' timeline
+starts a frame into the flash: Not's first step is under the second white frame and its second
+under the half one, and Guilty's G comes in 11 frames after the flash starts (the ink's height
+measured frame by frame, both verdicts in two scenes each). The DS also holds a frame now and
+then where several letters slam at once (Not's step 7 for two frames, and three more as Guilty's
+six land in not guilty), which puts its not-guilty letters 4 frames behind its own timeline by the
+time they go; the lone letters of guilty never are. 61 frames after the last letter has landed they all go at once (no rise, unlike the
 Japanese words), and the confetti follows for not guilty. (Its timer also slides something on
 the bottom screen, `0x0204bcd4`, which the GBA has not.)
 
@@ -467,7 +472,12 @@ with its timer run out (`SYS+0xa` = `0x21`) and calls the original, which hides 
 (entries 49 and 50, hidden from the start) and goes on to the confetti, or back to the court. The
 verdict starts with the DS's flash (0.16.86): `start_flash` points the start hook's trampoline at a
 routine that starts the fade through the game's own `0x08000b40` (3, 1, 8, `0x1f`; BLDY 24, 16, 8,
-0) and then calls `verdict_start`.
+0) and then calls `verdict_start`. Since 0.16.90 the letters' frames are the DS list's plus one
+(`START` in `patches/verdict.py`), so that the timeline starts a frame into the flash as on the
+DS: every zoom step, slam (heard with the frame that shows step 8: the mixer mixes the sound in
+the frame its call is made and plays it in the next), shake (from the frame after) and the
+letters' going falls on the DS's frame counted from the flash, apart from the frames the DS holds
+(not copied); until then all of them came a frame early.
 
 Sprite time: a line has 1210 cycles for sprites, a plain sprite takes its width, an affine one 10
 + 2 × its box's width (nine affine sprites with double size would take 9 × 138, and the judge
