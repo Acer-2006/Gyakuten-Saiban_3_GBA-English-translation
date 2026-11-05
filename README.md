@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.91 — the Court Record's names sit two rows higher (as high as the English GS1 patch has
+  them), and every description starts the same distance under its name: three empty rows under
+  the name's capitals in every panel. Four-line descriptions had a single row there, with the
+  tails of a name's g or y level with the top of the text, while three-line ones had five; the
+  three-line text now starts as high as the four-line text. No name has to step aside from the
+  text any more (46 were off centre), and the lines, their breaks and their spacing stay as they
+  were. Savestates from earlier builds keep working.
 * 0.16.90 — the Guilty / Not Guilty letters start one frame later, a frame into the white flash
   as on the DS (they came in with it, a frame early). Every step of the letters' zoom, each slam
   and shake, and the moment the letters go now fall on the same frame as on the DS, counted from

@@ -11,6 +11,8 @@ For every item the picture the item table points at is unpacked from the built R
   by every build), each drawn on its own with the DS font: nothing else, nothing missing;
 * no pixel of one line is on or next to (8 ways, corners included) a pixel of another line, the
   name line counting as a line;
+* every description starts on the same row (dsdesc.TALL_TOPS, row 13 since 0.16.91), under all
+  of the name's ink;
 * the lines put together are the DS description word for word.
 
 It prints one line per item with a problem and a summary; the exit status is 1 if any item has
@@ -136,6 +138,12 @@ def main():
         union = set().union(*lines)
         if union != text:
             problems.append(f'text pixels differ from the recorded lines ({len(union ^ text)})')
+        # one space under the name in every panel (0.16.91): the text from the same row, under all
+        # of the name's ink
+        if L['tops'][0] != dsdesc.TALL_TOPS[1][0]:
+            problems.append(f"the text starts on row {L['tops'][0]}, not {dsdesc.TALL_TOPS[1][0]}")
+        if name and max(y for _, y in name) >= L['tops'][0]:
+            problems.append('the name reaches the rows of the first line')
         parts = [name] + lines
         n = 0
         for p in range(len(parts)):

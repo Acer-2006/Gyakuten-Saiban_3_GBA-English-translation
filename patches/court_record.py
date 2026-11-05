@@ -437,7 +437,11 @@ def clear_lines(rom, ctx):
 # 0.16.76 chose other line breaks, spacings and word gaps around that).  The panel's red runs
 # down to y 92, under the picture's last row: the picture grows to 72 rows, its rows 0-68 red and
 # 69-71 the panel's bottom border (BORDER_TILE's last three rows), and four lines go 14 rows apart
-# (dsdesc.choose_tall).  The first 160 tiles are the picture's rows 0-63 as before (the ten
+# (dsdesc.choose_tall).  Since 0.16.91 the name line is NAME_RAISE rows higher than the DS's name
+# picture has it (its capitals on rows 1-10, the brackets on 0-11; as high as the maintainer's
+# English GS1 has its names) and every description starts on the same row under it, whatever its
+# number of lines (dsdesc.TALL_TOPS): the same space between the name and the text in every
+# panel.  The first 160 tiles are the picture's rows 0-63 as before (the ten
 # sprites); the 20 after them are its rows 64-71, of which the first 19 (the transparent columns
 # 152-159 are the panel's corner tile) are drawn on the panel itself, BG2 row 11, where the panel's
 # map has BORDER_TILE: no sprite memory is free for them whenever the Record shows, and the
@@ -447,6 +451,7 @@ def clear_lines(rom, ctx):
 # map (SLIDE_MAP) whose row 11 has the set of the item last loaded: the item sliding out keeps
 # its strip, in the set it had, until it is gone.
 TALL_H, RED_LAST = 72, 68
+NAME_RAISE = 2                 # rows the name line goes up from where the DS's name picture has it
 UI_SHEET = 0x08180820          # BG tile sheet in char block 0 (256 tiles)
 BORDER_TILE = 0x4c             # under the description: 5 red rows, then the border (a, b, 1)
 SLIDE_MAP = 0x0803bc44         # the panel's BG2 map (32x12), read only by the scroll at 0x080061bc
@@ -496,6 +501,9 @@ def tall_layouts(ctx, font, stems, names):
     for i, (name_px, text) in sorted(ctx.court_inputs.items()):
         cols = name_columns(name_px, AGES[i], names, LONG_NAMES.get(i)) if i in AGES else None
         if cols is None: cols = name_columns(name_px)
+        if any(m & ((1 << NAME_RAISE) - 1) for m in cols):
+            raise SystemExit(f'court record: the name of item {i} has ink in its top {NAME_RAISE} rows')
+        cols = [m >> NAME_RAISE for m in cols]
         places = []
         for dx in NUDGES:
             x0 = (W_USE - len(cols)) // 2 + dx

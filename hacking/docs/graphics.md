@@ -184,16 +184,22 @@ picture ended at y 87; the background's tiles are 8 rows high, so the picture ca
 higher, but it can go 8 rows further down. Rows 0–68 are red (9) and rows 69–71 the border
 (10, 11, 1: the last three rows of BG tile `0x4c`, which has five red rows above them).
 
-Layout (`dsdesc.choose_tall`): the DS's line breaks, each line filled as far as it goes; up to
-three lines at rows 17, 33 and 49 (16 apart, as before); four lines at 13, 27, 41 and 55 (14
-apart, the last line's tails on row 68). Where a pixel of one line would be on or next to (8
-ways) a pixel of another, the name line counting as the first, the name line moves off the
-centre (as since 0.16.65), then every other spacing of 13 to 15 rows with the first line on rows
-11 to 14 is tried, the evenest first; only then other line breaks; with none of that the build
-stops. With the US DS text all 195 descriptions keep the DS's breaks: 130 of the 132 four-line
-ones are 14 rows apart, one is 13 apart from row 14 and one 14 apart from row 14 (its last line
-has no tails). Word gaps narrow (4, then 3 pixels) only for a text that does not fit four lines
-otherwise (Franziska von Karma's second profile, item 163, which also has "prosecutor"
+Layout (`dsdesc.choose_tall`): the name line two rows higher than the DS's name picture has it
+(`court_record.NAME_RAISE`, since 0.16.91: capitals on rows 1-10, brackets on 0-11, the tails of
+g and y down to row 12; as high as the maintainer's English GS1 has its names), and every
+description from row 13, whatever its number of lines: the same space under the name in every
+panel, three empty rows between the name's capitals and the first line's (row 14). Up to three
+lines go 16 rows apart (13, 29, 45), four 14 apart (13, 27, 41, 55, the last line's tails on row
+68). The DS's line breaks, each line filled as far as it goes. Where a pixel of one line would be
+on or next to (8 ways) a pixel of another, the name line counting as the first, the name line
+moves off the centre (as since 0.16.65), then every other spacing of 13 to 15 rows with the first
+line on row 13 is tried, the evenest first; only then other line breaks; with none of that the
+build stops. With the US DS text all 195 descriptions keep the DS's breaks and those rows, and no
+name moves off the centre. (0.16.80-0.16.90 had the name on the DS's rows, capitals on 3-12, up to
+three lines from row 17 and four from row 13: five empty rows under the name's capitals over three
+lines, one over four, where the tails of a name's g or y reached the first line's rows, and 46
+names moved off the centre to keep clear of the text.) Word gaps narrow (4, then 3 pixels) only
+for a text that does not fit four lines otherwise (Franziska von Karma's second profile, item 163, which also has "prosecutor"
 hyphenated, and item 210). Pearl Fey's first profile keeps the 2-pixel gap between straight sides
 (`dsdesc.Font(stem_gap)`, since 0.16.74: the g and l of "amazingly") and the "??????" profile
 its given breaks ("Morgan Fey's daughter / and Iris's twin sister. / Her father deals / in
@@ -289,7 +295,8 @@ letters (`LONG_NAMES`), as the DS does with its long names: 149 columns of the 1
 itself shows the age only on the info panel, under the name: "Age: deceased".) The panels with
 ages are stored by `add_ages`, the last step of the build, and the item table points at them;
 the ones without stay where they were, so that nothing after them moves. Since 0.16.65 no letter
-of a name line touches its description (8 ways): the brackets cover rows 2–13, and `add_ages`
+of a name line touches its description (8 ways): the brackets cover rows 2–13 (in the 160×64
+pictures; the 160×72 panels have the name two rows higher, see above), and `add_ages`
 also makes again every panel whose name touched its first line (14 evidence panels did before
 the ages, from the tails of g, p and y over a four-line description, which starts at row 14);
 the description keeps the lines chosen against the name alone, and the name line moves off the

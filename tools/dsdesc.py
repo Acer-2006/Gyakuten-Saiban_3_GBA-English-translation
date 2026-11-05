@@ -252,12 +252,14 @@ def choose_clear(font, text, maxw, name_masks, x0, layouts, bottom, first=(), st
     return fewest[1:]
 
 # The 160x72 panels (since 0.16.80, court_record.tall_panels): the picture reaches 8 rows further
-# down, to the panel's bottom border, its rows 0-68 red.  Up to three lines keep their rows; four
-# lines go 14 rows apart from row 13 (the last one's tails on row 68), and where letters of two
-# lines (or of the name and the first line) would touch, every other spacing of 13 to 15 rows with
-# the first line on rows 11 to 14 is tried, the evenest first.
-TALL_TOPS = {1: (17,), 2: (17, 33), 3: (17, 33, 49), 4: (13, 27, 41, 55)}
-TALL_FIRST = (13, 12, 14, 11)
+# down, to the panel's bottom border, its rows 0-68 red.  Every description starts on row 13, three
+# rows under the capitals of the name line (court_record.NAME_RAISE: rows 1-10), whatever its
+# number of lines (0.16.91; up to three lines were on rows 17, 33 and 49 before, four on 13): up to
+# three lines 16 rows apart, four 14 apart (the last one's tails on row 68).  Where letters of two
+# lines would touch, every other spacing of 13 to 15 rows is tried for four lines, the evenest
+# first, the first line staying on row 13 (none needs one with the US DS text).
+TALL_TOPS = {1: (13,), 2: (13, 29), 3: (13, 29, 45), 4: (13, 27, 41, 55)}
+TALL_FIRST = (13,)
 TALL_PITCHES = (14, 13, 15)
 
 def tall_tops(n):
