@@ -31,12 +31,13 @@ PROMPTS = [
     (0x0818ac20, 'Back'),                   # もどる
 ]
 # きりかえ, R Swap above B L Back on the detail view of the one item whose table entry's +6 is 0x1c
-# (Court Record step 5, 0x08013e9a: the R icon at x 185, the prompt at 204, y 128), the Hanging
+# (Court Record step 5, 0x08013e9a: the R icon at x 185, the prompt at 204, y 128; 177 and 196 in
+# the English build, see below), the Hanging
 # Scroll covered in gravy (item 173, episode 5): R switches between it and the scroll underneath.
 # GS1 has no such prompt.  Since 0.16.93 it is drawn as OK and Back are (it kept the DS font's
 # advances squeezed to 31 pixels until then, the w against the a and the a against the p): 33
 # pixels with its outline, one more than the 32x16 sprite, and the p's tail on the sprite's last
-# row; the outline's last column (x 236) and the row under the tail (y 144) are left off, both
+# row; the outline's last column (x 228) and the row under the tail (y 144) are left off, both
 # over the detail view's black margin (the picture ends at x 175), where the outline's near-black
 # would not show anyway.
 SWAP = (0x08190420, 'Swap')
@@ -352,6 +353,12 @@ def apply(rom, ctx):
         raise SystemExit(f'ui: {text} needs more than its sprite less one outline column and row')
     grid = [row[:32] for row in grid[:16]]
     rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
+    # Its R icon (OAM shadow entry 1, x 185) sits over the B icon under it (184) in the original;
+    # since the B and L icons and Back went 8 pixels left (176, 192, 208), the R icon and Swap
+    # (entry 0, x 204) go 8 left with them (0.16.94): 177 and 196, as they were placed against the
+    # row under them.  Their attr1 literals are read only by step 5 (0x08013ec0, 0x08013ece).
+    assert rom.u32(0x08013f00) == 0x8000 | 204 and rom.u32(0x08013f04) == 0x4000 | 185
+    rom.w32(0x08013f00, 0x8000 | 196); rom.w32(0x08013f04, 0x4000 | 177)
     for addr, text in TABS:
         grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)
         for y in range(16, 29):

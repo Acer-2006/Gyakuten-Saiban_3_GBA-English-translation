@@ -110,6 +110,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.94 — on that detail view, the R icon and Swap move 8 pixels left with the B / L / Back
+  row under them, so R sits over B again as in the Japanese game (they had stayed put when the
+  row under them moved, in 0.16.46 and 0.16.92).
 * 0.16.93 — the Swap tag (R Swap above B L Back on the detail view of the Hanging Scroll covered
   in gravy, episode 5, the only item with it) is drawn like Back and OK: its letters were
   squeezed together, the w against the a and the a against the p, and now each has a pixel to
