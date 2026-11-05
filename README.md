@@ -110,6 +110,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.95 — the text is set at the English GS1's spacing: the same letters, each a pixel after
+  the last, word spaces of 4 pixels (the DS's spacing, which it had, puts most letters two
+  pixels apart and spaces of 8). A line comes out pixel for pixel as GS1 draws it, from x 9 as in
+  GS1, and about a fifth narrower than before; no line has to close up any more. This covers all
+  the text the box's font draws: dialogue, testimony, date and place cards, choices, captions,
+  the save screen's messages. Spaces at the start of a line keep the DS's width, so lines the DS
+  sets in ("THE END", "To be continued.", the letter in episode 5) start where they did. The
+  Court Record and the other pictures with lettering are unchanged.
 * 0.16.94 — on that detail view, the R icon and Swap move 8 pixels left with the B / L / Back
   row under them, so R sits over B again as in the Japanese game (they had stayed put when the
   row under them moved, in 0.16.46 and 0.16.92).

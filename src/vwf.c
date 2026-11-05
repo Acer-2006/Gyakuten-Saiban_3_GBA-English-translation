@@ -165,6 +165,8 @@ struct vwf_ext {
     u8 layout;          /* LAYOUT once a box made by an earlier build has been looked for (old_layout) */
     u16 icon_tile;      /* the third line's copy for the frame the presented icon came in (vwf_icon) */
     u8 cap_sq[LBL_LINES];   /* a caption's lines: pixels taken out of every letter gap (line_done) */
+    u8 box_lead;        /* the box's line has had only spaces so far (LEAD_SPACE; canvas_glyph, box_glyph) */
+    u8 lbl_lead;        /* the same for sprite text's line (label_draw_char) */
 };
 _Static_assert(sizeof(struct vwf_ext) <= 0x80, "vx runs into script.c's state at 0x02028800");
 #define vx (*(struct vwf_ext*)0x02028780)
@@ -479,13 +481,25 @@ static void canvas_check(void) {
     vs.lost = 1;
 }
 
+/* The letters are set at the English GS1's spacing (tools/dsfont.py, gs1_spacing: a pixel apart,
+   word spaces of 4).  The DS sets a few lines in from the left with spaces at their start, at its
+   own space of 8 pixels: "THE END" and an episode's name under its last page and "To be
+   continued.", over at the right, and the cascade of lines of a letter in episode 5.  Those
+   spaces keep the DS's 8 pixels (0.16.95), so that such lines start where they did. */
+#define LEAD_SPACE 8
+#define SPACE_CODE 0x17f
+
 /* Measure the rest of the current line (from the script pointer) in pixels; `glyphs`, if given,
-   gets the number of characters in it. */
-static __attribute__((noinline)) int measure_line_n(const u16* p, int* glyphs) {
+   gets the number of characters in it; `lead`: the line has had only spaces so far. */
+static __attribute__((noinline)) int measure_line_n(const u16* p, int* glyphs, int lead) {
     int w = 0, g = 0;
     for (int n = 0; n < 512; n++) {
         u32 t = *p++;
-        if (t >= 0x80) { w += font_w[glyph_index(t)]; g++; continue; }
+        if (t >= 0x80) {
+            if (lead && t == SPACE_CODE) w += LEAD_SPACE;
+            else { w += font_w[glyph_index(t)]; lead = 0; }
+            g++; continue;
+        }
         if (t == 0x00 || t == 0x01 || t == 0x02 || t == 0x07 || t == 0x08 || t == 0x09 || t == 0x0a ||
             t == 0x0d || t == 0x2c || t == 0x2d || t == 0x2e || t == 0x35 || t == 0x36) break;
         p += cmd_args[t];
@@ -493,7 +507,7 @@ static __attribute__((noinline)) int measure_line_n(const u16* p, int* glyphs) {
     if (glyphs) *glyphs = g;
     return w;
 }
-#define measure_line(p) measure_line_n(p, 0)
+#define measure_line(p, lead) measure_line_n(p, 0, lead)
 
 /* ---------------------------------------------------------------- choice labels */
 /* A line's tiles are cleared when the page first puts a character on it, not all three when it
@@ -547,14 +561,15 @@ static void line_done(int L, int w, int lead, int n) {
 
 static int page_scan(const u16* p, u32 code, int row) {
     int L = row - vs.lbl_row0;
-    int w = font_w[glyph_index(code)], g = 1;
-    int lead = code == 0x17f ? w : 0, inlead = code == 0x17f;
+    int inlead = code == SPACE_CODE;
+    int w = inlead ? LEAD_SPACE : font_w[glyph_index(code)], g = 1;
+    int lead = inlead ? w : 0;
     for (int n = 0; n < 1024; n++) {
         u32 t = *p++;
         if (t >= 0x80) {
-            int gw = font_w[glyph_index(t)];
-            w += gw; g++;
-            if (inlead && t == 0x17f) lead += gw; else inlead = 0;
+            if (inlead && t == SPACE_CODE) { w += LEAD_SPACE; lead += LEAD_SPACE; }
+            else { w += font_w[glyph_index(t)]; inlead = 0; }
+            g++;
             continue;
         }
         if (t == 0x01) {
@@ -597,11 +612,12 @@ static void label_draw_char(u32 code, int col, int row) {
     int L = row - vs.lbl_row0;
     if (L < 0 || L >= LBL_LINES) return;
     line_clean(L);
-    if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = -vx.lbl_trim[L]; }
+    if (col == 0 || L != vs.lbl_line) { vs.lbl_line = L; vs.lbl_pen = -vx.lbl_trim[L]; vx.lbl_lead = 1; }
     int gi = glyph_index(code);
     u32 c = text_colors[TXT_COLOR & 0xf];
     if (vs.lbl_pen >= 0 && vs.lbl_pen + 16 <= LBL_CELLS * LBL_CELLW && code != 0x17f) blit_to(gi, vs.lbl_pen, L * 16, lbl_colour(c), label_rowptr);
-    vs.lbl_pen += glyph_adv(gi, vs.lbl_caption ? vx.cap_sq[L] : vx.lbl_sq);
+    if (code != SPACE_CODE) vx.lbl_lead = 0;
+    vs.lbl_pen += vx.lbl_lead ? LEAD_SPACE : glyph_adv(gi, vs.lbl_caption ? vx.cap_sq[L] : vx.lbl_sq);
     if (vs.lbl_pen > 255) vs.lbl_pen = 255;
     if (vs.lbl_pen > vs.lbl_width[L]) vs.lbl_width[L] = vs.lbl_pen;
 }
@@ -981,7 +997,8 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
     if (vs.pen_x == 0) {
         if (vs.line == 0) vs.inset = page_is_statement((const u16*)TXT_PTR);
         /* start of a line: decide on squeeze */
-        int w = font_w[gi] + measure_line((const u16*)TXT_PTR);
+        vx.box_lead = code == SPACE_CODE;
+        int w = (vx.box_lead ? LEAD_SPACE : font_w[gi]) + measure_line((const u16*)TXT_PTR, vx.box_lead);
         int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
         vs.squeeze = 0;
         if (w > maxw) vs.squeeze = 1;
@@ -1014,7 +1031,8 @@ static void canvas_glyph(u32 code, u32 col, int blit) {
         if (vs.glog_n < GLOG_MAX) glog[vs.glog_n++] = gi | x << 9 | y << 17 | c << 23;
         vs.csum_ok = 0;
     }
-    int adv = glyph_adv(gi, vs.squeeze);
+    if (code != SPACE_CODE) vx.box_lead = 0;
+    int adv = vx.box_lead ? LEAD_SPACE : glyph_adv(gi, vs.squeeze);
     if (adv < 1) adv = 1;
     vs.pen_x += adv;
 }
@@ -1027,7 +1045,8 @@ static void box_glyph(u32 code, u32 col) {
     if (vs.pen_x == 0) {
         if (vs.line == 0) vs.inset = page_is_statement((const u16*)TXT_PTR);
         int gaps;
-        int w = font_w[gi] + measure_line_n((const u16*)TXT_PTR, &gaps);
+        vx.box_lead = code == SPACE_CODE;
+        int w = (vx.box_lead ? LEAD_SPACE : font_w[gi]) + measure_line_n((const u16*)TXT_PTR, &gaps, vx.box_lead);
         int maxw = vs.inset ? STMT_MAXW : TEXT_MAXW;
         vs.squeeze = 0;
         if (w > maxw) vs.squeeze = 1;
@@ -1070,8 +1089,9 @@ static void box_glyph(u32 code, u32 col) {
         if (right > 255) right = 255;
         if (right > vs.lbl_width[L]) vs.lbl_width[L] = right;
     }
-    int adv = glyph_adv(gi, vs.squeeze);
-    if (vx.cut_r && vs.line == MAX_LINES - 1) {
+    if (code != SPACE_CODE) vx.box_lead = 0;
+    int adv = vx.box_lead ? LEAD_SPACE : glyph_adv(gi, vs.squeeze);
+    if (vx.cut_r && vs.line == MAX_LINES - 1 && !vx.box_lead) {
         /* a pixel the gap has no room for goes to the next gap (the sum keeps it) */
         u32 acc = vx.cut_acc + vx.cut_r;
         int least = glyph_adv(gi, 15);

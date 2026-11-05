@@ -60,6 +60,35 @@ def tables(data, arm9, clear_top=False):
 # has those marks a row lower, their tops level with the capitals', which keeps a row clear
 # between any two lines.  (The pictures drawn with the font, tools/textgfx.py, keep the DS's.)
 
+# The renderer's spacing (0.16.95): the maintainer's English GS1 sets the same DS letters (its
+# tools/en/make_vwf_font.py: the DS English font, the same pixels in both DS games) each a pixel
+# after the last one's, word spaces of 4, where the DS's own advances put most letters two pixels
+# apart and its space is 8; the GBA patches set their text alike.  Each glyph's ink is moved to
+# start in its second column (from the first to the fifth, as the DS draws them) and its width
+# made the ink and a pixel: the pen moves on to a column after the ink, the next letter's ink a
+# column further.  The renderer's lines start at x 8 (src/vwf.c, TEXT_X0): the ink from x 9, as in
+# GS1.  A gap keeps no blank column a line could close up (glyph_adv), and none needs to: the
+# widest line of the script is 216 pixels this way (246 at the DS's advances).
+GS1_GAP, GS1_SPACE = 1, 4
+
+def gs1_spacing(rows, widths):
+    """tables() output -> the same at the English GS1's spacing (see above)."""
+    rows = list(struct.unpack('<%dH' % (len(rows) // 2), rows))
+    out = bytearray(widths)
+    for s in range(len(widths)):
+        g = rows[s * 16:(s + 1) * 16]
+        m = 0
+        for r in g: m |= r
+        if not m:
+            out[s] = GS1_SPACE; continue
+        left = 15 - (m.bit_length() - 1)
+        right = 15 - ((m & -m).bit_length() - 1)
+        sh = left - 1
+        if sh < 0 and right == 15: raise SystemExit(f'font: glyph {s:#x} fills its 16 columns')
+        rows[s * 16:(s + 1) * 16] = [(r << sh) & 0xffff if sh >= 0 else r >> -sh for r in g]
+        out[s] = right - left + 1 + GS1_GAP
+    return b''.join(struct.pack('<H', r) for r in rows), bytes(out)
+
 def width_map(arm9):
     """code -> advance width, for the script line-measuring in the converter."""
     return {c: glyph_width(arm9, c) for c in slot_codes()}
