@@ -63,11 +63,7 @@ def call_hook(rom, site, target, displaced, note='', keep=('r0', 'r1', 'r2', 'r3
 def apply(rom, ctx):
     genfont.gen()
     # font tables (from the DS ROM) first, at fixed positions in the old font area
-    # at the English GS1's spacing: letters a pixel apart, word spaces of 4 (0.16.95, dsfont); the
-    # spaces a line starts with keep the DS's own width (src/vwf.c, LEAD_SPACE)
-    rows, widths = dsfont.gs1_spacing(*dsfont.tables(ctx.data, ctx.arm9, clear_top=True))
-    if dsfont.glyph_width(ctx.arm9, 0x17f) != 8:
-        raise SystemExit("text: the DS's space is not 8 pixels wide (src/vwf.c, LEAD_SPACE)")
+    rows, widths = dsfont.tables(ctx.data, ctx.arm9, clear_top=True)
     rows_addr = rom.store(rows, 'font', 4, 'font rows')
     w_addr = rom.store(widths, 'font', 4, 'font widths')
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)

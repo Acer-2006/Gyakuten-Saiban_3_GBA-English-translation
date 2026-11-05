@@ -284,28 +284,6 @@ speed is 1, the typewriter included, and never on a space (`0x0202370c`; the Jap
 gives the third line of the three-line box its blips (the original had none past the second
 row).
 
-## Letter spacing
-
-Since 0.16.95 the renderer's letters are set at the English GS1's spacing (its
-`tools/en/make_vwf_font.py`): each letter's ink a pixel after the last letter's, word spaces of
-4 pixels. The letters are the DS's own and the same as GS1's (the DS English font, pixel for
-pixel the same in both DS games); the DS sets most of them two pixels apart, by its advance table
-(`0xac2c0`), and its space is 8. `tools/dsfont.py` (`gs1_spacing`) moves each glyph's ink to its
-second column (the DS has it from the first to the fifth) and makes its width the ink and a
-pixel; a line's pen starts at x 8 (`TEXT_X0`), so its ink starts at x 9, as GS1's
-(`VWF_TEXT_X`). A line set this way is the same, pixel for pixel, as GS1's `dsfont.render` of
-the same text. The widest line of the script is 216 pixels (246 at the DS's advances), so no line
-closes up any more and no third line reaches the page arrow (below). That applies to everything
-the renderer draws: the box's pages and statements, a choice's question and options, captions,
-the save screen's messages and the episode 4 data screen.
-
-The spaces a line starts with keep the DS's 8 pixels (`LEAD_SPACE`, `vx.box_lead`,
-`vx.lbl_lead`, and the measuring in `measure_line_n` and `page_scan`): the DS sets a few lines in
-with them, "THE END" and an episode's name at its end and "To be continued." over at the right,
-the cascade of lines of the letter in episode 5 (bank 35, section 116), a ringing phone and the
-credits' names, and those lines start where they did. Their letters being closer, a line set at
-the right ends a little further left than before ("To be continued." at x 218, 227 in 0.16.94).
-
 ## Closing up and the clear column
 
 A line that closes up (a page line over 230 pixels, a caption line or a choice's option that
@@ -315,8 +293,7 @@ most letters have one there and one at their left (all but j), so a closed-up ga
 clear column. W and the digits have none at their right; up to 0.16.71 a closed-up W touched the
 next letter ("What", "We": 131 places in the script), and the third line's cut put three more
 pairs together. Their gaps are now left as they are, and a third line's cut that a gap has no
-room for goes to the next gap. (At GS1's spacing, since 0.16.95, no gap has a blank column to
-give and no line needs it; the machinery is still there.)
+room for goes to the next gap.
 
 ## Lines 14 pixels apart
 
