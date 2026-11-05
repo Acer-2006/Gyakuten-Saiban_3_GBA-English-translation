@@ -21,7 +21,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(
 import lz, dsdesc, dsimgtext, textgfx
 
 # the "R" switch label under the panel: 64x16 (two 32x16 sprite cells), OBJ palette 4, white text
-# (12) with a dark outline (10); copied to OBJ tile 0x1a8 when the Court Record opens
+# (12) with a dark outline (10); copied to OBJ tile 0x1a8 when the Court Record opens.  Drawn as
+# the English GS1 draws its own (textgfx.label, 0.16.92: pixel for pixel GS1's), Evidence 53
+# pixels wide and Profiles 45 (they were 60 and 52, the letters at the DS's advances)
 LABELS = {0x0818ad20: 'Profiles',      # shown on the evidence page (人物ファイル)
           0x0818af20: 'Evidence'}      # shown on the profile page (証拠品ファイル)
 
@@ -311,7 +313,7 @@ def apply(rom, ctx):
           (f"; could not read the DS text of {unread}" if unread else ''))
     font = textgfx.Font.from_ctx(ctx)
     for addr, text in LABELS.items():
-        grid = textgfx.render(font, text, 64, 16, fill=12, outline=10, align='left', y0=2)
+        grid = textgfx.label(font, text, 64)    # as the English GS1 draws them (0.16.92)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'court record label ' + text)
 
 def add_ages(rom, ctx):

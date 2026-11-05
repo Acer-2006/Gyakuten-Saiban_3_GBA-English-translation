@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.92 — the Court Record's Profiles / Evidence tag next to the R button and the OK / Back
+  prompts next to A and B are drawn as in the English GS1: the same letters, each a pixel closer
+  to the next, pixel for pixel GS1's (Evidence 53 pixels wide, it was 60). B and Back sit
+  2 pixels further right, where GS1 has them (8 pixels left of the Japanese game's, 10 before),
+  both while presenting and on a photo's detail view. Nothing else changes, and savestates from
+  earlier builds keep working (with the Court Record open, the old tags stay until it is opened
+  again).
 * 0.16.91 — the Court Record's names sit two rows higher (as high as the English GS1 patch has
   them), and every description starts the same distance under its name: three empty rows under
   the name's capitals in every panel. Four-line descriptions had a single row there, with the

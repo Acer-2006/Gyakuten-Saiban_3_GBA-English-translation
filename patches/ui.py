@@ -23,13 +23,17 @@ BUTTONS = [
     (0x08190520, 2, 12, 62, 'Stop'),        # L やめる, top left while breaking Psyche-Locks (DMA'd by 0x0801a900's routine)
 ]
 # Court Record prompts next to the A / B icons, OBJ palette 4: white lettering (12) with a dark
-# outline (10) on a transparent background, like the R label (patches/court_record.py).  (address,
-# text, widest it may be, kerning: pairs set closer, in pixels; see the prompt rows below)
+# outline (10) on a transparent background, like the R label (patches/court_record.py).  OK and
+# Back are drawn as the English GS1 draws them (textgfx.label, since 0.16.92: each letter's ink a
+# pixel after the last one's, pixel for pixel GS1's): OK 20 pixels wide, Back 30.
 PROMPTS = [
-    (0x0818ab20, 'OK', 27, None),           # 決定
-    (0x0818ac20, 'Back', 32, {'Ba': -1}),   # もどる: 32 pixels with the B and a a pixel closer, the c and k apart
-    (0x08190420, 'Swap', 31, None),         # きりかえ, at x 204 after the A icon (Court Record step 5, 0x08013e9a)
+    (0x0818ab20, 'OK'),                     # 決定
+    (0x0818ac20, 'Back'),                   # もどる
 ]
+# きりかえ, at x 204 after the A icon (Court Record step 5, 0x08013e9a).  GS1 has no such prompt,
+# and drawn as its labels are it would be 33 pixels wide, its p's tail under the sprite's last row:
+# it keeps the DS font's advances, squeezed to fit 31 pixels.  (address, text, widest it may be)
+SWAP = (0x08190420, 'Swap', 31)
 
 # investigation menu tabs (slide down from the top of the screen): 64x32 sprites, the lettering in
 # rows 16-28; fill 1, lettering 3 (white), outline 14 (shows on the selected tab, OBJ palette 6;
@@ -309,12 +313,13 @@ def apply(rom, ctx):
                 if txt[y][x]: grid[y][x0 + x] = txt[y][x]
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'button ' + text)
     # The Back prompt (32x16, OBJ tile 0x1d8) ends at the screen's right edge in both rows that
-    # show it, of which the original's もどる needs only 24 pixels: "Back" is 32 pixels wide, so
-    # each row's B icon and prompt move left to leave it whole with 2 pixels to spare (0.16.46;
-    # until then the prompt was squeezed to 27 pixels, the c against the k, and the present row
-    # still cut its k off at the edge).
+    # show it, of which the original's もどる needs only 24 pixels: "Back" is 30 pixels wide, so
+    # each row's B icon and prompt move 8 pixels left, as in the English GS1, to leave it whole with
+    # 2 pixels to spare (0.16.46 moved them 10 for a 32-pixel Back, 0.16.92 8 as GS1 does; until
+    # 0.16.46 the prompt was squeezed to 27 pixels, the c against the k, and the present row still
+    # cut its k off at the edge).
     # The detail view (L on a photo, the routine at 0x08015170) shows the B and L icons and the
-    # prompt at x 184, 200 and 216; they move to 174, 190 and 206.  Its L icon's x was the B
+    # prompt at x 184, 200 and 216; they move to 176, 192 and 208.  Its L icon's x was the B
     # icon's tile literal less 0xfc; it is now the B icon's x plus 16, the tile going through r3.
     detail = rom.asm_thumb(0x0801517a, 'ldr r1, [pc, #0x30]\n strh r1, [r0, #4]\n adds r0, #8\n'
                                        ' strh r2, [r0]\n subs r1, #0xfc')
@@ -322,22 +327,24 @@ def apply(rom, ctx):
     assert rom.u32(0x080151a8) == 0x40b8 and rom.u32(0x080151ac) == 0x41c4 and rom.u32(0x080151b8) == 0x80d8
     rom.thumb(0x0801517a, 'ldr r3, [pc, #0x30]\n strh r3, [r0, #4]\n adds r0, #8\n strh r2, [r0]\n'
                           ' adds r1, #16', 'detail view prompts')
-    rom.w32(0x080151a8, 0x4000 | 174); rom.w32(0x080151b8, 0x8000 | 206)
+    rom.w32(0x080151a8, 0x4000 | 176); rom.w32(0x080151b8, 0x8000 | 208)
     # The present row (R Profiles, A OK, B Back: the routine at 0x08015034 when SYS+0xe8 bit 8 is
     # clear, from 0x080150c0) has the B icon at x 200, its tile the attr1 literal plus 0xfc, and
-    # the prompt at 216; they move to 190 and 206, the tile loaded from the detail view's literal
-    # (0x41c4 at 0x080151ac, the same icon).  The gap after OK is then the one after Profiles.
+    # the prompt at 216; they move to 192 and 208 (GS1's), the tile loaded from the detail view's
+    # literal (0x41c4 at 0x080151ac, the same icon).
     assert rom.u32(0x08015144) == 0x40c8 and rom.u32(0x08015148) == 0x80d8
     assert rom.read(0x08015106, 2) == rom.asm_thumb(0x08015106, 'adds r0, #0xfc')
     rom.thumb(0x08015106, 'ldr r0, [pc, #0xa4]', 'present row B icon tile')
     assert rom.read(0x08015106, 2) == bytes.fromhex('2948')       # 0x080151ac
-    rom.w32(0x08015144, 0x4000 | 190); rom.w32(0x08015148, 0x8000 | 206)
-    for addr, text, maxw, kern in PROMPTS:
-        sq = 0
-        width = font.measure(text) + sum((kern or {}).values())
-        while width - sq * (len(text) - 1) > maxw: sq += 1
-        grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq, kern=kern)
+    rom.w32(0x08015144, 0x4000 | 192); rom.w32(0x08015148, 0x8000 | 208)
+    for addr, text in PROMPTS:
+        grid = textgfx.label(font, text, 32)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
+    addr, text, maxw = SWAP
+    sq = 0
+    while font.measure(text) - sq * (len(text) - 1) > maxw: sq += 1
+    grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq)
+    rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
     for addr, text in TABS:
         grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)
         for y in range(16, 29):

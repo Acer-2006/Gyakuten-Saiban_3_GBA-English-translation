@@ -41,17 +41,43 @@ def render(font, text, w, h=16, fill=1, outline=None, align='center', y0=0, sque
                     xx = x + k
                     if 0 <= xx < w: grid[yy][xx] = fill
         x += adv - squeeze + more
-    if outline is not None:
-        src = [row[:] for row in grid]
-        for y in range(h):
-            for x in range(w):
-                if src[y][x] == fill: continue
-                for dy in (-1, 0, 1):
-                    for dx in (-1, 0, 1):
-                        yy, xx = y + dy, x + dx
-                        if 0 <= yy < h and 0 <= xx < w and src[yy][xx] == fill:
-                            grid[y][x] = outline; break
-                    if grid[y][x] == outline: break
+    if outline is not None: _outline(grid, fill, outline)
+    return grid
+
+def _outline(grid, fill, outline):
+    """Every pixel next to (8 ways) a `fill` pixel and not one itself becomes `outline`."""
+    h, w = len(grid), len(grid[0])
+    src = [row[:] for row in grid]
+    for y in range(h):
+        for x in range(w):
+            if src[y][x] == fill: continue
+            if any(src[yy][xx] == fill for yy in range(max(0, y - 1), min(h, y + 2))
+                   for xx in range(max(0, x - 1), min(w, x + 2))):
+                grid[y][x] = outline
+
+def label(font, text, w, h=16, fill=12, outline=10, y0=2, space=4):
+    """A label the way the English GS1 draws its Court Record tabs and prompts (its
+    tools/en/make_ui_text.py, outlined()): each letter's ink a pixel after the last letter's (the
+    GS1 text box's spacing, not the DS's own advances), a space `space` pixels more, the ink from
+    column 1 and a 1-pixel outline all round (8 ways) from column 0, glyph row r on row y0 + r
+    (the capitals on rows 3-12).  The DS font's letters are the same in GS1's DS game and this
+    one.  -> h rows of w palette indices (0 transparent); a label wider than w is an error."""
+    grid = [[0] * w for _ in range(h)]
+    pen = 1
+    for ch in text:
+        if ch == ' ':
+            pen += space; continue
+        rows, _ = font.glyph(ch)
+        cols = [k for k in range(16) if any(r & (1 << (15 - k)) for r in rows)]
+        lo, hi = cols[0], cols[-1]
+        if pen + hi - lo + 2 > w: raise ValueError(f'label {text!r} wider than {w} pixels')
+        for r, bits in enumerate(rows):
+            for k in range(lo, hi + 1):
+                if bits & (1 << (15 - k)):
+                    if not 0 <= y0 + r < h - 1: raise ValueError(f'label {text!r}: ink off rows 1-{h - 2}')
+                    grid[y0 + r][pen + k - lo] = fill
+        pen += hi - lo + 2
+    if outline is not None: _outline(grid, fill, outline)
     return grid
 
 def tile4(grid, x0, y0):
