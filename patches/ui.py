@@ -30,10 +30,16 @@ PROMPTS = [
     (0x0818ab20, 'OK'),                     # 決定
     (0x0818ac20, 'Back'),                   # もどる
 ]
-# きりかえ, at x 204 after the A icon (Court Record step 5, 0x08013e9a).  GS1 has no such prompt,
-# and drawn as its labels are it would be 33 pixels wide, its p's tail under the sprite's last row:
-# it keeps the DS font's advances, squeezed to fit 31 pixels.  (address, text, widest it may be)
-SWAP = (0x08190420, 'Swap', 31)
+# きりかえ, R Swap above B L Back on the detail view of the one item whose table entry's +6 is 0x1c
+# (Court Record step 5, 0x08013e9a: the R icon at x 185, the prompt at 204, y 128), the Hanging
+# Scroll covered in gravy (item 173, episode 5): R switches between it and the scroll underneath.
+# GS1 has no such prompt.  Since 0.16.93 it is drawn as OK and Back are (it kept the DS font's
+# advances squeezed to 31 pixels until then, the w against the a and the a against the p): 33
+# pixels with its outline, one more than the 32x16 sprite, and the p's tail on the sprite's last
+# row; the outline's last column (x 236) and the row under the tail (y 144) are left off, both
+# over the detail view's black margin (the picture ends at x 175), where the outline's near-black
+# would not show anyway.
+SWAP = (0x08190420, 'Swap')
 
 # investigation menu tabs (slide down from the top of the screen): 64x32 sprites, the lettering in
 # rows 16-28; fill 1, lettering 3 (white), outline 14 (shows on the selected tab, OBJ palette 6;
@@ -340,10 +346,11 @@ def apply(rom, ctx):
     for addr, text in PROMPTS:
         grid = textgfx.label(font, text, 32)
         rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
-    addr, text, maxw = SWAP
-    sq = 0
-    while font.measure(text) - sq * (len(text) - 1) > maxw: sq += 1
-    grid = textgfx.render(font, text, 32, 16, fill=12, outline=10, align='left', y0=2, squeeze=sq)
+    addr, text = SWAP
+    grid = textgfx.label(font, text, 34, h=17)
+    if any(v == 12 for v in grid[16]) or any(row[32] == 12 or row[33] for row in grid):
+        raise SystemExit(f'ui: {text} needs more than its sprite less one outline column and row')
+    grid = [row[:32] for row in grid[:16]]
     rom.write(addr, textgfx.sprite_cells(grid, 32, 16), 'prompt ' + text)
     for addr, text in TABS:
         grid = unpack_cells(rom.read(addr, 1024), 64, 32, 64, 32)

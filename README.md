@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.93 — the Swap tag (R Swap above B L Back on the detail view of the Hanging Scroll covered
+  in gravy, episode 5, the only item with it) is drawn like Back and OK: its letters were
+  squeezed together, the w against the a and the a against the p, and now each has a pixel to
+  itself. It takes one pixel more than its sprite, so the outline's last column and the row
+  under the p's tail are left off, over the screen's black margin where they would not show.
 * 0.16.92 — the Court Record's Profiles / Evidence tag next to the R button and the OK / Back
   prompts next to A and B are drawn as in the English GS1: the same letters, each a pixel closer
   to the next, pixel for pixel GS1's (Evidence 53 pixels wide, it was 60). B and Back sit
