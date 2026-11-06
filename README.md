@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.99 — with the Court Record open over a choice's question (the full-screen box: "Can I
+  prove that the crystal sphere was dropped before the murder...?" in episode 5, and the others),
+  the question stays in view while you move between items or between Evidence and Profiles and as
+  the Record closes, around the sliding panels, as in the Japanese game. 0.16.96 took it off once
+  the Record had slid over it and drew it again after the Record had gone, which also dropped a
+  frame. The Record's sliding names keep their own colours, and opening and closing the Record
+  without moving through it plays as before.
 * 0.16.98 — an Objection! (and the other shout bubbles drawn over the screen) over an item shown
   in court covers the item's picture again, as 0.16.95 and 0.16.96 showed it over the empty box,
   with the picture still in the box behind it: 0.16.97 drew the picture over the bubble and the

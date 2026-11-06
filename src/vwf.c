@@ -165,6 +165,10 @@ struct vwf_ext {
     u8 layout;          /* LAYOUT once a box made by an earlier build has been looked for (old_layout) */
     u16 icon_tile;      /* the third line's copy for the frame the presented icon came in (vwf_icon) */
     u8 cap_sq[LBL_LINES];   /* a caption's lines: pixels taken out of every letter gap (line_done) */
+    u8 rc;              /* the Court Record over a full-screen question: 1, BG0 shows the question
+                           from a copy (record_copy); 2, no room for one this time (as 0.16.96) */
+    u8 rc_dirty;        /* ... and a slide has copied the Record's panel into the canvas tiles */
+    u16 rc_pal[16];     /* BG palette RC_PAL from before the copy */
 };
 _Static_assert(sizeof(struct vwf_ext) <= 0x80, "vx runs into script.c's state at 0x02028800");
 #define vx (*(struct vwf_ext*)0x02028780)
@@ -195,6 +199,13 @@ static __attribute__((noinline)) void text_colours(int on) {
     if (on) { BGPAL[13] = TEXT_ORANGE; BGPAL[14] = TEXT_BLUE; BGPAL[15] = TEXT_GREEN; }
     else    { BGPAL[13] = UI_13;       BGPAL[14] = UI_14;     BGPAL[15] = UI_15; }
 }
+
+/* The question's copy while the Court Record is up over a full-screen box (record_copy): its
+   tiles in BG char block 3 in the same order, shown by BG0 in BG palette RC_PAL.  The canvas's
+   first tile is blank (no line starts left of x 8), and is the copy's tile 0: BG0's empty
+   entries show it. */
+#define RC_VRAM (VRAM + 0xc000)
+#define RC_PAL  15
 
 /* Sprite text uses OBJ palette 0, as the engine's own does: the same in every scene, with white
    at 3 and the three text colours at 6, 9 and 12 (the BG text has them at 8 and 13-15). */
@@ -1392,6 +1403,39 @@ static void box_leftovers(void) {
     if (dirty) SYS_BGDIRTY |= 2;
 }
 
+/* The question to BG char block 3 and BG palette RC_PAL while the Court Record is up (on 1), or
+   back: the canvas tiles again, from the copy if a slide has had them (0: the Record has gone and
+   nothing shows them), or, if the question has gone from BG0 with the Record still up (-1: not
+   seen), off as in 0.16.96, to be drawn again from the glyph log.
+   Only with the scene's background (BG3; BG1 and BG2, the box and the Record, are in char block
+   0 and palettes 0-1) 16-colour, out of char block 3 and not in palette RC_PAL.  RC_PAL gets
+   palette 0 as it is with the question up (its colours in 13-15), palette 0 the UI's. */
+static __attribute__((noinline, minsize)) void record_copy(int on) {
+    volatile u16* p = BGPAL + RC_PAL * 16;
+    if (on) {
+        u32 bg3 = REG16(0x0400000e);
+        vx.rc = 2;
+        if ((bg3 & 0x0c) == 0x0c || (bg3 & 0x80)) return;
+        volatile u16* m = (volatile u16*)(VRAM + (bg3 >> 8 & 31) * 0x800);
+        for (int i = 0; i < 32 * 20; i++) if (m[i] >> 12 == RC_PAL) return;
+        dma32(VRAM + CV_TILE0 * 32, RC_VRAM, CV_ROWS * CV_COLS * 8, 0);
+        dma32(p, vx.rc_pal, 8, 0);
+        dma32(BGPAL, p, 8, 0);
+        text_colours(0);
+        vx.rc_dirty = 0;
+    } else {
+        if (vx.rc_dirty) {
+            if (!on) dma32(RC_VRAM, VRAM + CV_TILE0 * 32, CV_ROWS * CV_COLS * 8, 0);
+            else if (vs.mapped) { choice_rows(1); canvas_unmap(); vs.lost = 1; }
+        }
+        dma32(vx.rc_pal, p, 8, 0);
+        if (vs.mapped) text_colours(1);
+        vs.csum_ok = 0;
+    }
+    vx.rc = on > 0;
+    vx.q_new = 1;
+}
+
 static void q_frame(void);
 static void frame_body(void);
 static void page_arrow(void);
@@ -1418,26 +1462,27 @@ static void frame_body(void) {
     if (fullscreen_box()) {
         /* The Court Record over a choice: its slide between items copies the panel into BG tiles
            0xa0-0x17f, which are the canvas's, and the question's colours in BG palette 0 (entries
-           13-15, text_colours) named the sliding items in green (entry 15).  The full-screen box
-           had no checksum to see the copy (canvas_check), and the question stayed mapped: its
-           letters on BG0 showed the panel's tiles over the panel, and once the Record had gone
-           the question was left as the slide had left its tiles (0.16.96).  So while the Record
-           is up the canvas tiles are checked against how they were when it opened, and once a
-           slide has copied the panel into them the question comes off (canvas_unmap: the UI's
-           colours back; q_frame takes it off BG0, under the panel by then); once the Record has
-           gone and no background shows the canvas tiles it is drawn again from the glyph log.
-           The Record opening and closing copy nothing: then the question stays as it was.  The
-           options are sprite text and stay. */
+           13-15, text_colours) named the sliding items in green (entry 15).  The original's
+           question is sprite text and stays in view around the sliding panels.  Since 0.16.99
+           the question is copied, as the Record opens (it copies nothing then), to BG char block
+           3 and shown from there in BG palette RC_PAL, palette 0 back to the UI's colours; a
+           slide's copy into the canvas tiles is only noted, and once the Record has gone and no
+           background shows those tiles the copy goes back there (record_copy).  With no room
+           for the copy (vx.rc 2) it is as 0.16.96: once a slide has copied into the canvas tiles
+           the question comes off (canvas_unmap; q_frame takes it off BG0) and is drawn again from
+           the glyph log once the Record has gone.  The options are sprite text and stay. */
         if (SYS[8] == MODE_RECORD && vs.mapped) {
+            if (!vx.rc && vx.q_on && !vs.lost) record_copy(1);
             u32 h = canvas_sum();
             if (!vs.csum_ok) { vs.csum = h; vs.csum_ok = 1; }
             else if (h != vs.csum) {
-                choice_rows(1);
-                canvas_unmap();
-                vs.lost = 1;
+                if (vx.rc == 1) vx.rc_dirty = 1;
+                else { choice_rows(1); canvas_unmap(); vs.lost = 1; }
             }
         } else if (SYS[8] != MODE_RECORD) {
             vs.csum_ok = 0;
+            if (vx.rc == 2) vx.rc = 0;
+            else if (vx.rc && (!vx.rc_dirty || !canvas_in_use())) record_copy(0);
         }
         if (vs.lost && SYS[8] != MODE_RECORD && !canvas_in_use()) {
             canvas_redraw();
@@ -1571,6 +1616,7 @@ static void q_frame(void) {
         }
     }
     if (!rows) {
+        if (vx.rc == 1) record_copy(-1);
         if (vx.q_on) {
             vx.q_on = 0; vx.q_rows = 0;
             SYS_BGDIRTY |= 3;       /* the game's BG0 map and scroll, and BG1's map as it is */
@@ -1607,7 +1653,13 @@ u32 vwf_bgcnt(u32 v) {
             if (!(old & bit) || BG0VRAM[row * 32 + 1] != t0 + 1)
                 NO_UNROLL for (int tx = 0; tx < 32; tx++) BG0VRAM[row * 32 + tx] = tx < CV_COLS ? t0 + tx : 0;
         } else if (rows & bit) {
-            if (!(old & bit) || BG0VRAM[row * 32 + 1] != BG1MAP[row * 32 + 1])
+            if (vx.rc == 1) {                /* the copy: char block 3, RC_PAL */
+                if (!(old & bit))
+                    NO_UNROLL for (int tx = 0; tx < 32; tx++) {
+                        u32 e = BG1MAP[row * 32 + tx];
+                        BG0VRAM[row * 32 + tx] = canvas_tile(e) ? ((e & 0x3ff) - CV_TILE0) | RC_PAL << 12 : 0;
+                    }
+            } else if (!(old & bit) || BG0VRAM[row * 32 + 1] != BG1MAP[row * 32 + 1])
                 dma32(BG1MAP + row * 32, BG0VRAM + row * 32, 16, 0);
             if (vx.q_bg1 || vx.q_new) dma32(box_row, BG1VRAM + row * 32, CV_COLS / 2, 0);   /* the box's own */
         } else if (old & bit)
@@ -1622,7 +1674,7 @@ u32 vwf_bgcnt(u32 v) {
     u32 scroll = SH_BG1SCROLL;
     if ((rows >> Q_MAPROW & 1) && fullscreen_box()) scroll -= Q_DROP << 16;
     REG(0x04000010) = scroll;
-    return (v & 0xffff0000) | 0x1c00 | (v >> 16 & 3);     /* char block 0, map 0x600e000 */
+    return (v & 0xffff0000) | 0x1c00 | (vx.rc == 1 ? 0x0c : 0) | (v >> 16 & 3);   /* char block 0 (3: the copy), map 0x600e000 */
 }
 
 void vwf_io_pre(void) {

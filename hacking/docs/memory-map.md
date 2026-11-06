@@ -106,6 +106,7 @@ before the pointer and the one at it (`src/script.c`, `script_save`, called inst
 | Address | Contents |
 | --- | --- |
 | `0x06000000` | BG char block 0 (the English build's text canvas uses tiles `0xe0`..`0x193`; the Court Record's description strips `0x194`–`0x1a6` and `0x1a7`–`0x1b9`; on the save and continue screens its SAVE / LOAD header is in tiles `0x1c4`–`0x1fb`) |
+| `0x0600c000` | BG char block 3: while the Court Record is up over a full-screen question, `src/vwf.c`'s copy of the question canvas (180 tiles, to `0x0600d67f`), shown by BG0 in BG palette 15 (since 0.16.99) |
 | `0x0600e800` | BG1 map |
 | `0x06010000` | OBJ tiles 0–127: dialogue text cells (original engine) |
 | `0x06011000` | OBJ tiles 128–255: pool for "free slot" sprite text |
