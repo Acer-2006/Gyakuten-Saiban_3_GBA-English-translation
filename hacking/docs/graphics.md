@@ -258,15 +258,44 @@ palette (11) uses the item's tiles, in the OAM shadow or in OAM (`src/item.c`, c
 at `0x08000430` and `0x0801db9c`): the bubble goes as in the original and the item comes up two
 frames after the original's, the script running on as before. A bubble can also come while an
 item is up, and the bubbles are not the only effects in its tiles: 29 effects have pictures there
-(the bubbles 1–9, Franziska's whip 28–30 from `0x200` and others,
-worked out by the build from the animation table, `ITEM_EFFECTS`). Until 0.16.94 an Objection! or
-a whip over an item that was up wrote into the item's picture, which kept the bubble's letters or
-the whip's strokes in its own colours until it was put away (episode 5, the crystal sphere).
-Since 0.16.95, while one of those effects runs with the item up (state 4) the item's sprite is
-hidden, and once none runs and no bubble sprite is left on its tiles its picture is copied again
-(`0x080157e0`, the copy states 3 and 5 make) and the sprite shown as it was; states 3 and 5 also
-wait while such an effect runs. The item is out of sight for the effect (the original, its item
-in other tiles, shows both) and comes back whole. The DS has
+(the bubbles 1–9, Franziska's whip 28–30 from `0x200` and others; the build works out the tiles of
+every effect from the animation table, `FX_RANGES`). Until 0.16.94 an Objection! or a whip over
+an item that was up wrote into the item's picture, which kept the bubble's letters or the whip's
+strokes in its own colours until it was put away (episode 5, the crystal sphere); 0.16.95 and
+0.16.96 hid the item while such an effect ran. Since 0.16.97 the item stays up, as in the
+original. When one of those effects starts with the item up (state 4) — its first frame is copied
+in the next vertical blank, before the item's update — the picture goes to 64 other OBJ tiles
+that no sprite on the screen and no running effect uses, from the top of the characters' tiles
+(`0x3c0`, `0x3b8`, … `0x2c0`), else `0x1a0` … `0x180`, and the sprite's attr2 points there. In
+`0x180`–`0x1df` what was there (the cross-examination's arrows and pair) is kept at EWRAM
+`0x02027800` and put back after, unless something else has written to them meanwhile (their
+sum); the characters' and the effects' tiles are copied again before they are shown, and nothing
+is kept for them. The picture comes from a copy the update takes each time
+the game copies the item to its own tiles (EWRAM `0x02027000`; with none, as after a save state
+from an older build, it is unpacked again from the table). Every frame the update checks those
+tiles (no running effect has tiles there, no sprite on the screen in OAM uses them); if they are
+lost it moves the item to other free tiles or, with none, hides it (as 0.16.95 did) and looks for
+free tiles again every 32 frames. The checks take a few scanlines of the vertical blank each
+frame; the search for tiles, which takes more, runs only as the effect starts and on those
+retries, after which the game's own updates (the life bar's tiles among them, copied just after
+the item's update) still come before the screen is drawn. The animations' copy (`0x08018134`) also runs without the item's update in frames
+of a mode change (`0x080043ce`, `0x08004dba`), and the check follows it there. Once no such
+effect runs and no other sprite on the screen uses the item's own tiles (sprites parked off the
+screen, such as the Court Record's text at x 326–422 during a cross-examination, do not count;
+after 60 frames, whatever is there) the picture goes back. When the item is put away it leaves
+those tiles once its sprite is off the screen: the game hides it at once as the item's box
+closes (state 1) or the Court Record opens (5), but a change of scene can set state 0 and hide
+it in the shadow only, which is not copied to OAM for a few frames, so the screen goes on
+showing the picture meanwhile (bank 31 section `0x46`, Objection! over a profile (item 0x99)
+just before the scene changes to Franziska). States 3 and 5 still wait while such
+an effect runs, so an item put up during a bubble comes up after it. 0.16.95 and 0.16.96 copied
+the picture back as soon as no sprite in the bubbles' palette was left on its tiles: an effect in
+another palette that stopped with its last frame still up (the episode's title card, effect 16,
+the whip, others) showed the item's picture in its own sprites for that frame. And the item's
+sprite is the entry the game's update uses, picked as it picks it (`0x08015662`: entry 0 with
+`TXT+0x2c` 3, 72 while `0x0801e210` says so — the scenes with the life bar up, for one — else 65):
+0.16.95 and 0.16.96 took the first of 65, 72 and 0 with the item's tiles, and with the bar up
+that could be a stale, hidden 65, so the item (72) still showed the effect's picture. The DS has
 the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
 per-language bases, the same set for both languages), then one more and twenty pairs: the
 Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the

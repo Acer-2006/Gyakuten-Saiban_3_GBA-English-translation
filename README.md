@@ -110,6 +110,14 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.97 — an item shown in court stays up while an Objection!, Franziska's whip or another
+  effect that shares its sprite memory plays, as in the Japanese game, instead of stepping out of
+  sight (0.16.95): for that time its picture is moved to sprite memory nothing else on the screen
+  is using, and back after. Where none is free (a cross-examination with a large character on the
+  stand, say) it still steps out of sight. With the life bar up the game draws the item with
+  another sprite, which 0.16.95 missed: there an Objection! still showed in the item's picture,
+  and now it doesn't. And an effect that stops while an item is up no longer shows the item's
+  picture in its last frame (0.16.95 and 0.16.96 did, for one frame, with the whip and others).
 * 0.16.96 — the Court Record opened over a choice's question (the full-screen box: "Can I prove
   that the crystal sphere was dropped before the murder...?" in episode 5, and every other such
   question) no longer goes wrong when you move between items or between Evidence and Profiles:

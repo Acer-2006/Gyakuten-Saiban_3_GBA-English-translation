@@ -267,15 +267,26 @@ def record_picture(rom):
 # those frames (0.16.89).  The original's item is in other tiles and shows with the bubble.  The
 # update now waits, in the two states that copy the picture, while the bubble is on screen
 # (src/item.c): the bubble goes as in the original, the item comes up after it.
-# The bubbles are not the only effects with tiles among the item's, nor up with it only then: 28
+# The bubbles are not the only effects with tiles among the item's, nor up with it only then: 29
 # effects in all (the bubbles, Franziska's whip from 0x200, ...), and an Objection! over an item
 # that is up wrote its letters into the item's picture, which kept them until it was put away
-# (episode 5, 0.16.95).  Since then the update hides the item while one of those effects runs and
-# copies its picture again after (src/item.c; the set is worked out here from the animation
-# table, ITEM_EFFECTS).
+# (episode 5, 0.16.95).  From 0.16.95 the update hid the item while one of those effects ran;
+# since 0.16.97 it moves the item's picture to 64 tiles that nothing on screen uses meanwhile and
+# keeps it up, as in the original (src/item.c).  The tiles each effect takes are worked out here
+# from the animation table (FX_RANGES).
 ITEM_FRAME = 0x0801545c             # the item's update, every frame (r0 = SYS)
 ITEM_FRAME_CALLS = (0x08000430, 0x0801db9c)
-ITEM_BSS = 0x02029900               # src/item.c's (a few bytes), between the verdict's and the strip set
+ITEM_BSS = 0x02029900               # src/item.c's (16 bytes), between the verdict's and the strip set
+# the item's picture (2 KB, after the 32 bytes of its palette when it is unpacked again) and what
+# was in the tiles it borrows (2 KB): EWRAM the original's chapter banks used (0x02011fc0-
+# 0x0202cfbf), free in the English build, whose banks stay in ROM (the two still compressed, 42
+# and 43, end below 0x02016700; src/script.c); L3_BACKUP in src/vwf.c is in the same area
+ITEM_PIC = 0x02027000
+ITEM_BACKUP = 0x02027800
+ANIM_COPY = 0x08018134              # the animations' tiles copied to VRAM, in the vertical blank
+# where that copy runs without the item's update (frames of a mode change: 0x08004cb0, and
+# 0x080043cc): src/item.c checks the item's tiles after it there
+ANIM_COPY_ALONE = (0x080043ce, 0x08004dba)
 
 def thumb_bl_target(rom, at):
     h1, h2 = struct.unpack('<HH', rom.read(at, 4))
@@ -284,31 +295,41 @@ def thumb_bl_target(rom, at):
     if off & 0x400000: off -= 0x800000
     return at + 4 + off
 
-def item_waits(rom, ctx):
-    """The build's last step: the item's update through src/item.c (see above)."""
-    from rom import compile_c
-    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if any(thumb_bl_target(rom, at) != ITEM_FRAME for at in ITEM_FRAME_CALLS):
-        raise SystemExit("icons: the item's update is not called where it was")
-    # the effects whose pictures go into the item's tiles (the animation table as the build left
-    # it, with MOVED_EFFECTS): src/item.c hides the item while one runs and copies it again after
-    bits = [0] * 8
-    for n in range(1, 256):
+def effect_ranges(rom):
+    """{n: (first tile, end)} for the effects of the animation table as the build left it (with
+    MOVED_EFFECTS).  255 is not an effect: a character's slot has 0xff for its number."""
+    out = {}
+    for n in range(1, 255):
         dest, fd = rom.u32(ANIM_TABLE + 20 * n + 4), rom.u32(ANIM_TABLE + 20 * n + 8)
         if not 0x06010000 <= dest < 0x06018000 or not 0x08000000 <= fd < 0x0a000000: continue
         try: t0, k = (dest - 0x06010000) // 32, effect_tiles(rom, n)
         except (KeyError, IndexError, struct.error, ValueError): continue
-        if t0 < ITEM_TILE + 64 and t0 + k > ITEM_TILE: bits[n >> 5] |= 1 << (n & 31)
+        if k: out[n] = (t0, t0 + k)
+    return out
+
+def item_waits(rom, ctx):
+    """The build's last steps: the item's update through src/item.c (see above)."""
+    from rom import compile_c
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if any(thumb_bl_target(rom, at) != ITEM_FRAME for at in ITEM_FRAME_CALLS):
+        raise SystemExit("icons: the item's update is not called where it was")
+    if any(thumb_bl_target(rom, at) != ANIM_COPY or rom.u16(at - 2) != 0x2000 for at in ANIM_COPY_ALONE):
+        raise SystemExit("icons: the animations' copy is not called where it was")
+    ranges = effect_ranges(rom)
+    over = [n for n, (a, b) in ranges.items() if a < ITEM_TILE + 64 and b > ITEM_TILE]
     for n in range(1, 10):
-        if not bits[0] >> n & 1: raise SystemExit(f'icons: shout bubble {n} is not among the effects over the item')
-    effects = '{' + ','.join(f'{b:#x}u' for b in bits) + '}'
+        if n not in over: raise SystemExit(f'icons: shout bubble {n} is not among the effects over the item')
+    fx = '{' + ','.join(f'{(ranges[n][0] | ranges[n][1] << 16) if n in ranges else 0:#x}u' for n in range(256)) + '}'
     text_addr = 0x08000000 + ((rom.regions['font'].cur + 3) & ~3)
     binary, syms, bss = compile_c([os.path.join(root, 'src/item.c')], text_addr, ITEM_BSS,
                                   os.path.join(root, 'build/item'),
-                                  defines=(f'ITEM_TILE={ITEM_TILE:#x}', f'ITEM_EFFECTS={effects}'))
-    assert rom.store(binary, 'font', 4, 'item waits for a bubble, hides for an effect') == text_addr
-    assert bss <= 0x10, bss
+                                  defines=(f'ITEM_TILE={ITEM_TILE:#x}', f'ITEM_BSS={ITEM_BSS:#x}',
+                                           f'ITEM_PIC={ITEM_PIC:#x}', f'ITEM_BACKUP={ITEM_BACKUP:#x}',
+                                           f'FX_RANGES={fx}'))
+    assert rom.store(binary, 'font', 4, 'the item shown in court over effects') == text_addr
+    assert bss == 0, bss
     for at in ITEM_FRAME_CALLS:
-        rom.hook_bl(at, syms['item_frame'], 'item update: waits for a shout bubble, hides for an effect')
-    print(f"  icons: the item shown in court waits for a shout bubble to go, hides for "
-          f"{sum(bin(b).count('1') for b in bits)} effects that use its tiles")
+        rom.hook_bl(at, syms['item_frame'], 'item update: keeps the item up over effects')
+    for at in ANIM_COPY_ALONE:
+        rom.hook_bl(at, syms['item_anim_copy'], "animations' copy, then the item's tiles checked")
+    print(f"  icons: the item shown in court moves out of the way of {len(over)} effects that use its tiles")
