@@ -110,6 +110,13 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.96 — the Court Record opened over a choice's question (the full-screen box: "Can I prove
+  that the crystal sphere was dropped before the murder...?" in episode 5, and every other such
+  question) no longer goes wrong when you move between items or between Evidence and Profiles:
+  the sliding items' names were green, scraps of the panel and green bars showed where the
+  question had been, and after the Record closed the question was left as garbage. The question
+  now goes from under the panel once a slide needs its tiles, and comes back whole when the
+  Record has gone. Opening and closing the Record without moving through it plays as before.
 * 0.16.95 — an Objection! (or Franziska's whip, or another of the effects that share its sprite
   memory) while an item is shown in court no longer writes into the item's picture: it showed the
   bubble's letters in the item's colours until the item was put away (episode 5, the crystal

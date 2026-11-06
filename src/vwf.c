@@ -263,7 +263,7 @@ static volatile u32* label_rowptr(int tx, int ty, int r) {
 }
 
 /* Blit glyph gi at pixel (x, y) with colour index c onto a tiled surface. */
-static void blit_to(int gi, int x, int y, u32 c, rowptr_fn rowptr) {
+static __attribute__((noinline)) void blit_to(int gi, int x, int y, u32 c, rowptr_fn rowptr) {
     const u16* rows = font_rows + gi * 16;
     int tx0 = x >> 3;
     for (int r = 0; r < 16; r++) {
@@ -299,7 +299,7 @@ static void fill_tile(int dst_tile, const u32* src) {
    on BG1 under them.  Framed (BG1 shows the canvas), its first and last rows carry the box's top
    and bottom edges, the template's tiles, unless vs.q_noedge: in the full-screen choice box the
    canvas sits at the top, where those edges would draw lines across the screen. */
-static void canvas_tiles(void) {
+static __attribute__((noinline)) void canvas_tiles(void) {
     vx.q_bare = vx.q_want;
     vs.csum_ok = 0;
     if (vx.q_bare) {
@@ -317,7 +317,7 @@ static void canvas_tiles(void) {
     }
 }
 
-static void canvas_redraw(void);
+static __attribute__((noinline)) void canvas_redraw(void);
 /* frame_edges(0): the canvas without the box's edges, for the full-screen choice box; (1): with. */
 static void frame_edges(int on) {
     if (vs.q_noedge == !on) return;
@@ -437,7 +437,7 @@ static void canvas_unmap(void) {
 }
 
 /* A sample of the canvas tiles (every 16th byte). */
-static u32 canvas_sum(void) {
+static __attribute__((noinline)) u32 canvas_sum(void) {
     volatile u32* p = (volatile u32*)(VRAM + CV_TILE0 * 32);
     u32 h = 0;
     for (int i = 0; i < CV_ROWS * CV_COLS * 8; i += 4) h = (h << 1 | h >> 31) ^ p[i];
@@ -445,7 +445,7 @@ static u32 canvas_sum(void) {
 }
 
 /* Does any background with char base 0 show canvas tiles (other than the canvas itself)? */
-static int canvas_in_use(void) {
+static __attribute__((noinline)) int canvas_in_use(void) {
     u32 dispcnt = REG16(0x04000000);
     for (int bg = 0; bg < 3; bg++) {
         if (!(dispcnt & (0x100 << bg)) || (bg == 0 && vx.q_on)) continue;
@@ -461,7 +461,7 @@ static int canvas_in_use(void) {
 static void blit_to(int gi, int x, int y, u32 c, rowptr_fn rowptr);
 static volatile u32* canvas_rowptr(int tx, int ty, int r);
 
-static void canvas_redraw(void) {
+static __attribute__((noinline)) void canvas_redraw(void) {
     canvas_tiles();
     for (int i = 0; i < vs.glog_n; i++) {
         u32 g = glog[i];
@@ -817,16 +817,15 @@ static void labels_oam(void) {
     }
 }
 
-/* question canvas lives at rows Q_MAPROW..+5; any canvas tiles copied elsewhere by the
-   box-grow animation become plain interior. */
-static void choice_frame(void) {
+/* question canvas lives at rows Q_MAPROW..+5 (with `off`, nowhere: the question comes off); any
+   canvas tiles copied elsewhere by the box-grow animation become plain interior. */
+static __attribute__((noinline)) void choice_rows(int off) {
     int dirty = 0;
-    if (!vs.q_noedge) frame_edges(0);
     /* rows are written and copied whole: two columns tell a row that is already right (the full
        scan of every cell every frame was a good part of the vertical blank) */
     for (int row = 0; row < 20; row++) {
         volatile u16* m = BG1MAP + row * 32;
-        int qrow = row - Q_MAPROW;
+        int qrow = off ? -1 : row - Q_MAPROW;
         if (qrow >= 0 && qrow < CV_ROWS) {
             u32 t0 = CV_TILE0 + qrow * CV_COLS;
             if (m[1] == t0 + 1 && m[CV_COLS - 2] == t0 + CV_COLS - 2 && m[0] == t0 && m[CV_COLS - 1] == t0 + CV_COLS - 1) continue;
@@ -838,6 +837,11 @@ static void choice_frame(void) {
         }
     }
     if (dirty) SYS_BGDIRTY |= 2;
+}
+
+static void choice_frame(void) {
+    if (!vs.q_noedge) frame_edges(0);
+    choice_rows(0);
     labels_oam();
 }
 
@@ -1412,7 +1416,37 @@ static void frame_body(void) {
         return;
     }
     if (fullscreen_box()) {
+        /* The Court Record over a choice: its slide between items copies the panel into BG tiles
+           0xa0-0x17f, which are the canvas's, and the question's colours in BG palette 0 (entries
+           13-15, text_colours) named the sliding items in green (entry 15).  The full-screen box
+           had no checksum to see the copy (canvas_check), and the question stayed mapped: its
+           letters on BG0 showed the panel's tiles over the panel, and once the Record had gone
+           the question was left as the slide had left its tiles (0.16.96).  So while the Record
+           is up the canvas tiles are checked against how they were when it opened, and once a
+           slide has copied the panel into them the question comes off (canvas_unmap: the UI's
+           colours back; q_frame takes it off BG0, under the panel by then); once the Record has
+           gone and no background shows the canvas tiles it is drawn again from the glyph log.
+           The Record opening and closing copy nothing: then the question stays as it was.  The
+           options are sprite text and stay. */
+        if (SYS[8] == MODE_RECORD && vs.mapped) {
+            u32 h = canvas_sum();
+            if (!vs.csum_ok) { vs.csum = h; vs.csum_ok = 1; }
+            else if (h != vs.csum) {
+                choice_rows(1);
+                canvas_unmap();
+                vs.lost = 1;
+            }
+        } else if (SYS[8] != MODE_RECORD) {
+            vs.csum_ok = 0;
+        }
+        if (vs.lost && SYS[8] != MODE_RECORD && !canvas_in_use()) {
+            canvas_redraw();
+            text_colours(1);
+            vs.mapped = 1;
+            vs.lost = 0;
+        }
         if (vs.mapped) choice_frame();
+        else if (vs.lost) labels_oam();
         return;
     }
     /* the question canvas's colours, kept in BG palette 0 against the scene's palette loads */
