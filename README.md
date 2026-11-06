@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.98 — an Objection! (and the other shout bubbles drawn over the screen) over an item shown
+  in court covers the item's picture again, as 0.16.95 and 0.16.96 showed it over the empty box,
+  with the picture still in the box behind it: 0.16.97 drew the picture over the bubble and the
+  box's border under it, as the Japanese game does, which with the bubble in the middle of the
+  screen looked cut where the bubble crosses the box (episode 5, Elise's profile as Franziska
+  objects). Franziska's whip and the other effects are as in 0.16.97.
 * 0.16.97 — an item shown in court stays up while an Objection!, Franziska's whip or another
   effect that shares its sprite memory plays, as in the Japanese game, instead of stepping out of
   sight (0.16.95): for that time its picture is moved to sprite memory nothing else on the screen

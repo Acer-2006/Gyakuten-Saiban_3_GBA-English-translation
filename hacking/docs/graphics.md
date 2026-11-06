@@ -295,7 +295,18 @@ the whip, others) showed the item's picture in its own sprites for that frame. A
 sprite is the entry the game's update uses, picked as it picks it (`0x08015662`: entry 0 with
 `TXT+0x2c` 3, 72 while `0x0801e210` says so — the scenes with the life bar up, for one — else 65):
 0.16.95 and 0.16.96 took the first of 65, 72 and 0 with the item's tiles, and with the bar up
-that could be a stale, hidden 65, so the item (72) still showed the effect's picture. The DS has
+that could be a stale, hidden 65, so the item (72) still showed the effect's picture. Layering:
+the item's box is BG1 (priority 1) and the item's sprite is priority 0, before the bubble's in
+OAM; of the 29 effects only the bubbles 1–4 (Objection! and the like) are at priority 0 (the
+effect slot's byte `+0x43`), the rest at 1–3, under the box. So in the original, as on the DS,
+the picture is drawn over a bubble at priority 0 and the box's border under it; with the bubble
+centred (0.16.52) it covers only the box's lower right, and the border looks cut. Since 0.16.98
+the item's sprite is at priority 1 while such a bubble runs (and two frames after): the bubble
+covers the picture as it covers the box, as it did over the empty box in 0.16.95–0.16.96. That
+is set in the OAM shadow after the animations' update (`0x080184ac`, called at `0x0800043c`, the
+last of the vertical blank's updates to write the shadow), and in the mode-change frames'
+check; with no item up it is a few cycles at the end of the updates, so the copies that race the
+screen in a busy scene come as before. The DS has
 the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
 per-language bases, the same set for both languages), then one more and twenty pairs: the
 Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the

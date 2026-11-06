@@ -34,6 +34,16 @@
  * for tiles, which takes more, runs only as an effect starts and on the retries, so that the
  * game's own updates after this one (the life bar's tiles) still come before the screen is drawn.
  *
+ * While one of those effects runs with its sprites at priority 0 (the slot's byte +0x43: the shout
+ * bubbles 1-4, Objection! and the like; the rest are at 1-3, under the box), the item's sprite is
+ * at priority 1 (since 0.16.98): the bubble covers the picture as it covers the box (BG1, priority
+ * 1), as it did from 0.16.95 to 0.16.96 with the item hidden.  The original, its item at priority
+ * 0 and before the bubble in OAM, drew the picture over the bubble and the box's border under it.
+ * That is set in the OAM shadow once the animations have put the effects' sprites for the next
+ * frame in it (after 0x080184ac, the last of the vertical blank's updates to write the shadow;
+ * and in item_anim_copy), and for TAIL frames after.  With no item and no bubble it costs a few
+ * cycles, at the end of the updates: the copies racing the screen in a busy scene come as before.
+ *
  * States 3 and 5 wait (doing nothing that frame, the state staying) while such an effect is
  * running, or (since 0.16.89) while a sprite in the bubbles' palette uses the item's tiles, in the
  * OAM shadow or in OAM itself (a bubble stays a frame or two after its effect has gone): the item
@@ -57,6 +67,7 @@
 #define ITEM_FRAME(s) ((void (*)(volatile u8*))0x0801545d)(s)
 #define ITEM_COPY(s)  ((void (*)(volatile u8*))0x080157e1)(s)   /* unpack and copy the picture */
 #define ANIM_COPY(r)  ((void (*)(u32))0x08018135)(r)            /* animations' tiles to VRAM */
+#define ANIM_UPDATE(r) ((void (*)(u32))0x080184ad)(r)           /* animations' sprites to the shadow */
 #define LZ77_WRAM(s, d) ((void (*)(u32, u32))0x0803a049)(s, d)
 #define EFFECT_SLOT(k) ((volatile u32*)(0x0300103c - (k) * 0x44))   /* 32 slots, +0 bit 28 running */
 #define EFFECT_NUM(k)  (*(volatile u16*)(0x0300103c - (k) * 0x44 + 0xc))   /* 0xff: a character */
@@ -64,6 +75,7 @@
 #define PIC         ((volatile u32*)ITEM_PIC)      /* 2 KB: the item's picture */
 #define BACKUP      ((volatile u32*)ITEM_BACKUP)   /* 2 KB: what was in the tiles it borrows */
 #define PIC_MAGIC   0x9c17
+#define TAIL        2                              /* frames the item stays under a bubble after it */
 
 /* At ITEM_BSS; the first three as up to 0.16.96, so that save states carry over. */
 struct item_st {
@@ -76,6 +88,7 @@ struct item_st {
     u8 pic_item;
     u8 tick;
     u8 idle;                /* frames with no such effect running while the item is away */
+    u8 behind;              /* frames left with the item at priority 1, under a bubble */
 };
 _Static_assert(sizeof(struct item_st) <= 0x10, "item.c's state runs past its 16 bytes");
 #define ST (*(volatile struct item_st*)ITEM_BSS)
@@ -402,13 +415,50 @@ void item_frame(volatile u8* sys) {
     keep(sys, busy, 1);
 }
 
+/* a running effect with tiles among the item's and its sprites at priority 0 (slot byte +0x43) */
+static int bubble_up(void) {
+    volatile u32* slot = EFFECT_SLOT(0);
+    for (int k = 0; k < 32; k++, slot -= 0x44 / 4) {
+        if (!(slot[0] & (1u << 28)) || ((volatile u8*)slot)[0x43]) continue;
+        u32 n = ((volatile u16*)slot)[6];
+        if (n >= 256) continue;
+        u32 r = fx_range[n];
+        if (r && (r & 0xffff) < ITEM_TILE + ITEM_TILES && (r >> 16) > ITEM_TILE) return 1;
+    }
+    return 0;
+}
+
+/* the item's sprite (whichever of 0, 65 and 72 shows its tiles) at priority 1 while such a bubble
+   is up and TAIL frames after, else 0 as the game sets it; in the shadow, just before it goes to OAM */
+static void item_prio(void) {
+    static const u8 entries[3] = { 0, 65, 72 };
+    if (!ST.behind && !SYS[ITEM_STATE]) return;   /* no item: nothing to do */
+    if (bubble_up()) ST.behind = TAIL + 1;
+    else if (!ST.behind) return;
+    else ST.behind--;
+    u32 p = ST.behind ? 0x400 : 0;
+    for (int k = 0; k < 3; k++) {
+        int i = entries[k];
+        if (item_entry(i, OAM_SH, ITEM_TILE) || (ST.win && item_entry(i, OAM_SH, ST.win)))
+            OAM_SH[i * 4 + 2] = (OAM_SH[i * 4 + 2] & ~0xc00) | p;
+    }
+}
+
 /* in place of the animations' copy (0x08018134) where it runs without the item's update */
 void item_anim_copy(void) {
     ANIM_COPY(0);
-    if (!ST.win) return;
-    int i = item_sprite();
-    if (i < 0) return;
-    if (!window_ok(i, OAM_SH)) window_lost(i, effect_in(ITEM_TILE, ITEM_TILE + ITEM_TILES), OAM_SH);
+    if (ST.win) {
+        int i = item_sprite();
+        if (i >= 0 && !window_ok(i, OAM_SH)) window_lost(i, effect_in(ITEM_TILE, ITEM_TILE + ITEM_TILES), OAM_SH);
+    }
+    item_prio();
+}
+
+/* in place of the animations' update in the vertical blank's updates (0x0800043c), after the
+   item's: the shadow as the next frame's copy to OAM (0x08006780) will take it */
+void item_anim_update(u32 r0) {
+    ANIM_UPDATE(r0);
+    item_prio();
 }
 
 void _start(void) {}
