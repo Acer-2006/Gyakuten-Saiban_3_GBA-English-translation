@@ -256,7 +256,17 @@ the bubble (Take that! or Objection!) stays two frames longer, and the item's up
 frames; since 0.16.89 the update waits in those two states while a sprite in the bubbles'
 palette (11) uses the item's tiles, in the OAM shadow or in OAM (`src/item.c`, called in its place
 at `0x08000430` and `0x0801db9c`): the bubble goes as in the original and the item comes up two
-frames after the original's, the script running on as before. The DS has
+frames after the original's, the script running on as before. A bubble can also come while an
+item is up, and the bubbles are not the only effects in its tiles: 29 effects have pictures there
+(the bubbles 1–9, Franziska's whip 28–30 from `0x200` and others,
+worked out by the build from the animation table, `ITEM_EFFECTS`). Until 0.16.94 an Objection! or
+a whip over an item that was up wrote into the item's picture, which kept the bubble's letters or
+the whip's strokes in its own colours until it was put away (episode 5, the crystal sphere).
+Since 0.16.95, while one of those effects runs with the item up (state 4) the item's sprite is
+hidden, and once none runs and no bubble sprite is left on its tiles its picture is copied again
+(`0x080157e0`, the copy states 3 and 5 make) and the sprite shown as it was; states 3 and 5 also
+wait while such an effect runs. The item is out of sight for the effect (the original, its item
+in other tiles, shows both) and comes back whole. The DS has
 the same 123 as 64×64 16-colour textures one after another in `data.bin` (word 1 of the
 per-language bases, the same set for both languages), then one more and twenty pairs: the
 Japanese picture again and the English version of it (the Coldkiller X bottle, the Ami jar, the

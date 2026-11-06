@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.95 — an Objection! (or Franziska's whip, or another of the effects that share its sprite
+  memory) while an item is shown in court no longer writes into the item's picture: it showed the
+  bubble's letters in the item's colours until the item was put away (episode 5, the crystal
+  sphere). The item now steps out of sight while the effect plays and comes back whole after
+  it. Presenting evidence plays as before, frame for frame.
 * 0.16.94 — on that detail view, the R icon and Swap move 8 pixels left with the B / L / Back
   row under them, so R sits over B again as in the Japanese game (they had stayed put when the
   row under them moved, in 0.16.46 and 0.16.92).
