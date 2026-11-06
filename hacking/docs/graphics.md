@@ -231,6 +231,21 @@ where the panel's map (`0x0803bc44`, 32×12, columns 11–29) has tile `0x4c`:
   Opening the Record and the evidence-added pop-up go through the same loader and scroll. The
   save screen's map (`0x0803bf44`) is not touched.
 
+The panel's picture is ten 32×32 sprites, OAM 35–44 (34 is the icon, 0–1 and 45–47 the arrows
+and labels). When it slides in from the left (LEFT, and the Evidence / Profiles switch) in the
+free-slot text mode a choice puts the engine in (`TXT+0x1c` bit 2), the game swaps the shadow
+entries of the top row's cells 1–4 (36–39) with four of the dialogue's sprite-text entries
+(`0x08014ee6`–`0x08014f82`: `r7`+2, +3, +18 and +19, `r7` from the panel's position over the
+Japanese question's characters, 14 pixels apart), so that the panel comes before them in OAM and
+is drawn over them. The English question is on BG0, not sprite text, and those entries are the
+options' cells, which `src/vwf.c` writes every frame before OAM is copied: up to 0.16.99 two to
+four of the incoming panel's cells went missing for about eight frames of every such slide in a
+choice, the outgoing item's text (the panel's copy on BG2) showing through ("Irise's
+Autopsymony", "Pho Magatarght (26)"), and the options' cells moved to 36–39 showed over the panel.
+Since 0.16.100 the swap is skipped (`court_record.no_panel_swap`: the branch at `0x08014ef0`
+taken always); the options sit under the panel's top row (y 24–55) at most for two rows of a
+one-line question's first option (y 54).
+
 ### Icons
 
 The picture in the Court Record's left box, the item shown in court (top left, kept solid by

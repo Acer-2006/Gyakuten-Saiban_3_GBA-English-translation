@@ -616,3 +616,23 @@ def tall_panels(rom, ctx):
     print(f"  court record: {len(layouts)} descriptions on 160x72 pictures ({len(stored)}), "
           f"{len(four)} in four lines ({len(moved)} spaced otherwise), "
           f"narrower word gaps in {[i for i, l in layouts.items() if l[4]]}")
+
+
+# When the Record's panel slides in from the left (LEFT; in the free-slot text mode a choice puts
+# the engine in, TXT+0x1c bit 2), the game swaps the OAM shadow entries of the panel's top-row
+# cells 1-4 (36-39) with four of the dialogue's sprite-text entries (0x08014ee6-0x08014f82: r7+2,
+# r7+3, r7+18 and r7+19, r7 worked out from the panel's position over the Japanese question's
+# characters, 14 pixels apart), so that the panel comes before the characters it slides over in
+# OAM and the hardware draws it over them.  The English question is not sprite text (it is on
+# the canvas, BG0: src/vwf.c), and those entries are the options' cells, which src/vwf.c writes
+# again every frame before OAM is copied: two of the incoming panel's cells were lost each frame
+# for about eight frames of every LEFT slide in a choice, and the panel's copy behind them (the
+# outgoing item's text, on BG2) showed through ("Irise's Autopsymony").  Since 0.16.100 the swap
+# is skipped: the branch past it taken always.  The options sit under the panel's top row at
+# most for two rows of a one-line question's first option (y 54-55).
+SWAP_TEST = 0x08014ef0          # beq 0x08014f84 (TXT+0x1c bit 2 clear: no swap)
+
+def no_panel_swap(rom):
+    if rom.u16(SWAP_TEST) != 0xd048:
+        raise SystemExit("court_record: the panel's OAM swap is not where it was")
+    rom.w16(SWAP_TEST, 0xe048)     # b 0x08014f84

@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.16.100 — with the Court Record open over a choice, moving to the previous item (LEFT) or
+  between Evidence and Profiles no longer mixes two items' text in the panel sliding in ("Irise's
+  Autopsymony", "Pho Magatarght (26)") or shows bits of the options over it: part of the panel
+  went missing for about eight frames of each such slide, and the item behind it showed through.
 * 0.16.99 — with the Court Record open over a choice's question (the full-screen box: "Can I
   prove that the crystal sphere was dropped before the murder...?" in episode 5, and the others),
   the question stays in view while you move between items or between Evidence and Profiles and as
