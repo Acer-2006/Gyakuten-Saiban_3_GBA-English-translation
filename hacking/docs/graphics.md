@@ -242,7 +242,7 @@ options' cells, which `src/vwf.c` writes every frame before OAM is copied: up to
 four of the incoming panel's cells went missing for about eight frames of every such slide in a
 choice, the outgoing item's text (the panel's copy on BG2) showing through ("Irise's
 Autopsymony", "Pho Magatarght (26)"), and the options' cells moved to 36–39 showed over the panel.
-Since 0.16.100 the swap is skipped (`court_record.no_panel_swap`: the branch at `0x08014ef0`
+Since 0.17.00 the swap is skipped (`court_record.no_panel_swap`: the branch at `0x08014ef0`
 taken always); the options sit under the panel's top row (y 24–55) at most for two rows of a
 one-line question's first option (y 54).
 

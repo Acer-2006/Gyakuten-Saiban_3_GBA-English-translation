@@ -627,7 +627,7 @@ def tall_panels(rom, ctx):
 # the canvas, BG0: src/vwf.c), and those entries are the options' cells, which src/vwf.c writes
 # again every frame before OAM is copied: two of the incoming panel's cells were lost each frame
 # for about eight frames of every LEFT slide in a choice, and the panel's copy behind them (the
-# outgoing item's text, on BG2) showed through ("Irise's Autopsymony").  Since 0.16.100 the swap
+# outgoing item's text, on BG2) showed through ("Irise's Autopsymony").  Since 0.17.00 the swap
 # is skipped: the branch past it taken always.  The options sit under the panel's top row at
 # most for two rows of a one-line question's first option (y 54-55).
 SWAP_TEST = 0x08014ef0          # beq 0x08014f84 (TXT+0x1c bit 2 clear: no swap)
