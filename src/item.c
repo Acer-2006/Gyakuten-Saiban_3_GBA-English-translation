@@ -16,7 +16,8 @@
  * Since 0.16.97 the item stays up over those effects, as in the original: while one of them runs
  * (FX_RANGES, from the build: the tiles each effect takes) the item's picture is in 64 other OBJ
  * tiles that no sprite on screen and no running effect uses, from the top of the characters'
- * (0x3c0, 0x3b8, ... 0x2c0), else 0x1a0 ... 0x180, and its sprite points there.  In 0x180-0x1df
+ * (0x3c0, 0x3b8, ... 0x2c0), else 0x1a0 ... 0x180, and its sprite points there (sprites parked
+ * off the screen leave their tiles free for it since 0.17.01, see find_window).  In 0x180-0x1df
  * what was there is kept at ITEM_BACKUP and put back after, unless something else has written
  * to those tiles meanwhile (their sum); the characters' and the effects' tiles are copied again
  * before they are shown, and nothing is kept for them.  The picture comes from ITEM_PIC, a copy
@@ -221,8 +222,13 @@ static void mark(u32* used, u32 g0, u32 g1) {
     }
 }
 
-/* 64 tiles from `windows` that no sprite in `oam` (other than the item's) and no running effect
-   uses, or 0: the 8-tile blocks in use, then the first window clear of them */
+/* 64 tiles from `windows` that no sprite on the screen in `oam` (other than the item's) and no
+   running effect uses, or 0: the 8-tile blocks in use, then the first window clear of them.
+   Sprites parked off the screen do not count, as in sprite_in (since 0.17.01; up to 0.17.00 they
+   did: in a conversation from the Talk list, its boxes wait at y 180-184 on 0x1a0-0x21f and the
+   investigation's tabs at y 224 on 0x100-0x17f, and with the characters' tiles taken no window
+   was left, so Laurice's Sketch in episode 5 was hidden while Larry's angry pose, effect 238 on
+   0x1e0-0x1f3, played; what the item covers in 0x180-0x1df is kept and put back, as before) */
 static __attribute__((noinline)) u32 find_window(volatile u16* oam, int skip) {
     u32 used[4] = { 0, 0, 0, 0 };
     volatile u32* end = (volatile u32*)oam + 128 * 2;
@@ -231,7 +237,7 @@ static __attribute__((noinline)) u32 find_window(volatile u16* oam, int skip) {
         if (!(((q[0] ^ 0x200) | (q[2] ^ 0x200) | (q[4] ^ 0x200) | (q[6] ^ 0x200)) & 0x300)) continue;
         for (volatile u32* p = q; p != q + 8; p += 2) {
             u32 a = p[0];
-            if ((a & 0x300) == 0x200 || p == own) continue;
+            if ((a & 0x300) == 0x200 || p == own || off_screen(a)) continue;
             u32 t0 = p[1] & 0x3ff, n = obj_n[(a >> 11 & 0x1c) | a >> 30];
             if (n) mark(used, t0 >> 3, (t0 + n + 7) >> 3);
         }

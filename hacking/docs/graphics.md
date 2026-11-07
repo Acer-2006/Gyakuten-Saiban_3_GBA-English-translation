@@ -281,8 +281,13 @@ strokes in its own colours until it was put away (episode 5, the crystal sphere)
 original. When one of those effects starts with the item up (state 4) — its first frame is copied
 in the next vertical blank, before the item's update — the picture goes to 64 other OBJ tiles
 that no sprite on the screen and no running effect uses, from the top of the characters' tiles
-(`0x3c0`, `0x3b8`, … `0x2c0`), else `0x1a0` … `0x180`, and the sprite's attr2 points there. In
-`0x180`–`0x1df` what was there (the cross-examination's arrows and pair) is kept at EWRAM
+(`0x3c0`, `0x3b8`, … `0x2c0`), else `0x1a0` … `0x180`, and the sprite's attr2 points there.
+Sprites parked off the screen do not count as using their tiles (since 0.17.01; up to 0.17.00 they
+did: in a conversation from the Talk list its boxes wait at y 180–184 on `0x1a0`–`0x21f`, so with
+the characters' tiles taken no window was left, and Laurice's Sketch in episode 5 was hidden while
+Larry's angry pose, effect 238 on `0x1e0`–`0x1f3`, played). In
+`0x180`–`0x1df` what was there (the cross-examination's arrows and pair, the Talk list's first
+box) is kept at EWRAM
 `0x02027800` and put back after, unless something else has written to them meanwhile (their
 sum); the characters' and the effects' tiles are copied again before they are shown, and nothing
 is kept for them. The picture comes from a copy the update takes each time

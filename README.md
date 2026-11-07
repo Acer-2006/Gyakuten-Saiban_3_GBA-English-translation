@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.01 — an item put up during a conversation no longer disappears while a large animation
+  takes its graphics' place: in episode 5, Laurice's Sketch stayed blank in its box for over a
+  second while Larry's angry pose played ("Heh! I've got nothing to say to you, Nick!"). It moves
+  to other free graphics, as since 0.16.97, now including those of the Talk list's boxes while
+  they are off the screen (kept and put back after), and stays up, as in the Japanese game.
 * 0.17.00 — with the Court Record open over a choice, moving to the previous item (LEFT) or
   between Evidence and Profiles no longer mixes two items' text in the panel sliding in ("Irise's
   Autopsymony", "Pho Magatarght (26)") or shows bits of the options over it: part of the panel
