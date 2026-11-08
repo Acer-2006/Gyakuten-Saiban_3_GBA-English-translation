@@ -32,3 +32,4 @@ def apply_all(rom, ctx):
     icons.item_waits(rom, ctx)
     court_record.no_panel_swap(rom)
     court_record.detail_keeps_text(rom)
+    topics.tighten(rom, ctx)

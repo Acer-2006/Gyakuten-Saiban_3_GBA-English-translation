@@ -16,6 +16,17 @@ the fill to the lettering colour.  The lettering is an anti-aliased face that is
 game's fonts, so the English pictures are copied: every DS pixel's ink (how far its colour lies
 from the fill towards the lettering colour) is set again with the GBA ramp inside the GBA
 frame, and lettering wider than the frame is narrowed to fit.
+
+Narrowing (since 0.17.04, `tighten`, one of the last build steps): 52 of the 150 DS pictures are
+1-6 columns wider than the 122 the GBA frame has room for.  Scaling the whole line down blurs every
+stroke, so instead the extra columns are taken out one seam at a time: a path of one pixel per row
+(moving at most one column between rows) where taking the pixel out changes the least, between
+two neighbours that are alike (a blank space of 3 or more pixels, a word gap first, or the middle
+of a bar or bowl), never a thin stroke or the last blank pixel between two letters, and not beside
+an earlier seam.  The letters keep the DS's pixels; a few are a pixel narrower and the spacing a
+little tighter.  `apply` still stores the earlier, scaled pictures where they were, so that the
+data after them keeps its addresses (savestates); `tighten` adds the new ones at the end and
+points the table at them.
 """
 import os, struct, sys
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'tools'))
@@ -95,15 +106,102 @@ def fit(rows, width):
         out.append(o)
     return out
 
-def picture(orig, px, ink, levels, width=W):
-    """The GBA box `orig` (rows of indices, `width` wide) with the DS picture's lettering."""
+INK_T = 0.1                          # ink a pixel needs to count as part of a letter for the seams
+GAP_COST = {1: 8.0, 2: 2.5, 3: 0.4, 4: 0.1}    # taking a pixel out of a blank space this wide
+STROKE = 6.0                         # taking out a pixel darker than both its neighbours
+JOIN = 6.0                           # taking out a pixel lighter than both its neighbours
+REPEAT = 1.5                         # per row, within two columns of an earlier seam
+KEEP = {110: (30, 37)}               # DS columns no seam goes through: the C of "Kurain Channeling
+                                     # Technique" and the pixel after it, kept as on the DS
+
+def gaps(rows, reach=2):
+    """For each blank pixel, the width of the blank space it is in: from the nearest ink on its
+    left to the nearest on its right, in its row and `reach` rows up and down (a T's bar over a g
+    counts), leaving out rows where its own column is ink (a seam cuts that stroke there).  99 with
+    no ink on one side (before the first letter, after the last); 0 for ink."""
+    h, w = len(rows), len(rows[0])
+    ink = [[v >= INK_T for v in r] for r in rows]
+    prev, nxt = [], []
+    for y in range(h):
+        p, q, last = [-1] * w, [w] * w, -1
+        for x in range(w):
+            p[x] = last
+            if ink[y][x]: last = x
+        last = w
+        for x in range(w - 1, -1, -1):
+            q[x] = last
+            if ink[y][x]: last = x
+        prev.append(p); nxt.append(q)
+    out = [[0] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            if ink[y][x]: continue
+            lo, hi = -1, w
+            for yy in range(max(0, y - reach), min(h, y + reach + 1)):
+                if not ink[yy][x]: lo, hi = max(lo, prev[yy][x]), min(hi, nxt[yy][x])
+            out[y][x] = 99 if lo < 0 or hi >= w else hi - lo - 1
+    return out
+
+def seam(rows, near, kept):
+    """The cheapest seam (forward energy): [column of each row]."""
+    h, w = len(rows), len(rows[0])
+    def v(y, x): return rows[y][x] if 0 <= y < h and 0 <= x < w else 0.0
+    gw = gaps(rows)
+    cost = [[0.0] * w for _ in range(h)]; back = [[0] * w for _ in range(h)]
+    for y in range(h):
+        for x in range(w):
+            l, c, r = v(y, x - 1), v(y, x), v(y, x + 1)
+            e = abs(r - l)
+            e += STROKE * max(0.0, c - max(l, r)) + JOIN * max(0.0, min(l, r) - c)
+            e += GAP_COST.get(gw[y][x], 0.0)
+            if near[y][x]: e += REPEAT
+            e += 0.001
+            if kept[y][x]: e += 1e6
+            if y == 0:
+                cost[y][x] = e; continue
+            u = v(y - 1, x)
+            best = (cost[y - 1][x] + e, x)
+            if x > 0: best = min(best, (cost[y - 1][x - 1] + e + abs(u - l), x - 1))
+            if x < w - 1: best = min(best, (cost[y - 1][x + 1] + e + abs(u - r), x + 1))
+            cost[y][x], back[y][x] = best
+    x = min(range(w), key=lambda i: cost[-1][i])
+    path = [x]
+    for y in range(h - 1, 0, -1):
+        x = back[y][x]; path.append(x)
+    return path[::-1]
+
+def fit_seams(rows, width, keep=None):
+    """Crop to the inked columns; take seams out until `width` wide (see the module notes).
+    `keep`: (first, last) column of `rows` that no seam may go through."""
+    cols = [x for x in range(len(rows[0])) if any(r[x] > 0 for r in rows)]
+    if not cols: return [[] for _ in rows]
+    src = [list(range(len(rows[0]))) for _ in rows]      # each pixel's column in `rows`
+    near = [[0] * len(rows[0]) for _ in rows]
+    def crop(a, b):
+        return [r[a:b] for r in rows], [s[a:b] for s in src], [n[a:b] for n in near]
+    rows, src, near = crop(cols[0], cols[-1] + 1)
+    while len(rows[0]) > width:
+        kept = [[keep is not None and keep[0] <= x <= keep[1] for x in s] for s in src]
+        path = seam(rows, near, kept)
+        rows = [r[:c] + r[c + 1:] for r, c in zip(rows, path)]
+        src = [s[:c] + s[c + 1:] for s, c in zip(src, path)]
+        near = [n[:c] + n[c + 1:] for n, c in zip(near, path)]
+        for n, c in zip(near, path):
+            for x in range(max(0, c - 2), min(len(n), c + 2)): n[x] = 1
+        cols = [x for x in range(len(rows[0])) if any(r[x] > 0 for r in rows)]
+        rows, src, near = crop(cols[0], cols[-1] + 1)
+    return rows
+
+def picture(orig, px, ink, levels, width=W, fitter=None):
+    """The GBA box `orig` (rows of indices, `width` wide) with the DS picture's lettering, fitted
+    by `fitter(rows, width)` (scaled down by `fit` if not given)."""
     x1 = width - 4 if width != W else X1
     g = [r[:] for r in orig]
     for y in range(Y0, Y1 + 1):                          # clear the Japanese lettering
         for x in range(X0 - 1, x1 + 2):
             if (y, x) != (Y1, x1 + 1): g[y][x] = FILL
     rows, top = lettering(px, ink)
-    rows = fit(rows, x1 - X0 + 1)
+    rows = (fitter or fit)(rows, x1 - X0 + 1)
     used = [i for i, r in enumerate(rows) if any(v > 0 for v in r)]
     if not used: raise ValueError('empty picture')
     w = len(rows[used[0]])
@@ -139,3 +237,27 @@ def apply(rom, ctx):
         if blob not in stored: stored[blob] = rom.store(blob, 'ext', 4, f'topic {k}')
         rom.w32(TABLE + 4 * k, stored[blob])
     print(f"  topics: {TOPICS} talk topics and {PLACES} places in English")
+
+def tighten(rom, ctx):
+    """Store the pictures whose lettering is wider than the frame again, fitted by seams instead of
+    scaled, and point the table at them (see the module notes)."""
+    d, arm9 = ctx.data, ctx.arm9
+    places_jp, places_en, _, topics_jp, topics_en, _ = struct.unpack_from('<6I', arm9, DS_BASES - DS_ARM9)
+    size = dsimgtext.texture_size(d, topics_en)
+    levels = ramp_gba(rom)
+    stored, n = {}, 0
+    for k in range(TOPICS + PLACES):
+        src = topics_en + k * size if k < TOPICS else places_en + (k - TOPICS) * size
+        px, w, h, pal = dsimgtext.texture(d, src)
+        ink = ink_ds(pal)
+        rows, _ = lettering(px, ink)
+        cols = [x for x in range(W) if any(r[x] > 0 for r in rows)]
+        if cols[-1] - cols[0] + 1 <= X1 - X0 + 1: continue        # fits: as before
+        jp = struct.unpack_from('<I', ctx.gba, TABLE - 0x08000000 + 4 * k)[0]
+        data, _ = lz.decompress(ctx.gba, jp - 0x08000000)                     # the Japanese box
+        keep = KEEP.get(k)
+        g = picture(unpack(data), px, ink, levels, fitter=lambda r, wd: fit_seams(r, wd, keep))
+        blob = lz.compress(pack(g))
+        if blob not in stored: stored[blob] = rom.store(blob, 'ext', 4, f'topic {k} (seams)')
+        rom.w32(TABLE + 4 * k, stored[blob]); n += 1
+    print(f"  topics: {n} pictures fitted without scaling")

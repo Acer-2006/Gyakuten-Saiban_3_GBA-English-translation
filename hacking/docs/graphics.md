@@ -397,7 +397,15 @@ before that (`0x020b2498`) are the 128×128 8bpp place thumbnails. In the DS pic
 the fill and 4–15 a ramp from the fill to the lettering. The English lettering is an
 anti-aliased face that is not in either game's fonts, so the build copies the pictures: it takes
 each pixel's ink (how far its colour is from the fill towards the lettering colour) and sets it
-again with the GBA ramp inside the GBA frame, narrowing lettering wider than 122 pixels.
+again with the GBA ramp inside the GBA frame. 52 of the DS pictures are 1–6 pixels wider than the
+122 the frame has room for. Up to 0.17.03 those were scaled down, which blurred every stroke;
+since 0.17.04 the extra columns are taken out as seams, one pixel per row, where the two
+neighbours are alike (a word gap first, a gap of 3 pixels or more, the middle of a bar or a
+bowl), never through a thin stroke or the last pixel between two letters, and not next to an
+earlier seam, so the letters keep the DS's pixels (`patches/topics.py`, `tighten`; the C of
+"Kurain Channeling Technique" is kept out of the seams' way, `KEEP`). The scaled pictures are
+still stored where they were and the table points at the new ones, added at the end of the
+build, so that nothing after them moves.
 
 ## Episode-select screen
 

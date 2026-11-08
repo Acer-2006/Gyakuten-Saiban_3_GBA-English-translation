@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.04 — the Talk topics and Move places whose English name is wider than the box (52 of
+  150, "Kurain Channeling Technique", "The night of the crime", "Criminal Affairs Dept." and so
+  on) are no longer shrunk as a whole, which blurred every letter: a pixel or a few are taken
+  out of the spaces and of flat parts of letters instead, so the letters are the DS's, as sharp
+  as the names that fit. The other 98 boxes and everything else are unchanged.
 * 0.17.03 — the text an item's detail view keeps aside (0.17.02) is now kept in memory the game
   never uses: it sat over a scratch area where the game unpacks backgrounds, which closing the
   view can do, so with some backgrounds the line could have come back wrong. Nothing else changes.
