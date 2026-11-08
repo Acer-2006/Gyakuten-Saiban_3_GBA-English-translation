@@ -636,3 +636,97 @@ def no_panel_swap(rom):
     if rom.u16(SWAP_TEST) != 0xd048:
         raise SystemExit("court_record: the panel's OAM swap is not where it was")
     rom.w16(SWAP_TEST, 0xe048)     # b 0x08014f84
+
+
+# An item's detail view (L in the Court Record) is a step routine of its own (0x08013a14, steps
+# 0-10).  Two kinds of item copy pictures to the first OBJ tiles: the Hanging Scroll covered in
+# gravy (item 173, detail 0x1c, R Swap above B L Back; ui.py, SWAP) its Swap prompt to tiles
+# 0x00-0x07 and the button icon sheet to 0x08-0x17 (step 1, 0x08013e9a: two 16-bit DMAs, done
+# again each time R swaps the scrolls, step 6 to step 1), and items 202 and 203 (detail 0x21 and
+# 0x22) a mark to tile 0x00 (the end of step 0, 0x08013dfc).  In the original those tiles hold the
+# page's first characters (16x16 sprites, four tiles each), which the game draws again from its
+# sprite records as the view closes (step 10, 0x08014464: 0x08020024).  In the English build they
+# are the first three 32x16 cells of the page's first line (src/vwf.c), which the records do not
+# hold: up to 0.17.01 the Swap prompt and the icons took the place of the line's first words
+# ("The painting is obscured by..." in Bikini's Psyche-Lock), and the map's mark left a dot before
+# them, under the Court Record and after it had closed, until the page was over.  Since 0.17.02
+# the tiles are kept as the view opens, at the end of step 0 (its call to the B / L / Back row's
+# placement, 0x08015170, which comes once a view and before both copies), and put back as it
+# closes, after the game's own redraw (DETAIL_FLAG holds DETAIL_MAGIC while DETAIL_KEEP holds
+# them; anything else there, as from a save state made with an earlier build during the view,
+# puts nothing back).  Step 0 also hides OAM entries 0-31, the original's sprite text, for the
+# view; the English renderer writes a choice's options into its entries every frame, so up to
+# 0.17.01 they were drawn over the picture at a choice.  Since 0.17.02 the view opening also calls
+# vwf_overlay, as the save screen does, which keeps the page's sprite text hidden until
+# vwf_restore, which the view's closing already calls (RESTORE_CALLS).
+DETAIL_OPEN  = 0x08013d7e       # bl 0x08015170 (r0 = 1), the end of the detail view's step 0
+DETAIL_ROW   = 0x08015170
+DETAIL_CLOSE = 0x08014464       # bl to the restore trampoline (patches/text.py, RESTORE_CALLS)
+DETAIL_TILES = 0x18             # OBJ tiles 0x00-0x17
+DETAIL_KEEP  = 0x0202b000       # 768 bytes, in the chapter bank's buffer (free: memory-map.md)
+DETAIL_FLAG  = 0x0202b300
+DETAIL_MAGIC = 0x4c494554
+
+def detail_keeps_text(rom):
+    """The build's last step: the page's first tiles kept over an item's detail view."""
+    from .icons import thumb_bl_target
+    if thumb_bl_target(rom, DETAIL_OPEN) != DETAIL_ROW:
+        raise SystemExit("court_record: the detail view's B / L row is not placed where it was")
+    if thumb_bl_target(rom, DETAIL_CLOSE) != rom.restore_tramp & ~1:
+        raise SystemExit("court_record: the detail view does not close where it did")
+    words = DETAIL_TILES * 32 // 4
+    keep = rom.thumb_code(f'''
+        push {{r0, lr}}
+        ldr r1, k_dma
+        ldr r2, k_vram
+        str r2, [r1]
+        ldr r2, k_keep
+        str r2, [r1, #4]
+        ldr r2, k_ctl
+        str r2, [r1, #8]
+        ldr r2, [r1, #8]
+        ldr r1, k_flag
+        ldr r2, k_magic
+        str r2, [r1]
+        bl #{rom.syms["vwf_overlay"] & ~1:#x}
+        pop {{r0}}
+        bl #{DETAIL_ROW:#x}
+        pop {{pc}}
+        .align 2
+    k_dma:   .word 0x040000d4
+    k_vram:  .word 0x06010000
+    k_keep:  .word {DETAIL_KEEP:#x}
+    k_ctl:   .word {0x84000000 | words:#x}
+    k_flag:  .word {DETAIL_FLAG:#x}
+    k_magic: .word {DETAIL_MAGIC:#x}
+    ''', note='detail view: the page\'s first tiles kept')
+    back = rom.thumb_code(f'''
+        push {{lr}}
+        bl #{rom.restore_tramp & ~1:#x}
+        ldr r3, b_flag
+        ldr r2, [r3]
+        ldr r1, b_magic
+        cmp r2, r1
+        bne b_done
+        movs r1, #0
+        str r1, [r3]
+        ldr r1, b_dma
+        ldr r2, b_keep
+        str r2, [r1]
+        ldr r2, b_vram
+        str r2, [r1, #4]
+        ldr r2, b_ctl
+        str r2, [r1, #8]
+        ldr r2, [r1, #8]
+    b_done:
+        pop {{pc}}
+        .align 2
+    b_dma:   .word 0x040000d4
+    b_vram:  .word 0x06010000
+    b_keep:  .word {DETAIL_KEEP:#x}
+    b_ctl:   .word {0x84000000 | words:#x}
+    b_flag:  .word {DETAIL_FLAG:#x}
+    b_magic: .word {DETAIL_MAGIC:#x}
+    ''', note='detail view: the page\'s first tiles put back')
+    rom.hook_bl(DETAIL_OPEN, keep, 'detail view opens: the page\'s first tiles kept')
+    rom.hook_bl(DETAIL_CLOSE, back, 'detail view closes: the page\'s first tiles put back')

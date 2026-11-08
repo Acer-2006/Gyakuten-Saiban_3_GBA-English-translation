@@ -110,6 +110,12 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.02 — looking at an item's details in the Court Record (L) no longer leaves bits of that
+  screen in the text: after the gravy-covered Hanging Scroll, its Swap prompt and button icons took
+  the place of the start of the line ("The painting is obscured by..." in Bikini's Psyche-Lock in
+  episode 5), and after the Hazakura Temple Map a small dot sat before it, until the next line.
+  At a choice, the answers are no longer drawn over the item's picture while you look at it. Both
+  as in the Japanese game.
 * 0.17.01 — an item put up during a conversation no longer disappears while a large animation
   takes its graphics' place: in episode 5, Laurice's Sketch stayed blank in its box for over a
   second while Larry's angry pose played ("Heh! I've got nothing to say to you, Nick!"). It moves
