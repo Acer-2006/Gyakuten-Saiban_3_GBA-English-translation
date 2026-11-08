@@ -659,12 +659,19 @@ def no_panel_swap(rom):
 # 0.17.01 they were drawn over the picture at a choice.  Since 0.17.02 the view opening also calls
 # vwf_overlay, as the save screen does, which keeps the page's sprite text hidden until
 # vwf_restore, which the view's closing already calls (RESTORE_CALLS).
+# The kept tiles are in the chapter bank's buffer, which the English build's banks do not use
+# (memory-map.md), after BOX_EDGES (0x0202a800-0x0202a877).  In 0.17.02 they were at
+# 0x0202b000-0x0202b303, over the original's own scratch buffer at 0x0202b1c0, where the
+# background loader (0x08003ccc, case 0x08003ea8: SYS+0x258 2, 3 or 7) unpacks a picture before
+# copying it to VRAM; the view's closing reloads the scene's background through that loader (step
+# 3, 0x08014172), so with such a background the kept tiles and the flag could have been written
+# over before step 10 put them back.  No scene was seen to take that case with a detail view open.
 DETAIL_OPEN  = 0x08013d7e       # bl 0x08015170 (r0 = 1), the end of the detail view's step 0
 DETAIL_ROW   = 0x08015170
 DETAIL_CLOSE = 0x08014464       # bl to the restore trampoline (patches/text.py, RESTORE_CALLS)
 DETAIL_TILES = 0x18             # OBJ tiles 0x00-0x17
-DETAIL_KEEP  = 0x0202b000       # 768 bytes, in the chapter bank's buffer (free: memory-map.md)
-DETAIL_FLAG  = 0x0202b300
+DETAIL_KEEP  = 0x0202a900       # 768 bytes (0x0202a900-0x0202abff), clear of 0x0202b1c0
+DETAIL_FLAG  = 0x0202ac00
 DETAIL_MAGIC = 0x4c494554
 
 def detail_keeps_text(rom):

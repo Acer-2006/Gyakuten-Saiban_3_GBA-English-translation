@@ -110,6 +110,9 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.03 — the text an item's detail view keeps aside (0.17.02) is now kept in memory the game
+  never uses: it sat over a scratch area where the game unpacks backgrounds, which closing the
+  view can do, so with some backgrounds the line could have come back wrong. Nothing else changes.
 * 0.17.02 — looking at an item's details in the Court Record (L) no longer leaves bits of that
   screen in the text: after the gravy-covered Hanging Scroll, its Swap prompt and button icons took
   the place of the start of the line ("The painting is obscured by..." in Bikini's Psyche-Lock in
