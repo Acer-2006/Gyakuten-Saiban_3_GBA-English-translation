@@ -110,6 +110,11 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.05 — Dahlia's breakdown at the end of episode 5: as the screen darkened after her scream,
+  bands of broken tiles showed behind her instead of the witness stand (a background command the
+  English DS script lacks; put back, the scene now plays as in the Japanese game). The episode
+  select's "Episode n" no longer turns grey and flat when the arrows come back after a scroll:
+  it keeps the DS's white with a black outline the whole time.
 * 0.17.04 — the Talk topics and Move places whose English name is wider than the box (52 of
   150, "Kurain Channeling Technique", "The night of the crime", "Criminal Affairs Dept." and so
   on) are no longer shrunk as a whole, which blurred every letter: a pixel or a few are taken

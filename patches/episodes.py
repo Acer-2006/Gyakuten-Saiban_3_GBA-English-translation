@@ -309,3 +309,40 @@ def apply(rom, ctx):
         rom.w32(e + 4, 0x06010000 + 32 * LABEL_TILE)
         rom.write(e + 17, bytes([len(LABEL_SPRITES)]), 'episode label sprites')
     print(f"  episode select: the GBA boxes with the DS titles ({', '.join(titles)}), the DS labels")
+
+ARROW_FRAMES = [0x086def70, 0x086defd0]          # effects 26, 27: the arrows beside the label
+
+def arrows_keep_label_palette(rom, ctx):
+    """One of the last build steps (0.17.05).  The arrows (effects 26 and 27) are in the label's
+    sub-archive, and each time they start its two palettes go to OBJ palettes 13 (the label's)
+    and 14 (theirs).  The English label has its own sub-archive with the DS colours, loaded to
+    palette 13 when it starts, so whenever the arrows came back after a scroll they put the
+    Japanese label's greys back in 13 and the English label turned grey and flat until the next
+    scroll (the Japanese label looks the same throughout).  The arrows now have a copy of their
+    sub-archive whose first palette is the DS label's colours, so the label keeps them, as on the
+    DS; the arrows' own palette and pictures are as before."""
+    _, pal = label_pictures(ctx.data)
+    sa = sub_archive(rom, LABEL_SUB)
+    if sa['npal'] != 2: raise SystemExit('episodes: unexpected label sub-archive')
+    arrow_pal = list(struct.unpack_from('<16H', sa['pals'], 32))
+    cells, frames = [], {}
+    for fp in ARROW_FRAMES:
+        sub, fl, defs = read_frames(rom, fp)
+        if sub != LABEL_SUB: raise SystemExit(f'episodes: unexpected arrow frame data at {fp:#x}')
+        new = {}
+        for off, sp in defs.items():
+            out = []
+            for x, y, w, h, c, attr in sp:
+                data = rle16(unrle16(rom.d, sa['cells'][c] - 0x08000000, w * h // 2))
+                if data not in cells: cells.append(data)
+                out.append((x, y, w, h, cells.index(data), attr))
+            new[off] = out
+        frames[fp] = write_frames(fl, new)
+    arch = rom.store(dspic.write_sub(2, sa['flag'], [[0] + pal[1:], arrow_pal], cells), 'ext', 4,
+                     'episode arrows')
+    entries = effect_entries(rom, ARROW_FRAMES)
+    if len(entries) != len(ARROW_FRAMES): raise SystemExit('episodes: unexpected arrow effects')
+    stored = {fp: rom.store(b, 'ext', 4, 'episode arrow frames') for fp, b in frames.items()}
+    for e in entries:
+        rom.w32(e, arch); rom.w32(e + 8, stored[rom.u32(e + 8)])
+    print("  episode select: the arrows keep the label's DS colours")

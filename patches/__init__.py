@@ -33,3 +33,4 @@ def apply_all(rom, ctx):
     court_record.no_panel_swap(rom)
     court_record.detail_keeps_text(rom)
     topics.tighten(rom, ctx)
+    episodes.arrows_keep_label_palette(rom, ctx)

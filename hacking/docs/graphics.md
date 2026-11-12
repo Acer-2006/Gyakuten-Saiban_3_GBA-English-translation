@@ -441,6 +441,15 @@ Episode and the digit, 96×24 in six sprites (three 32×16 over three 32×8) at 
 titles read from the DS common bank (the sections the save screen uses: two centred lines, the
 episode title and the part) check that each box is the episode it should be.
 
+The label and the arrows share OBJ palette 13: the arrows' sub-archive (the label's, `0x9ca0`) has
+two palettes, the label's and the arrows', loaded to 13 and 14 each time the arrows start. Up to
+0.17.04 the English label's DS colours were loaded to 13 only while it slid in after a scroll,
+and when the arrows came back they put the Japanese label's greys there again, so "Episode n" was
+grey and flat at rest and white with a black outline while scrolling. Since 0.17.05 the arrows have
+a copy of the sub-archive whose first palette is the DS label's (`episodes.py`,
+`arrows_keep_label_palette`, one of the last build steps): the label keeps the DS colours, as on
+the DS.
+
 ## Save screen
 
 START during an investigation opens it; common-bank section 0 or 1 asks the question, and the

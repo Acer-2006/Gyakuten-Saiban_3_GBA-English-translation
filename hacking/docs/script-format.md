@@ -306,8 +306,8 @@ Two commands differ between the versions:
   scene plays frame for frame as in the Japanese game. Checked at the same time against the
   Japanese GBA and the DS, and left as the DS has them: the other GBA animations the DS dropped
   (a step of the flashback's film scratches in 25 `0x80` and 38 `0x9d`, one of the shakes as
-  Larry shouts in 27 `0x96`), which change nothing visible, and a second `{55 3 4}` in 38 `0x9d`
-  (the same background again: the next line starts a few frames later, nothing else).
+  Larry shouts in 27 `0x96`), which change nothing visible. A second `{55 3 4}`, in 38 `0x9d`,
+  was left out then too as the same background again; it was not (fix level 11, below).
 * Valerie's picture in Dahlia's testimony in episode 4 (0.16.58, fix level 9, `RESTORE9`; bank 25
   section `0xac`): after "...a raw diamond." the GBA and the Japanese DS fade the old photo to
   Valerie on the bridge (`{6b 6d 2 0}{69 307 200}`, then two pauses). The English DS rewrote that
@@ -325,6 +325,16 @@ Two commands differ between the versions:
   English build side by side and counting the text typed while the screen was fully faded; no
   other section types more of it than the Japanese game (episode 5's first part has the same
   pattern in bank 27 section `0x81`, where the white flash before it leaves the screen visible).
+* Dahlia's breakdown at the end of episode 5's last trial (0.17.05, fix level 11, `RESTORE11`;
+  bank 38 section `0x9d`, her scream "AAAA...", then "...I'M... NOT... READY..."): as the scream
+  starts, the GBA sets the witness stand again with `{55 3 4}` after `{1b 3}{0e b00}`. The
+  English DS script has no such command there, and when the next page loads the background of
+  her breakdown (`{1b 96}`) while the stand fades to black, the screen showed bands of broken
+  tiles behind her instead of the stand, dark speckles as it went dark. Put back after the
+  `{0e b00}` it follows on the GBA; the stand fades out whole as in the Japanese game, a frame or
+  two later (the English DS script's own short pauses on that page; checked by running the scene
+  from the same point in both). The section's earlier version
+  stays where it was, so a savestate made inside it still plays (without the fix) to its end.
 * Sections keep their place from build to build (0.16.38): a savestate holds the script
   pointer and its section's start as addresses. Fixes to the conversion are numbered
   (`FIX_LEVEL` in `tools/convert_script.py`; level 0 is the conversion of 0.16.37); a bank is

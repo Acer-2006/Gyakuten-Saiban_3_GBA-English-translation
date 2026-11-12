@@ -118,7 +118,15 @@ MARKER_CMDS = {0x39, 0x3a, 0x3c}
 #     needs no such command there and the English DS script has none, so the screen stayed black
 #     and the flashback's lines went by over it, the box as dark as the rest.  It goes back after
 #     the {5f 3 1 1f} it follows on the GBA (RESTORE10).
-FIX_LEVEL = 10
+#  11 (0.17.05): Dahlia's breakdown at the end of episode 5's last trial (bank 38 section 0x9d,
+#     "AAAA...", then "...I'M... NOT... READY..."): as her scream starts, the GBA sets the witness
+#     stand again with {55 3 4} (a background change with a transition, SYS+0x258).  The English
+#     DS script has no such command there, and when the next page loads the background of her
+#     breakdown ({1b 96}) while the stand fades to black, the screen showed bands of broken tiles
+#     behind her instead of the stand (dark speckles as it went dark).  With it the stand fades out
+#     whole as in the Japanese game (a frame or two later: the English DS script's own short
+#     pauses on that page).  Put back after the {0e b00} it follows on the GBA (RESTORE11).
+FIX_LEVEL = 11
 # fix level 7: section (bank, GBA number) -> the GBA's commands put back there, where the GBA has
 # them (each one the GBA has and the conversion did not keep)
 RESTORE7 = {(28, 0xcd): {(0x52, (2,))}, (35, 0xf9): {(0x52, (2,))},
@@ -135,11 +143,13 @@ RESTORE8 = {(36, 0xa7): {(0x55, (6, 4))}}
 RESTORE9 = {(25, 0xac): {(0x6b, (0x6d, 2, 0)): (0x0c, (0x10,)), (0x69, (0x307, 0x200)): (0x0c, (0x10,))}}
 # fix level 10, as fix level 7
 RESTORE10 = {(32, 0x80): {(0x12, (0x100, 0, 0x1f))}}
+# fix level 11, as fix level 7
+RESTORE11 = {(38, 0x9d): {(0x55, (3, 4))}}
 def restore_for(b, s):
     """(bank, GBA section number) -> {(command, arguments): (the fix level that puts it back, the
     English DS command it goes after, or None for after the command it follows on the GBA)}"""
     out = {}
-    for lv, table in ((10, RESTORE10), (9, RESTORE9), (8, RESTORE8), (7, RESTORE7)):
+    for lv, table in ((11, RESTORE11), (10, RESTORE10), (9, RESTORE9), (8, RESTORE8), (7, RESTORE7)):
         t = table.get((b, s), ())
         for it in t: out[it] = (lv, t[it] if isinstance(t, dict) else None)
     return out
