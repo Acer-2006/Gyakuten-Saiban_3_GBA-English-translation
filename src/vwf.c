@@ -543,13 +543,23 @@ static void labels_reset(void) {
    closes up a pixel a letter gap, two if one is not enough, as a page's line does; each line by
    itself, as on a page (cap_sq). */
 #define CAP_FIT (TEXT_X0 + TEXT_MAXW - 9)
+/* The staff roll's voice credits (free-slot pages, command 0x48 x y): the engine puts a page at
+   x 23 + x, and the English DS script has the DS's x, where the DS draws the page with no such
+   margin, its longest line ending at the DS screen's edge.  Beside the character on the left
+   ("Phoenix Wright", "Ben "Gromin" Judd", "Miles Edgeworth", "Christina Katano") the last
+   letters ran past the GBA's right edge.  Since 0.17.06 a page goes at the DS's x, or at 23 if
+   that is less (the pages on the left, at 0, stay where they were), and a line still wider than
+   the room to x 238 closes up a pixel a letter gap, two if one is not enough, as a caption's
+   does: lbl_fx is the page's x less 9 (a caption's x, which CAP_FIT counts from), 0 on any other
+   page.  (In the English script only these three pages have an x other than 0; bank 42, which
+   the English build leaves in Japanese, chapter 23's, has others.) */
 static void line_done(int L, int w, int lead, int n) {
     if (L < 0 || L >= LBL_LINES) return;
     int trim = 0;
     if (w > LBL_FIT) { trim = w - LBL_FIT; if (trim > lead) trim = lead; }
     w -= trim;
     int sq = 0;
-    if (n > 1) while (w - sq * (n - 1) > (vs.lbl_caption ? CAP_FIT : OPT_FIT) && sq < 2) sq++;
+    if (n > 1) while (w + vs.lbl_fx - sq * (n - 1) > (vs.lbl_caption ? CAP_FIT : OPT_FIT) && sq < 2) sq++;
     if (vs.lbl_caption) { vx.cap_sq[L] = sq; w -= sq * (n - 1); }
     else if (sq > vx.lbl_sq) vx.lbl_sq = sq;
     vs.lbl_full[L] = w > 255 ? 255 : w;
@@ -596,7 +606,8 @@ static void label_draw_char(u32 code, int col, int row) {
         vs.lbl_sys = (sec <= 1 || sec == 3 || sec == 4 || (sec >= 6 && sec <= 31));
         vs.lbl_align = TXT_ALIGN & 0xf;
         vs.lbl_free = (TXT_FLAGS & 4) ? 1 : 0;
-        vs.lbl_fx = TXT_OFSX; vs.lbl_fy = TXT_OFSY;
+        { int fx = TXT_OFSX; if (fx < 23) fx = 23; vs.lbl_fx = vs.lbl_free ? fx - 9 : 0; }   /* see line_done */
+        vs.lbl_fy = TXT_OFSY;
         for (int i = 0; i < LBL_LINES; i++) { vs.lbl_full[i] = 0; vx.lbl_trim[i] = 0; }
         vx.lbl_sq = 0;
         vs.lbl_rows = page_scan((const u16*)TXT_PTR, code, row);
@@ -798,8 +809,8 @@ static void labels_oam(void) {
             y = (vs.lbl_rows > 2 || box_open()) ? TEXT_Y0 + L * BOX_PITCH : 116 + L * 18;
             if (vs.lbl_free) {
                 /* free-slot mode (the staff roll): the records hold 14 + 14 * column + x offset,
-                   36 + 18 * row + y offset, and the writer adds 9 to x */
-                x = 23 + vs.lbl_fx;
+                   36 + 18 * row + y offset, and the writer adds 9 to x (x: see line_done) */
+                x = 9 + vs.lbl_fx;
                 y = 36 + L * 18 + vs.lbl_fy;
                 if (vs.lbl_sys) y -= 64;
             } else if (vs.lbl_sys) {

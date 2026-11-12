@@ -110,6 +110,10 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.06 — the voice credits at the end of episode 5 beside Phoenix, Edgeworth and Mia ran off
+  the right edge of the screen ("Phoenix Wrigh", "Ben "Gromin"", "Miles Edgewor", "Christina
+  Kata"): they now start where the DS has them, and "Ben "Gromin" Judd" closes up a pixel a
+  letter to fit. Every name shows in full.
 * 0.17.05 — Dahlia's breakdown at the end of episode 5: as the screen darkened after her scream,
   bands of broken tiles showed behind her instead of the witness stand (a background command the
   English DS script lacks; put back, the scene now plays as in the Japanese game). The episode

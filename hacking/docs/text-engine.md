@@ -151,7 +151,11 @@ out. Where the engine puts them:
   (14 + 14 · column + `TXT+0x4c`, 36 + 18 · row + `TXT+0x4d`; the writer adds 9 to x) and the
   records are taken from 32 on. The staff roll at the end of the game is shown this way, with
   the offsets set by command `0x48 x y` (`x = 0xffff` puts 0 in both and sets bit 9 of
-  `0x03003ada`).
+  `0x03003ada`). The English renderer puts such a page at x 23 + x as well, except where the
+  English script has the DS's x (episode 5's voice credits beside a character on the left,
+  `0x48 0x68 0x14`): the DS draws those with no margin, the longest line ending at its screen's
+  edge, so since 0.17.06 they go at the DS's x (23 at least), and a line still wider than the
+  room to x 238 closes up a pixel a letter gap, as a caption's does (`src/vwf.c`, `line_done`).
 
 Command `0x42 0` (bit 2 of `SYS+0x25c`) is used for every line shown without the text box:
 captions, the episode-select prompt (common section 2), phone calls and voices over a black
