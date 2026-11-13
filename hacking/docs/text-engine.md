@@ -156,6 +156,9 @@ out. Where the engine puts them:
   `0x48 0x68 0x14`): the DS draws those with no margin, the longest line ending at its screen's
   edge, so since 0.17.06 they go at the DS's x (23 at least), and a line still wider than the
   room to x 238 closes up a pixel a letter gap, as a caption's does (`src/vwf.c`, `line_done`).
+  The engine does not centre a free-slot page; the English renderer centres one with command
+  `0x5d` (since 0.17.07: the "Voice" heading before those credits, which the DS centres and the
+  Japanese pads with spaces).
 
 Command `0x42 0` (bit 2 of `SYS+0x25c`) is used for every line shown without the text box:
 captions, the episode-select prompt (common section 2), phone calls and voices over a black

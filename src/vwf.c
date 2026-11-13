@@ -818,11 +818,12 @@ static void labels_oam(void) {
                    English lines are centred, as on the DS, and a little lower and closer
                    together, clear of the DS header above them (patches/ui.py) */
                 y = SYS_Y0 + L * LINE_H;
-                x = (240 - fw) / 2;
-            } else if (vs.lbl_align) {
-                x = (240 - fw) / 2;
-                if (vs.lbl_align == 2) y = (vs.lbl_low ? 71 : CAP_Y0) + L * CAP_PITCH;
-            }
+            } else if (vs.lbl_align == 2) y = (vs.lbl_low ? 71 : CAP_Y0) + L * CAP_PITCH;
+            /* centred: those, and any page with command 0x5d (alignment 1 or 2), a free-slot one
+               too since 0.17.07 (the English script's "Voice" heading before the staff roll's
+               voice credits, centred on the DS and, with spaces, in the Japanese; the engine
+               does not centre free-slot pages, and it sat at x 23) */
+            if (vs.lbl_align || (vs.lbl_sys && !vs.lbl_free)) x = (240 - fw) / 2;
             if (x < 0) x = 0;
         }
         if (L == 2 && ((vs.l3_lent && !vx.l3_tile) || (lbl_tile(2, 0) == 0x80 && icon_up()))) ncells = 0;

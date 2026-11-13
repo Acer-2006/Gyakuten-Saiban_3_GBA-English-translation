@@ -110,6 +110,8 @@ samples, find cross references, plus a headless mGBA harness for tracing. See
 
 ## Version history
 
+* 0.17.07 — the "Voice" heading before the voice credits at the end of episode 5 is centred, as on
+  the DS and in the Japanese game; it sat on the left.
 * 0.17.06 — the voice credits at the end of episode 5 beside Phoenix, Edgeworth and Mia ran off
   the right edge of the screen ("Phoenix Wrigh", "Ben "Gromin"", "Miles Edgewor", "Christina
   Kata"): they now start where the DS has them, and "Ben "Gromin" Judd" closes up a pixel a
